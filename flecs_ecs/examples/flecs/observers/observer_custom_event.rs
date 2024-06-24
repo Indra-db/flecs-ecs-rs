@@ -36,7 +36,7 @@ fn main() {
         .event()
         .add::<Position>()
         .target(entity)
-        .emit(&MyEvent);
+        .emit(&mut MyEvent);
 
     // Output:
     //  - MyEvent: Position: e1

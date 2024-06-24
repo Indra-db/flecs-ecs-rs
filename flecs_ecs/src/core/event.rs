@@ -182,7 +182,7 @@ impl<'a, T: ComponentId> EventBuilder<'a, T> {
         self
     }
 
-    pub fn emit(&mut self, data: &T) {
+    pub fn emit(&mut self, data: &mut T) {
         let ids = &mut self.ids;
         let ids_array = &mut self.ids_array;
         let desc = &mut self.desc;

@@ -2147,7 +2147,7 @@ impl<'a> EntityView<'a> {
     /// * C++ API: `entity_view::emit`
     #[doc(alias = "entity_view::emit")]
     pub unsafe fn emit_id(self, event: impl Into<Entity>) {
-        self.world().event_id(event).target(self).emit(&());
+        self.world().event_id(event).target(self).emit(&mut ());
     }
 
     /// Emit event with an immutable payload for entity.
@@ -2160,7 +2160,7 @@ impl<'a> EntityView<'a> {
     ///
     /// * C++ API: `entity_view::emit`
     #[doc(alias = "entity_view::emit")]
-    pub fn emit<T: ComponentId>(self, event: &T) {
+    pub fn emit<T: ComponentId>(self, event: &mut T) {
         self.world().event().target(self).emit(event);
     }
 

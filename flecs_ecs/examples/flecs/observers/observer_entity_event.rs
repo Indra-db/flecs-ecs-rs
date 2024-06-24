@@ -72,14 +72,14 @@ fn main() {
         );
     });
 
-    widget.emit(&Click);
+    widget.emit(&mut Click);
 
-    widget.emit(&Resize {
+    widget.emit(&mut Resize {
         width: 100.0,
         height: 200.0,
     });
 
-    widget.emit(&CloseRequested {
+    widget.emit(&mut CloseRequested {
         reason: CloseReason::User,
     });
 
