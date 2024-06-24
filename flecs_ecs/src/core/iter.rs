@@ -251,6 +251,9 @@ where
 
     /// Access param.
     /// param contains the pointer passed to the param argument of `system::run` or the event payload
+    /// 
+    /// There is no `param_mut` function to discourage the user from making changes to events sent to observers as 
+    /// order of execution is not defined.
     ///
     /// # See also
     ///
@@ -275,28 +278,6 @@ where
         }
 
         unsafe { &*ptr }
-    }
-
-    #[doc(alias = "iter::param")]
-    pub fn param_mut(&mut self) -> &mut P {
-        ecs_assert!(
-            !P::IS_TAG,
-            FlecsErrorCode::InvalidParameter,
-            "cannot access tag data, no payload provided"
-        );
-
-        let ptr = self.iter.param as *mut P;
-
-        assert!(
-            !ptr.is_null(),
-            "Tried to get param on an iterator where it was null."
-        );
-
-        if P::IS_TAG {
-            panic!("cannot access tag data, no payload provided");
-        }
-
-        unsafe { &mut *ptr }
     }
 
     /// # Arguments
