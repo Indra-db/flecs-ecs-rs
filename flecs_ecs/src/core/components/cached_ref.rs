@@ -7,11 +7,27 @@ use crate::sys;
 
 /// A reference to a component from a specific entity.
 /// Refs are a fast mechanism for referring to a specific entity/component
+#[derive(Debug)]
 pub struct CachedRef<'a, T: ComponentId + DataComponent> {
     world: WorldRef<'a>,
     component_ref: RefT,
     _marker: PhantomData<T>,
 }
+
+impl<'a, T> Clone for CachedRef<'a, T>
+where
+    T: ComponentId + DataComponent,
+{
+    fn clone(&self) -> Self {
+        Self {
+            world: self.world.clone(),
+            component_ref: self.component_ref,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T> Copy for CachedRef<'a, T> where T: ComponentId + DataComponent {}
 
 impl<'a, T: ComponentId + DataComponent> CachedRef<'a, T> {
     /// Create a new ref to a component.
