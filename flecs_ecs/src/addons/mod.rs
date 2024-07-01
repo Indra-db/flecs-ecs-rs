@@ -1,6 +1,9 @@
 #[cfg(feature = "flecs_app")]
 pub mod app;
 
+#[cfg(feature = "flecs_doc")]
+pub mod doc;
+
 #[cfg(feature = "flecs_meta")]
 pub mod meta;
 
