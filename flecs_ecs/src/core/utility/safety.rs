@@ -1,55 +1,15 @@
 use crate::core::*;
-use crate::sys;
 
-#[cfg(feature = "flecs_safety_locks")]
 use core::ptr::NonNull;
 
-#[cfg(feature = "flecs_safety_locks")]
-#[inline(always)]
-fn lock_target_begin(
-    world: &WorldRef,
-    locks: NonNull<StageLocks>,
-    si: &SafetyInfo,
-) {
-    match si {
-        SafetyInfo::Read(si) => {
-            if !si.cr.is_null() {
-                sparse_id_record_lock_read_begin(world, locks, si.cr);
-            } else {
-                get_table_column_lock_read_begin(world, locks, si.table, si.column_index);
-            }
-        }
-        SafetyInfo::Write(si) => {
-            if !si.cr.is_null() {
-                sparse_id_record_lock_write_begin(world, locks, si.cr);
-            } else {
-                get_table_column_lock_write_begin(world, locks, si.table, si.column_index);
-            }
-        }
-    }
-}
-
-#[cfg(feature = "flecs_safety_locks")]
-#[inline(always)]
-fn lock_target_end(locks: NonNull<StageLocks>, si: &SafetyInfo) {
-    match si {
-        SafetyInfo::Read(si) => {
-            if !si.cr.is_null() {
-                sparse_id_record_lock_read_end(locks, si.cr);
-            } else {
-                table_column_lock_read_end(locks, si.table, si.column_index);
-            }
-        }
-        SafetyInfo::Write(si) => {
-            if !si.cr.is_null() {
-                sparse_id_record_lock_write_end(locks, si.cr);
-            } else {
-                table_column_lock_write_end(locks, si.table, si.column_index);
-            }
-        }
-    }
-}
-
+/// Take the borrow locks for a tuple access, run the callback, release.
+///
+/// Deferring is the caller's responsibility (see `ScopeEndGuard` /
+/// `ecs_rust_get_scope_begin`): the defer scope must enclose this call so a
+/// violation panic or callback panic unwinds through the caller's guard and
+/// closes the defer bracket. Releasing locks inside the caller's still-open
+/// defer scope also means command-flush side effects (hooks, observers)
+/// never run under these locks.
 pub(crate) fn rw_locking<T: GetTuple, Return, const MULTITHREADED: bool>(
     world: &WorldRef,
     callback: impl FnOnce(<T as GetTuple>::TupleType<'_>) -> Return,
@@ -62,51 +22,65 @@ pub(crate) fn rw_locking<T: GetTuple, Return, const MULTITHREADED: bool>(
     // multithreaded system callback this is the stage world, so each worker
     // uses its own stage map.
     let locks = stage_locks::<MULTITHREADED>(world);
-    let world = world.real_world();
 
     for (index, si) in safety_info.iter().enumerate() {
         if unsafe { components.get_unchecked(index).is_null() } {
             continue;
         }
-        lock_target_begin(&world, locks, si);
+        // SAFETY: stage map is owned by this thread; the reference does not
+        // outlive this iteration, so the callback below can nest accesses.
+        let map = unsafe { &mut *locks.as_ptr() };
+        match si {
+            SafetyInfo::Read(li) => {
+                if map.read_begin(li.key) {
+                    alias_violation_panic(world, li.id, false);
+                }
+            }
+            SafetyInfo::Write(li) => {
+                if map.write_begin(li.key) {
+                    alias_violation_panic(world, li.id, true);
+                }
+            }
+        }
     }
 
-    world.defer_begin();
     let ret = callback(tuple);
-    world.defer_end();
 
     for (index, si) in safety_info.iter().enumerate() {
         if unsafe { components.get_unchecked(index).is_null() } {
             continue;
         }
-        lock_target_end(locks, si);
+        // SAFETY: as above.
+        let map = unsafe { &mut *locks.as_ptr() };
+        match si {
+            SafetyInfo::Read(li) => map.read_end(li.key),
+            SafetyInfo::Write(li) => map.write_end(li.key),
+        }
     }
     ret
 }
 
-#[cfg(feature = "flecs_safety_locks")]
+/// Transient read check for `cloned`: verify no write is held on any source,
+/// releasing each probe immediately.
 #[inline(always)]
 pub(crate) fn clone_locking<const MULTITHREADED: bool>(
     world: WorldRef<'_>,
     components: &[*mut core::ffi::c_void],
-    safety_info: &[sys::ecs_rust_lock_target_t],
+    safety_info: &[LockInfo],
 ) {
-    let locks = stage_locks::<MULTITHREADED>(&world);
+    let locks: NonNull<StageLocks> = stage_locks::<MULTITHREADED>(&world);
 
-    for (index, si) in safety_info.iter().enumerate() {
+    for (index, li) in safety_info.iter().enumerate() {
         // skip missing components
         if unsafe { components.get_unchecked(index).is_null() } {
             continue;
         }
 
-        // transient read: verify no write is present, then release immediately
-        if !si.cr.is_null() {
-            sparse_id_record_lock_read_begin(&world, locks, si.cr);
-            sparse_id_record_lock_read_end(locks, si.cr);
-            continue;
+        // SAFETY: stage map is owned by this thread.
+        let map = unsafe { &mut *locks.as_ptr() };
+        if map.read_begin(li.key) {
+            alias_violation_panic(&world, li.id, false);
         }
-
-        get_table_column_lock_read_begin(&world, locks, si.table, si.column_index);
-        table_column_lock_read_end(locks, si.table, si.column_index);
+        map.read_end(li.key);
     }
 }

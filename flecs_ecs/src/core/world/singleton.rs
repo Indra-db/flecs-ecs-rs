@@ -140,6 +140,7 @@ impl<Return> WorldGet<Return> for World {
 
         if has_all_components {
             let tuple = tuple_data.get_tuple();
+            let _defer = crate::core::world_ctx::DeferGuard::new(self.world());
 
             #[cfg(feature = "flecs_safety_locks")]
             {
@@ -158,10 +159,7 @@ impl<Return> WorldGet<Return> for World {
 
             #[cfg(not(feature = "flecs_safety_locks"))]
             {
-                self.defer_begin();
-                let ret = callback(tuple);
-                self.defer_end();
-                return Some(ret);
+                return Some(callback(tuple));
             }
         }
         None
@@ -173,6 +171,7 @@ impl<Return> WorldGet<Return> for World {
     ) -> Return {
         let tuple_data = T::create_ptrs_singleton::<true>(self);
         let tuple = tuple_data.get_tuple();
+        let _defer = crate::core::world_ctx::DeferGuard::new(self.world());
 
         #[cfg(feature = "flecs_safety_locks")]
         {
@@ -187,10 +186,7 @@ impl<Return> WorldGet<Return> for World {
 
         #[cfg(not(feature = "flecs_safety_locks"))]
         {
-            self.defer_begin();
-            let ret = callback(tuple);
-            self.defer_end();
-            ret
+            callback(tuple)
         }
     }
 }

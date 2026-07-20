@@ -325,11 +325,19 @@ done:
 error:
     return (ecs_rust_set_t){0};
 }
+/* Key encodings mirrored by safety_map.rs dense_lock_key / sparse_lock_key. */
+#define ECS_RUST_DENSE_KEY(table_, col_) \
+    ((((uint64_t)(uintptr_t)(table_)) << 16) | (uint64_t)(uint16_t)(col_))
+
+#define ECS_RUST_SPARSE_KEY(cr_) \
+    (((uint64_t)(uintptr_t)(cr_)) | (1ull << 63))
+
 #define ECS_RUST_GET_PTR(ptr_, cr_, table_, col_) \
     (ecs_rust_get_ptr_t){ \
         .ptr = (ptr_), \
-        .lock_target = { .cr = (cr_), .table = (table_), \
-            .column_index = (int16_t)(col_) } \
+        .lock_key = (cr_) != NULL \
+            ? ECS_RUST_SPARSE_KEY(cr_) \
+            : ECS_RUST_DENSE_KEY(table_, col_) \
     }
 
 #define ECS_RUST_GET_PTR_NULL (ecs_rust_get_ptr_t){0}
@@ -576,6 +584,30 @@ ecs_rust_get_ptr_t ecs_rust_record_get_mut_id(
         NULL, table, column_index);
 error:
     return ECS_RUST_GET_PTR_NULL;
+}
+
+const ecs_record_t* ecs_rust_get_scope_begin(
+    ecs_world_t *world,
+    ecs_entity_t entity)
+{
+    /* ecs_record_find asserts on dead entities in debug builds; gate on
+     * liveness so the Rust side gets NULL and can panic with its own
+     * message. */
+    if (!ecs_is_alive(world, entity)) {
+        return NULL;
+    }
+    const ecs_record_t *r = ecs_record_find(world, entity);
+    if (!r) {
+        return NULL;
+    }
+    ecs_defer_begin(world);
+    return r;
+}
+
+void ecs_rust_scope_end(
+    ecs_world_t *world)
+{
+    ecs_defer_end(world);
 }
 
 size_t ecs_rust_sizeof_ecs_ref_t(void) {

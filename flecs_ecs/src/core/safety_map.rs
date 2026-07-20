@@ -42,24 +42,27 @@ const WRITE_FLAG: u16 = 1 << 15;
 const READ_MASK: u16 = WRITE_FLAG - 1;
 
 /// Identifies the storage region a component pointer originates from.
-/// Dense: `(table ptr << 16) | column`. Sparse: `(1 << 127) | component
+/// Dense: `(table ptr << 16) | column`. Sparse: `(1 << 63) | component
 /// record ptr`. Pointer-based keys need no FFI to derive and never collide
-/// across the two shapes thanks to the tag bit; both pointers are stable for
-/// the world's lifetime and the maps are world-owned. Entries are balanced
-/// begin/end pairs, so no key outlives the storage it names.
+/// across the two shapes thanks to the tag bit (user-space pointers stay
+/// below 2^47 on all tier-1 targets, so the shift cannot reach bit 63); both
+/// pointers are stable for the world's lifetime and the maps are world-owned.
+/// Entries are balanced begin/end pairs, so no key outlives the storage it
+/// names. The same encodings are produced C-side by `ECS_RUST_DENSE_KEY` /
+/// `ECS_RUST_SPARSE_KEY` in `flecs_rust.c` for `ecs_rust_get_ptr_t::lock_key`.
 #[cfg(feature = "flecs_safety_locks")]
-pub(crate) type LockKey = u128;
+pub(crate) type LockKey = u64;
 
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
 pub(crate) fn dense_lock_key(table: *mut sys::ecs_table_t, column: i16) -> LockKey {
-    ((table as usize as u128) << 16) | (column as u16 as u128)
+    ((table as usize as u64) << 16) | (column as u16 as u64)
 }
 
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
 pub(crate) fn sparse_lock_key(cr: *mut sys::ecs_component_record_t) -> LockKey {
-    (1u128 << 127) | (cr as usize as u128)
+    (1u64 << 63) | (cr as usize as u64)
 }
 
 /// Read/write counters for one stage. Not thread-safe by design: each stage
@@ -86,7 +89,7 @@ impl StageLocks {
     /// Returns `true` on violation (a write is already held). On violation no
     /// read is registered.
     #[inline(always)]
-    fn read_begin(&mut self, key: LockKey) -> bool {
+    pub(crate) fn read_begin(&mut self, key: LockKey) -> bool {
         if let Some(entry) = self.find(key) {
             if entry.1 & WRITE_FLAG != 0 {
                 return true;
@@ -99,7 +102,7 @@ impl StageLocks {
     }
 
     #[inline(always)]
-    fn read_end(&mut self, key: LockKey) {
+    pub(crate) fn read_end(&mut self, key: LockKey) {
         if let Some(index) = self.entries.iter().position(|entry| entry.0 == key) {
             let entry = &mut self.entries[index];
             debug_assert!(entry.1 & READ_MASK != 0, "unbalanced read_end");
@@ -113,7 +116,7 @@ impl StageLocks {
     /// Returns `true` on violation (a read or write is already held). On
     /// violation no write is registered.
     #[inline(always)]
-    fn write_begin(&mut self, key: LockKey) -> bool {
+    pub(crate) fn write_begin(&mut self, key: LockKey) -> bool {
         if self.find(key).is_some() {
             return true;
         }
@@ -122,7 +125,7 @@ impl StageLocks {
     }
 
     #[inline(always)]
-    fn write_end(&mut self, key: LockKey) {
+    pub(crate) fn write_end(&mut self, key: LockKey) {
         if let Some(index) = self.entries.iter().position(|entry| entry.0 == key) {
             let entry = &mut self.entries[index];
             debug_assert!(entry.1 & WRITE_FLAG != 0, "unbalanced write_end");
@@ -249,7 +252,7 @@ pub(crate) fn stage_locks_dyn(world: &WorldRef) -> NonNull<StageLocks> {
 #[cfg(feature = "flecs_safety_locks")]
 #[cold]
 #[inline(never)]
-fn alias_violation_panic(world: &WorldRef, component_id: u64, write: bool) -> ! {
+pub(crate) fn alias_violation_panic(world: &WorldRef, component_id: u64, write: bool) -> ! {
     let component = {
         let id = IdView::new_from_id(world, component_id);
         if id.is_pair() {
@@ -537,7 +540,7 @@ mod tests {
     #[test]
     fn stage_locks_read_write_protocol() {
         let mut locks = StageLocks::default();
-        let key = 42u128;
+        let key = 42u64;
         assert!(!locks.read_begin(key));
         assert!(!locks.read_begin(key));
         assert!(locks.write_begin(key), "write while reads held must fail");
@@ -567,10 +570,12 @@ mod tests {
     fn dense_and_sparse_keys_never_collide() {
         // sparse keys carry the tag bit, dense keys never can (pointers stay
         // far below 2^111 even after the column shift)
-        let sparse = sparse_lock_key(usize::MAX as *mut sys::ecs_component_record_t);
-        assert!(sparse >> 127 == 1);
-        let dense = dense_lock_key(usize::MAX as *mut sys::ecs_table_t, i16::MAX);
-        assert!(dense >> 127 == 0);
+        let sparse = sparse_lock_key(0x7000_0000_0000 as *mut sys::ecs_component_record_t);
+        assert!(sparse >> 63 == 1);
+        // highest realistic user-space pointer (2^47 - 1): the column shift
+        // must not reach the sparse tag bit
+        let dense = dense_lock_key(0x7FFF_FFFF_FFFF as *mut sys::ecs_table_t, i16::MAX);
+        assert!(dense >> 63 == 0);
     }
 
     #[test]

@@ -12,7 +12,7 @@ pub struct ComponentsData<T: ClonedTuple, const LEN: usize> {
     pub array_components: [*mut c_void; LEN],
     pub has_all_components: bool,
     #[cfg(feature = "flecs_safety_locks")]
-    pub(crate) safety_info: [sys::ecs_rust_lock_target_t; LEN],
+    pub(crate) safety_info: [LockInfo; LEN],
     _marker: PhantomData<T>,
 }
 
@@ -36,7 +36,7 @@ pub trait ClonedComponentPointers<T: ClonedTuple> {
     fn component_ptrs(&self) -> &[*mut c_void];
 
     #[cfg(feature = "flecs_safety_locks")]
-    fn safety_info(&self) -> &[sys::ecs_rust_lock_target_t];
+    fn safety_info(&self) -> &[LockInfo];
 }
 
 impl<T: ClonedTuple, const LEN: usize> ClonedComponentPointers<T> for ComponentsData<T, LEN> {
@@ -48,7 +48,7 @@ impl<T: ClonedTuple, const LEN: usize> ClonedComponentPointers<T> for Components
         let mut array_components = [core::ptr::null::<c_void>() as *mut c_void; LEN];
 
         #[cfg(feature = "flecs_safety_locks")]
-        let mut safety_info = [sys::ecs_rust_lock_target_t::default(); LEN];
+        let mut safety_info = [LockInfo::default(); LEN];
 
         // SAFETY: same contract as this function — record is the entity's
         // record from the same world, guaranteed by the caller.
@@ -76,7 +76,7 @@ impl<T: ClonedTuple, const LEN: usize> ClonedComponentPointers<T> for Components
         let mut array_components = [core::ptr::null::<c_void>() as *mut c_void; LEN];
 
         #[cfg(feature = "flecs_safety_locks")]
-        let mut safety_info = [sys::ecs_rust_lock_target_t::default(); LEN];
+        let mut safety_info = [LockInfo::default(); LEN];
 
         let has_all_components = T::populate_array_ptrs_singleton::<SHOULD_PANIC>(
             world,
@@ -107,7 +107,7 @@ impl<T: ClonedTuple, const LEN: usize> ClonedComponentPointers<T> for Components
     }
 
     #[cfg(feature = "flecs_safety_locks")]
-    fn safety_info(&self) -> &[sys::ecs_rust_lock_target_t] {
+    fn safety_info(&self) -> &[LockInfo] {
         &self.safety_info
     }
 }
@@ -205,7 +205,7 @@ pub trait ClonedTuple: Sized {
         components: &mut [*mut c_void],
         has_all_components: &mut bool,
         index: usize,
-        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [sys::ecs_rust_lock_target_t],
+        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [LockInfo],
     ) {
         world.check_thread_affinity_shared::<<T::OnlyType as ComponentOrPairId>::CastType>();
 
@@ -280,7 +280,10 @@ pub trait ClonedTuple: Sized {
             components[index] = component_ptr;
             #[cfg(feature = "flecs_safety_locks")]
             {
-                safety_info[index] = get_ptr.lock_target;
+                safety_info[index] = LockInfo {
+                    key: get_ptr.lock_key,
+                    id,
+                };
             }
         }
     }
@@ -294,13 +297,13 @@ pub trait ClonedTuple: Sized {
         entity: Entity,
         record: *const ecs_record_t,
         components: &mut [*mut c_void],
-        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [sys::ecs_rust_lock_target_t],
+        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [LockInfo],
     ) -> bool;
 
     fn populate_array_ptrs_singleton<'a, const SHOULD_PANIC: bool>(
         world: impl WorldProvider<'a>,
         components: &mut [*mut c_void],
-        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [sys::ecs_rust_lock_target_t],
+        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [LockInfo],
     ) -> bool;
 
     fn create_tuple<'a>(array_components: &[*mut c_void]) -> Self::TupleType<'a>;
@@ -323,7 +326,7 @@ where
         entity: Entity,
         record: *const ecs_record_t,
         components: &mut [*mut c_void],
-        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [sys::ecs_rust_lock_target_t],
+        #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [LockInfo],
     ) -> bool {
         let world_ref = world.world();
         let world_ptr = unsafe {
@@ -357,7 +360,7 @@ where
     fn populate_array_ptrs_singleton<'a, const SHOULD_PANIC: bool>(
     world: impl WorldProvider<'a>,
     components: &mut [*mut c_void],
-    #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [sys::ecs_rust_lock_target_t],
+    #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [LockInfo],
     ) -> bool {
         let world_ref = world.world();
         let world_ptr = unsafe {
@@ -447,7 +450,7 @@ macro_rules! impl_cloned_tuple {
             #[allow(unused)]
             unsafe fn populate_array_ptrs<'a, const SHOULD_PANIC: bool>(
                 world: impl WorldProvider<'a>, entity: Entity, record: *const ecs_record_t, components: &mut [*mut c_void],
-                #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [sys::ecs_rust_lock_target_t]
+                #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [LockInfo]
             ) -> bool {
 
                 let world_ref = world.world();
@@ -476,7 +479,7 @@ macro_rules! impl_cloned_tuple {
             #[allow(unused)]
             fn populate_array_ptrs_singleton<'a, const SHOULD_PANIC: bool>(
                 world: impl WorldProvider<'a>, components: &mut [*mut c_void],
-                #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [sys::ecs_rust_lock_target_t]
+                #[cfg(feature = "flecs_safety_locks")] safety_info: &mut [LockInfo]
             ) -> bool {
                 let world_ref = world.world();
                 let world_ptr = unsafe { sys::ecs_get_world(world_ref.ptr_mut() as *const c_void) as *mut sys::ecs_world_t };

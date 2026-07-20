@@ -1448,15 +1448,16 @@ impl<'a, Return> EntityViewGet<'a, Return> for EntityView<'a> {
         self,
         callback: impl for<'e> FnOnce(T::TupleType<'e>) -> Return,
     ) -> Option<Return> {
-        if !self.is_alive() {
-            return None;
-        }
-
-        let record = unsafe { sys::ecs_record_find(self.world.world_ptr(), *self.id) };
+        // combined record lookup + defer_begin; returns null without opening
+        // a defer scope when the entity is not alive
+        let record =
+            unsafe { sys::ecs_rust_get_scope_begin(self.world.world_ptr_mut(), *self.id) };
 
         if record.is_null() {
             return None;
         }
+
+        let _scope = ScopeEndGuard { world: self.world };
 
         // SAFETY: record was just looked up for self.id on this world.
         let tuple_data = unsafe { T::create_ptrs::<false>(self.world, self.id, record) };
@@ -1487,28 +1488,25 @@ impl<'a, Return> EntityViewGet<'a, Return> for EntityView<'a> {
 
             #[cfg(not(feature = "flecs_safety_locks"))]
             {
-                let _defer_guard = DeferGuard::new(self.world);
-                let ret = callback(tuple);
-                return Some(ret);
+                return Some(callback(tuple));
             }
         }
         None
     }
 
     fn get<T: GetTuple>(self, callback: impl for<'e> FnOnce(T::TupleType<'e>) -> Return) -> Return {
-        assert!(
-            self.is_alive(),
-            "Entity {} does not exist in the world. Use `try_get` if the entity may not be alive.",
-            self.id
-        );
-
-        let record = unsafe { sys::ecs_record_find(self.world.world_ptr(), *self.id) };
+        // combined record lookup + defer_begin; returns null without opening
+        // a defer scope when the entity is not alive
+        let record =
+            unsafe { sys::ecs_rust_get_scope_begin(self.world.world_ptr_mut(), *self.id) };
 
         assert!(
             !record.is_null(),
             "Entity {} does not exist in the world. Use `try_get` if the entity may not be alive.",
             self.id
         );
+
+        let _scope = ScopeEndGuard { world: self.world };
 
         // SAFETY: record was just looked up for self.id on this world.
         let tuple_data = unsafe { T::create_ptrs::<true>(self.world, self.id, record) };
@@ -1526,7 +1524,6 @@ impl<'a, Return> EntityViewGet<'a, Return> for EntityView<'a> {
 
         #[cfg(not(feature = "flecs_safety_locks"))]
         {
-            let _defer_guard = DeferGuard::new(self.world);
             callback(tuple)
         }
     }
@@ -2876,28 +2873,6 @@ impl EntityView<'_> {
         unsafe {
             ptr::drop_in_place(ptr_struct);
         }
-    }
-}
-
-/// Calls `defer_begin` on construction and `defer_end` on drop, so the defer
-/// block is closed even when the user callback unwinds.
-#[cfg(not(feature = "flecs_safety_locks"))]
-struct DeferGuard<'w> {
-    world: WorldRef<'w>,
-}
-
-#[cfg(not(feature = "flecs_safety_locks"))]
-impl<'w> DeferGuard<'w> {
-    fn new(world: WorldRef<'w>) -> Self {
-        world.defer_begin();
-        Self { world }
-    }
-}
-
-#[cfg(not(feature = "flecs_safety_locks"))]
-impl Drop for DeferGuard<'_> {
-    fn drop(&mut self) {
-        self.world.defer_end();
     }
 }
 

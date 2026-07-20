@@ -18,19 +18,29 @@ pub(crate) fn get_ptr_null() -> sys::ecs_rust_get_ptr_t {
     sys::ecs_rust_get_ptr_t::default()
 }
 
+/// Lock key plus the component id it stands for (id only read on the cold
+/// violation-panic path).
+#[cfg(feature = "flecs_safety_locks")]
+#[derive(Debug, Copy, Clone, Default)]
+#[doc(hidden)]
+pub struct LockInfo {
+    pub(crate) key: crate::core::LockKey,
+    pub(crate) id: u64,
+}
+
 #[cfg(feature = "flecs_safety_locks")]
 #[derive(Debug, Copy, Clone)]
 #[doc(hidden)]
 pub enum SafetyInfo {
-    Read(sys::ecs_rust_lock_target_t),
-    Write(sys::ecs_rust_lock_target_t),
+    Read(LockInfo),
+    Write(LockInfo),
 }
 
 #[cfg(feature = "flecs_safety_locks")]
 impl Default for SafetyInfo {
     #[inline]
     fn default() -> Self {
-        SafetyInfo::Read(sys::ecs_rust_lock_target_t::default())
+        SafetyInfo::Read(LockInfo::default())
     }
 }
 
@@ -74,7 +84,7 @@ impl<T: GetTuple, const LEN: usize> GetComponentPointers<T> for ComponentsData<T
         let mut array_components = [core::ptr::null::<c_void>() as *mut c_void; LEN];
 
         #[cfg(feature = "flecs_safety_locks")]
-        let mut safety_info = [SafetyInfo::Read(sys::ecs_rust_lock_target_t::default()); LEN];
+        let mut safety_info = [SafetyInfo::default(); LEN];
 
         // SAFETY: same contract as this function — record is the entity's
         // record from the same world, guaranteed by the caller.
@@ -102,7 +112,7 @@ impl<T: GetTuple, const LEN: usize> GetComponentPointers<T> for ComponentsData<T
         let mut array_components = [core::ptr::null::<c_void>() as *mut c_void; LEN];
 
         #[cfg(feature = "flecs_safety_locks")]
-        let mut safety_info = [SafetyInfo::Read(sys::ecs_rust_lock_target_t::default()); LEN];
+        let mut safety_info = [SafetyInfo::default(); LEN];
 
         let has_all_components = T::populate_array_ptrs_singleton::<SHOULD_PANIC>(
             world,
@@ -430,10 +440,14 @@ or use `Option<{}> instead to handle individual cases.",
             components[index] = component_ptr;
             #[cfg(feature = "flecs_safety_locks")]
             {
+                let lock_info = LockInfo {
+                    key: get_ptr.lock_key,
+                    id,
+                };
                 if T::IS_IMMUTABLE {
-                    safety_info[index] = SafetyInfo::Read(get_ptr.lock_target);
+                    safety_info[index] = SafetyInfo::Read(lock_info);
                 } else {
-                    safety_info[index] = SafetyInfo::Write(get_ptr.lock_target);
+                    safety_info[index] = SafetyInfo::Write(lock_info);
                 }
             }
         }

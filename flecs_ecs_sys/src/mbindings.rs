@@ -252,23 +252,12 @@ fn compile_test_check_if_any_ecs_world_info_fields_changed() {
     };
 }
 
-impl Default for ecs_rust_lock_target_t {
-    #[inline]
-    fn default() -> Self {
-        ecs_rust_lock_target_t {
-            cr: core::ptr::null_mut(),
-            table: core::ptr::null_mut(),
-            column_index: -1,
-        }
-    }
-}
-
 impl Default for ecs_rust_get_ptr_t {
     #[inline]
     fn default() -> Self {
         ecs_rust_get_ptr_t {
             ptr: core::ptr::null_mut(),
-            lock_target: ecs_rust_lock_target_t::default(),
+            lock_key: 0,
         }
     }
 }

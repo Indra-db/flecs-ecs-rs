@@ -9700,20 +9700,12 @@ unsafe extern "C-unwind" {
         size: usize,
     ) -> ecs_rust_set_t;
 }
-#[doc = "Identifies the storage a component pointer originates from, so the Rust\n side can key its mut-alias tracking. cr set: sparse / non-fragmenting\n storage. table set: dense table column (which may belong to an IsA base\n entity's table for inherited reads)."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ecs_rust_lock_target_t {
-    pub cr: *mut ecs_component_record_t,
-    pub table: *mut ecs_table_t,
-    pub column_index: i16,
-}
-#[doc = "Component pointer plus its storage origin. ptr is NULL when the entity\n does not have the component."]
+#[doc = "Component pointer plus the key the Rust side uses for its mut-alias\n tracking. ptr is NULL when the entity does not have the component.\n\n Key encoding (must stay in sync with safety_map.rs dense_lock_key /\n sparse_lock_key): dense storage = ((uintptr_t)table << 16) | column, which\n may name an IsA base entity's table for inherited reads; sparse /\n non-fragmenting storage = (uintptr_t)component_record | (1ull << 63).\n Assumes user-space pointers stay below 2^47 (true on all tier-1 targets).\n 16 bytes so the struct returns in registers."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct ecs_rust_get_ptr_t {
     pub ptr: *mut ::core::ffi::c_void,
-    pub lock_target: ecs_rust_lock_target_t,
+    pub lock_key: u64,
 }
 unsafe extern "C-unwind" {
     #[doc = "Get an immutable component pointer by entity record, including components\n inherited through an IsA relationship. Mirrors ecs_get_id() but skips the\n repeat record lookup and reports the storage origin."]
@@ -9740,6 +9732,16 @@ unsafe extern "C-unwind" {
         id: ecs_id_t,
         size: usize,
     ) -> ecs_rust_get_ptr_t;
+}
+unsafe extern "C-unwind" {
+    #[doc = "Combined entity-record lookup + defer_begin, the entry half of a component\n access scope (ecs_rust_scope_end is the exit half). Returns NULL without\n starting a defer scope when the entity is not alive."]
+    pub fn ecs_rust_get_scope_begin(
+        world: *mut ecs_world_t,
+        entity: ecs_entity_t,
+    ) -> *const ecs_record_t;
+}
+unsafe extern "C-unwind" {
+    pub fn ecs_rust_scope_end(world: *mut ecs_world_t);
 }
 unsafe extern "C-unwind" {
     #[doc = "ABI guards: C-side sizeof for structs with FLECS_DEBUG-gated fields, so the\n Rust side can assert its bindings match the compiled profile."]

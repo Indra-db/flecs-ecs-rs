@@ -103,6 +103,39 @@ impl WorldCtx {
     }
 }
 
+/// Calls `defer_begin` on construction and `defer_end` on drop, so the defer
+/// block is closed even when the user callback unwinds.
+pub(crate) struct DeferGuard<'w> {
+    world: super::WorldRef<'w>,
+}
+
+impl<'w> DeferGuard<'w> {
+    pub(crate) fn new(world: super::WorldRef<'w>) -> Self {
+        world.defer_begin();
+        Self { world }
+    }
+}
+
+impl Drop for DeferGuard<'_> {
+    fn drop(&mut self) {
+        self.world.defer_end();
+    }
+}
+
+/// Exit half of a component access scope opened by
+/// `sys::ecs_rust_get_scope_begin` (which combines the entity-record lookup
+/// with `defer_begin`). Dropping ends the defer scope, including on unwind
+/// from the user callback or a borrow-violation panic.
+pub(crate) struct ScopeEndGuard<'w> {
+    pub(crate) world: super::WorldRef<'w>,
+}
+
+impl Drop for ScopeEndGuard<'_> {
+    fn drop(&mut self) {
+        unsafe { sys::ecs_rust_scope_end(self.world.raw_world.as_ptr()) };
+    }
+}
+
 impl World {
     pub(crate) fn world_ctx(&self) -> &WorldCtx {
         unsafe { &*(sys::ecs_get_binding_ctx(self.raw_world.as_ptr()) as *const WorldCtx) }
