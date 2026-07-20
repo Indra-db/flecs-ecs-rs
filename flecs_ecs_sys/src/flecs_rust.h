@@ -74,6 +74,18 @@ ecs_rust_get_ptr_t ecs_rust_get_sparse_id(
     ecs_id_t id,
     size_t size);
 
+/* Combined ecs_ref_get_id + defer_begin for cached refs, the entry half of a
+ * component access scope (ecs_rust_scope_end is the exit half). Returns a
+ * NULL ptr without starting a defer scope when the component is gone. A
+ * lock_key of 0 means the ref's table is unchanged and the caller's cached
+ * key is still valid; otherwise lock_key carries the recomputed key. */
+FLECS_API
+ecs_rust_get_ptr_t ecs_rust_ref_get_scope_begin(
+    ecs_world_t *world,
+    ecs_ref_t *ref,
+    ecs_id_t id,
+    uint64_t cached_key_table_id);
+
 /* Combined entity-record lookup + defer_begin, the entry half of a component
  * access scope (ecs_rust_scope_end is the exit half). Returns NULL without
  * starting a defer scope when the entity is not alive. */

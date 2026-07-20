@@ -9734,6 +9734,15 @@ unsafe extern "C-unwind" {
     ) -> ecs_rust_get_ptr_t;
 }
 unsafe extern "C-unwind" {
+    #[doc = "Combined ecs_ref_get_id + defer_begin for cached refs, the entry half of a\n component access scope (ecs_rust_scope_end is the exit half). Returns a\n NULL ptr without starting a defer scope when the component is gone. A\n lock_key of 0 means the ref's table is unchanged and the caller's cached\n key is still valid; otherwise lock_key carries the recomputed key."]
+    pub fn ecs_rust_ref_get_scope_begin(
+        world: *mut ecs_world_t,
+        ref_: *mut ecs_ref_t,
+        id: ecs_id_t,
+        cached_key_table_id: u64,
+    ) -> ecs_rust_get_ptr_t;
+}
+unsafe extern "C-unwind" {
     #[doc = "Combined entity-record lookup + defer_begin, the entry half of a component\n access scope (ecs_rust_scope_end is the exit half). Returns NULL without\n starting a defer scope when the entity is not alive."]
     pub fn ecs_rust_get_scope_begin(
         world: *mut ecs_world_t,
