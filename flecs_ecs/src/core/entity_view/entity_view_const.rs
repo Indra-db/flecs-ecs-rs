@@ -1400,6 +1400,15 @@ pub trait EntityViewGet<'a, Return>: WorldProvider<'a> + Sized {
     /// - This will panic if the entity does not exist in the world (e.g. it was deleted).
     ///   `try_get` returns `None` in that case instead.
     ///
+    /// # Deferred operations
+    ///
+    /// The callback runs inside a defer scope: ECS operations performed in it
+    /// (`set`, `add`, `remove`, entity creation, ...) are queued and applied
+    /// when `get` returns. This is what keeps the borrowed component pointers
+    /// valid if the callback mutates the world. Consequently those operations'
+    /// effects — including any observers they trigger — are not visible inside
+    /// the callback itself; observers never run while the borrow is live.
+    ///
     /// # Example
     ///
     /// ```
