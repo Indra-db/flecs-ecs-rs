@@ -273,9 +273,7 @@ pub struct TableColumnMut<'a, T> {
     #[cfg(feature = "flecs_safety_locks")]
     column_index: i16,
     #[cfg(feature = "flecs_safety_locks")]
-    stage_id: i32,
-    #[cfg(feature = "flecs_safety_locks")]
-    multithreaded: bool,
+    locks: core::ptr::NonNull<StageLocks>,
 }
 
 impl<'a, T> TableColumnMut<'a, T> {
@@ -292,25 +290,10 @@ impl<'a, T> TableColumnMut<'a, T> {
         count: usize,
     ) -> Self {
         #[cfg(feature = "flecs_safety_locks")]
-        let (stage_id, multithreaded) = {
-            let stage_id = world.stage_id();
-            let multithreaded = world.is_currently_multithreaded();
-            if multithreaded {
-                get_table_column_lock_write_begin::<true>(
-                    &world,
-                    _table.as_ptr(),
-                    _column_index,
-                    stage_id,
-                );
-            } else {
-                get_table_column_lock_write_begin::<false>(
-                    &world,
-                    _table.as_ptr(),
-                    _column_index,
-                    stage_id,
-                );
-            }
-            (stage_id, multithreaded)
+        let locks = {
+            let locks = stage_locks_dyn(&world);
+            get_table_column_lock_write_begin(&world, locks, _table.as_ptr(), _column_index);
+            locks
         };
         world.defer_begin();
         // SAFETY: caller guarantees ptr/count describe the column array. The
@@ -326,9 +309,7 @@ impl<'a, T> TableColumnMut<'a, T> {
             #[cfg(feature = "flecs_safety_locks")]
             column_index: _column_index,
             #[cfg(feature = "flecs_safety_locks")]
-            stage_id,
-            #[cfg(feature = "flecs_safety_locks")]
-            multithreaded,
+            locks,
         }
     }
 }
@@ -353,17 +334,7 @@ impl<T> Drop for TableColumnMut<'_, T> {
     fn drop(&mut self) {
         self.world.defer_end();
         #[cfg(feature = "flecs_safety_locks")]
-        {
-            if self.multithreaded {
-                table_column_lock_write_end::<true>(
-                    self.table.as_ptr(),
-                    self.column_index,
-                    self.stage_id,
-                );
-            } else {
-                table_column_lock_write_end::<false>(self.table.as_ptr(), self.column_index, 0);
-            }
-        }
+        table_column_lock_write_end(self.locks, self.table.as_ptr(), self.column_index);
     }
 }
 

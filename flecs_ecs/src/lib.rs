@@ -14,7 +14,11 @@
 //! borrowing and concurrency guarantees when calling into the underlying C
 //! Flecs library. Those checks are provided by the `flecs_safety_locks` feature
 //! (enabled by default) and help prevent unsafe aliasing and concurrent mutable
-//! access across Flecs callbacks, systems and queries.
+//! access across Flecs callbacks, systems and queries. The bookkeeping is
+//! tracked per pipeline stage on the Rust side, so multithreaded systems pay
+//! no atomic or cross-thread synchronization cost for these checks, and
+//! parallel access to the same component on disjoint entities (including
+//! sparse components) is not reported as a conflict.
 //!
 //! These safety checks imposes a runtime cost. If you fully understand the
 //! characteristics of your application and need maximum performance,

@@ -173,8 +173,10 @@ pub struct Field<'a, T, const LOCK: bool> {
     pub(crate) is_shared: bool,
     #[cfg(feature = "flecs_safety_locks")]
     pub(crate) table: NonNull<sys::ecs_table_t>,
+    /// Stage lock map this field's read lock lives in; dangling when no lock
+    /// is held (`LOCK == false` or empty field).
     #[cfg(feature = "flecs_safety_locks")]
-    pub(crate) stage_id: Option<i32>,
+    pub(crate) locks: NonNull<StageLocks>,
     #[cfg(feature = "flecs_safety_locks")]
     pub(crate) column_index: i16,
     #[cfg(feature = "flecs_safety_locks")]
@@ -196,17 +198,7 @@ impl<T, const LOCK: bool> Drop for Field<'_, T, LOCK> {
         if LOCK && !self.slice_components.is_empty() {
             // Only release lock if we actually acquired one (non-empty slice).
             // Empty slices are returned for optional unset fields without lock acquisition.
-            unsafe {
-                if let Some(stage_id) = self.stage_id {
-                    table_column_lock_read_end::<true>(
-                        self.table.as_mut(),
-                        self.column_index,
-                        stage_id,
-                    );
-                } else {
-                    table_column_lock_read_end::<false>(self.table.as_mut(), self.column_index, 0);
-                }
-            }
+            table_column_lock_read_end(self.locks, self.table.as_ptr(), self.column_index);
         }
     }
 }
@@ -218,23 +210,18 @@ impl<'a, T> Field<'a, T, false> {
     pub(crate) fn new_lockless(
         slice_components: &'a [T],
         is_shared: bool,
-        stage_id: i32,
+        _stage_id: i32,
         column_index: i16,
         field_index: i8,
         table: NonNull<sys::ecs_table_t>,
-        world: &WorldRef,
+        _world: &WorldRef,
     ) -> Self {
-        let stage_id = if world.is_currently_multithreaded() {
-            Some(stage_id)
-        } else {
-            None
-        };
         Self {
             slice_components,
             is_shared,
             table,
             field_index,
-            stage_id,
+            locks: NonNull::dangling(),
             column_index,
         }
     }
@@ -256,13 +243,13 @@ impl<'a, T, const LOCK: bool> Field<'a, T, LOCK> {
     #[inline(always)]
     pub(crate) fn new_empty(is_shared: bool) -> Self {
         // SAFETY: Drop checks slice_components.is_empty() and skips unlock for empty fields.
-        // table is dangling but never accessed when slice is empty.
+        // table/locks are dangling but never accessed when slice is empty.
         Self {
             slice_components: &[],
             is_shared,
             table: NonNull::dangling(),
             field_index: 0,
-            stage_id: None,
+            locks: NonNull::dangling(),
             column_index: 0,
         }
     }
@@ -287,27 +274,25 @@ impl<'a, T, const LOCK: bool> Field<'a, T, LOCK> {
     pub(crate) fn new<const MULTITHREADED: bool>(
         slice_components: &'a [T],
         is_shared: bool,
-        stage_id: i32,
+        _stage_id: i32,
         column_index: i16,
         field_index: i8,
         table: NonNull<sys::ecs_table_t>,
         world: &WorldRef,
     ) -> Self {
-        if LOCK {
-            get_table_column_lock_read_begin::<MULTITHREADED>(
-                world,
-                table.as_ptr(),
-                column_index,
-                stage_id,
-            );
-        }
-        let stage_id = if MULTITHREADED { Some(stage_id) } else { None };
+        let locks = if LOCK {
+            let locks = stage_locks::<MULTITHREADED>(world);
+            get_table_column_lock_read_begin(world, locks, table.as_ptr(), column_index);
+            locks
+        } else {
+            NonNull::dangling()
+        };
         Self {
             slice_components,
             is_shared,
             table,
             field_index,
-            stage_id,
+            locks,
             column_index,
         }
     }
@@ -323,29 +308,27 @@ impl<'a, T, const LOCK: bool> Field<'a, T, LOCK> {
     pub(crate) fn new_result<const MULTITHREADED: bool>(
         slice_components: &'a [T],
         is_shared: bool,
-        stage_id: i32,
+        _stage_id: i32,
         column_index: i16,
         field_index: i8,
         table: NonNull<sys::ecs_table_t>,
         world: &WorldRef,
     ) -> Result<Self, FieldError> {
-        if LOCK
-            && table_column_lock_read_begin::<MULTITHREADED>(
-                world,
-                table.as_ptr(),
-                column_index,
-                stage_id,
-            )
-        {
-            return Err(FieldError::Locked);
-        }
-        let stage_id = if MULTITHREADED { Some(stage_id) } else { None };
+        let locks = if LOCK {
+            let locks = stage_locks::<MULTITHREADED>(world);
+            if table_column_lock_read_begin(locks, table.as_ptr(), column_index) {
+                return Err(FieldError::Locked);
+            }
+            locks
+        } else {
+            NonNull::dangling()
+        };
         Ok(Self {
             slice_components,
             is_shared,
             table,
             field_index,
-            stage_id,
+            locks,
             column_index,
         })
     }
@@ -496,8 +479,10 @@ pub struct FieldMut<'a, T, const LOCK: bool> {
     pub(crate) is_shared: bool,
     #[cfg(feature = "flecs_safety_locks")]
     pub(crate) table: NonNull<sys::ecs_table_t>,
+    /// Stage lock map this field's write lock lives in; dangling when no lock
+    /// is held (`LOCK == false` or empty field).
     #[cfg(feature = "flecs_safety_locks")]
-    pub(crate) stage_id: Option<i32>,
+    pub(crate) locks: NonNull<StageLocks>,
     #[cfg(feature = "flecs_safety_locks")]
     pub(crate) column_index: i16,
     #[cfg(feature = "flecs_safety_locks")]
@@ -517,19 +502,7 @@ where
 impl<T, const LOCK: bool> Drop for FieldMut<'_, T, LOCK> {
     fn drop(&mut self) {
         if LOCK && !self.slice_components.is_empty() {
-            if let Some(stage_id) = self.stage_id {
-                unsafe {
-                    table_column_lock_write_end::<true>(
-                        self.table.as_mut(),
-                        self.column_index,
-                        stage_id,
-                    );
-                }
-            } else {
-                unsafe {
-                    table_column_lock_write_end::<false>(self.table.as_mut(), self.column_index, 0);
-                }
-            }
+            table_column_lock_write_end(self.locks, self.table.as_ptr(), self.column_index);
         }
     }
 }
@@ -541,23 +514,18 @@ impl<'a, T> FieldMut<'a, T, false> {
     pub(crate) fn new_lockless(
         slice_components: &'a mut [T],
         is_shared: bool,
-        stage_id: i32,
+        _stage_id: i32,
         column_index: i16,
         field_index: i8,
         table: NonNull<sys::ecs_table_t>,
-        world: &WorldRef,
+        _world: &WorldRef,
     ) -> Self {
-        let stage_id = if world.is_currently_multithreaded() {
-            Some(stage_id)
-        } else {
-            None
-        };
         Self {
             slice_components,
             is_shared,
             table,
             field_index,
-            stage_id,
+            locks: NonNull::dangling(),
             column_index,
         }
     }
@@ -583,7 +551,7 @@ impl<'a, T, const LOCK: bool> FieldMut<'a, T, LOCK> {
             is_shared,
             table: NonNull::dangling(),
             field_index: 0,
-            stage_id: None,
+            locks: NonNull::dangling(),
             column_index: 0,
         }
     }
@@ -614,29 +582,26 @@ impl<'a, T, const LOCK: bool> FieldMut<'a, T, LOCK> {
     pub(crate) fn new<const MULTITHREADED: bool>(
         slice_components: &'a mut [T],
         is_shared: bool,
-        stage_id: i32,
+        _stage_id: i32,
         column_index: i16,
         field_index: i8,
         table: NonNull<sys::ecs_table_t>,
         world: &WorldRef,
     ) -> Self {
-        if LOCK {
-            get_table_column_lock_write_begin::<MULTITHREADED>(
-                world,
-                table.as_ptr(),
-                column_index,
-                stage_id,
-            );
-        }
-
-        let stage_id = if MULTITHREADED { Some(stage_id) } else { None };
+        let locks = if LOCK {
+            let locks = stage_locks::<MULTITHREADED>(world);
+            get_table_column_lock_write_begin(world, locks, table.as_ptr(), column_index);
+            locks
+        } else {
+            NonNull::dangling()
+        };
 
         Self {
             slice_components,
             is_shared,
             table,
             field_index,
-            stage_id,
+            locks,
             column_index,
         }
     }
@@ -651,31 +616,28 @@ impl<'a, T, const LOCK: bool> FieldMut<'a, T, LOCK> {
     pub(crate) fn new_result<const MULTITHREADED: bool>(
         slice_components: &'a mut [T],
         is_shared: bool,
-        stage_id: i32,
+        _stage_id: i32,
         column_index: i16,
         field_index: i8,
         table: NonNull<sys::ecs_table_t>,
         world: &WorldRef,
     ) -> Result<Self, FieldError> {
-        if LOCK
-            && table_column_lock_write_begin::<MULTITHREADED>(
-                world,
-                table.as_ptr(),
-                column_index,
-                stage_id,
-            )
-        {
-            return Err(FieldError::Locked);
-        }
-
-        let stage_id = if MULTITHREADED { Some(stage_id) } else { None };
+        let locks = if LOCK {
+            let locks = stage_locks::<MULTITHREADED>(world);
+            if table_column_lock_write_begin(locks, table.as_ptr(), column_index) {
+                return Err(FieldError::Locked);
+            }
+            locks
+        } else {
+            NonNull::dangling()
+        };
 
         Ok(Self {
             slice_components,
             is_shared,
             table,
             field_index,
-            stage_id,
+            locks,
             column_index,
         })
     }
@@ -885,17 +847,16 @@ pub struct FieldAt<'a, T> {
 /// released on drop.
 #[cfg(feature = "flecs_safety_locks")]
 pub(crate) enum FieldAtLock {
-    /// Sparse / non-fragmenting component: per-component-record lock.
+    /// Sparse / non-fragmenting component: per-component (per-stage) lock.
     Sparse {
         idr: NonNull<sys::ecs_component_record_t>,
-        multithreaded: bool,
+        locks: NonNull<StageLocks>,
     },
     /// Dense component: table column lock, same lock [`Field`]/[`FieldMut`] use.
-    /// `stage_id` is `Some` when the world is currently multithreaded.
     DenseColumn {
         table: NonNull<sys::ecs_table_t>,
         column: i16,
-        stage_id: Option<i32>,
+        locks: NonNull<StageLocks>,
     },
 }
 
@@ -912,34 +873,15 @@ where
 impl<T> Drop for FieldAt<'_, T> {
     fn drop(&mut self) {
         match self.lock {
-            FieldAtLock::Sparse {
-                mut idr,
-                multithreaded,
-            } => {
-                if multithreaded {
-                    unsafe {
-                        sparse_id_record_lock_read_end::<true>(idr.as_mut());
-                    }
-                } else {
-                    unsafe {
-                        sparse_id_record_lock_read_end::<false>(idr.as_mut());
-                    }
-                }
+            FieldAtLock::Sparse { idr, locks } => {
+                sparse_id_record_lock_read_end(locks, idr.as_ptr());
             }
             FieldAtLock::DenseColumn {
-                mut table,
+                table,
                 column,
-                stage_id,
+                locks,
             } => {
-                if let Some(stage_id) = stage_id {
-                    unsafe {
-                        table_column_lock_read_end::<true>(table.as_mut(), column, stage_id);
-                    }
-                } else {
-                    unsafe {
-                        table_column_lock_read_end::<false>(table.as_mut(), column, 0);
-                    }
-                }
+                table_column_lock_read_end(locks, table.as_ptr(), column);
             }
         }
     }
@@ -964,21 +906,14 @@ impl<'a, T> FieldAt<'a, T> {
     pub(crate) fn new(
         component: &'a T,
         world: &WorldRef,
-        mut idr: NonNull<sys::ecs_component_record_t>,
+        idr: NonNull<sys::ecs_component_record_t>,
     ) -> Self {
-        let is_multithreaded = world.is_currently_multithreaded();
-        if is_multithreaded {
-            sparse_id_record_lock_read_begin::<true>(world, unsafe { idr.as_mut() });
-        } else {
-            sparse_id_record_lock_read_begin::<false>(world, unsafe { idr.as_mut() });
-        }
+        let locks = stage_locks_dyn(world);
+        sparse_id_record_lock_read_begin(world, locks, idr.as_ptr());
 
         Self {
             component,
-            lock: FieldAtLock::Sparse {
-                idr,
-                multithreaded: is_multithreaded,
-            },
+            lock: FieldAtLock::Sparse { idr, locks },
         }
     }
 
@@ -997,19 +932,14 @@ impl<'a, T> FieldAt<'a, T> {
         table: NonNull<sys::ecs_table_t>,
         column: i16,
     ) -> Self {
-        let stage_id = world.stage_id();
-        let multithreaded = world.is_currently_multithreaded();
-        if multithreaded {
-            get_table_column_lock_read_begin::<true>(world, table.as_ptr(), column, stage_id);
-        } else {
-            get_table_column_lock_read_begin::<false>(world, table.as_ptr(), column, stage_id);
-        }
+        let locks = stage_locks_dyn(world);
+        get_table_column_lock_read_begin(world, locks, table.as_ptr(), column);
         Self {
             component,
             lock: FieldAtLock::DenseColumn {
                 table,
                 column,
-                stage_id: if multithreaded { Some(stage_id) } else { None },
+                locks,
             },
         }
     }
@@ -1055,34 +985,15 @@ where
 impl<T> Drop for FieldAtMut<'_, T> {
     fn drop(&mut self) {
         match self.lock {
-            FieldAtLock::Sparse {
-                mut idr,
-                multithreaded,
-            } => {
-                if multithreaded {
-                    unsafe {
-                        sparse_id_record_lock_write_end::<true>(idr.as_mut());
-                    }
-                } else {
-                    unsafe {
-                        sparse_id_record_lock_write_end::<false>(idr.as_mut());
-                    }
-                }
+            FieldAtLock::Sparse { idr, locks } => {
+                sparse_id_record_lock_write_end(locks, idr.as_ptr());
             }
             FieldAtLock::DenseColumn {
-                mut table,
+                table,
                 column,
-                stage_id,
+                locks,
             } => {
-                if let Some(stage_id) = stage_id {
-                    unsafe {
-                        table_column_lock_write_end::<true>(table.as_mut(), column, stage_id);
-                    }
-                } else {
-                    unsafe {
-                        table_column_lock_write_end::<false>(table.as_mut(), column, 0);
-                    }
-                }
+                table_column_lock_write_end(locks, table.as_ptr(), column);
             }
         }
     }
@@ -1116,21 +1027,14 @@ impl<'a, T> FieldAtMut<'a, T> {
     pub(crate) fn new(
         component: &'a mut T,
         world: &WorldRef,
-        mut idr: NonNull<sys::ecs_component_record_t>,
+        idr: NonNull<sys::ecs_component_record_t>,
     ) -> Self {
-        let is_multithreaded = world.is_currently_multithreaded();
-        if is_multithreaded {
-            sparse_id_record_lock_write_begin::<true>(world, unsafe { idr.as_mut() });
-        } else {
-            sparse_id_record_lock_write_begin::<false>(world, unsafe { idr.as_mut() });
-        }
+        let locks = stage_locks_dyn(world);
+        sparse_id_record_lock_write_begin(world, locks, idr.as_ptr());
 
         Self {
             component,
-            lock: FieldAtLock::Sparse {
-                idr,
-                multithreaded: is_multithreaded,
-            },
+            lock: FieldAtLock::Sparse { idr, locks },
         }
     }
 
@@ -1151,19 +1055,14 @@ impl<'a, T> FieldAtMut<'a, T> {
         table: NonNull<sys::ecs_table_t>,
         column: i16,
     ) -> Self {
-        let stage_id = world.stage_id();
-        let multithreaded = world.is_currently_multithreaded();
-        if multithreaded {
-            get_table_column_lock_write_begin::<true>(world, table.as_ptr(), column, stage_id);
-        } else {
-            get_table_column_lock_write_begin::<false>(world, table.as_ptr(), column, stage_id);
-        }
+        let locks = stage_locks_dyn(world);
+        get_table_column_lock_write_begin(world, locks, table.as_ptr(), column);
         Self {
             component,
             lock: FieldAtLock::DenseColumn {
                 table,
                 column,
-                stage_id: if multithreaded { Some(stage_id) } else { None },
+                locks,
             },
         }
     }

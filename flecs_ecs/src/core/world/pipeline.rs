@@ -306,6 +306,10 @@ impl World {
         unsafe {
             sys::ecs_set_threads(self.raw_world.as_ptr(), threads);
         }
+        #[cfg(feature = "flecs_safety_locks")]
+        self.world_ctx()
+            .safety_locks
+            .set_stage_count(unsafe { sys::ecs_get_stage_count(self.raw_world.as_ptr()) });
     }
 
     /// Get number of configured stages. Return number of stages set by [`World::set_stage_count()`].
@@ -350,6 +354,10 @@ impl World {
         unsafe {
             sys::ecs_set_task_threads(self.raw_world.as_ptr(), task_threads);
         }
+        #[cfg(feature = "flecs_safety_locks")]
+        self.world_ctx()
+            .safety_locks
+            .set_stage_count(unsafe { sys::ecs_get_stage_count(self.raw_world.as_ptr()) });
     }
 
     /// Returns true if task thread use have been requested.

@@ -22,6 +22,10 @@ pub(crate) struct WorldCtx {
     // a handle dropping on another thread takes the lock so its refcount
     // release can never interleave with `ecs_fini` freeing query memory.
     world_dead: Arc<Mutex<bool>>,
+    // Per-stage mut-alias counters; stage count kept in sync by the
+    // set_threads/set_stage_count wrappers.
+    #[cfg(feature = "flecs_safety_locks")]
+    pub(crate) safety_locks: crate::core::SafetyLocks,
 }
 
 impl WorldCtx {
@@ -33,6 +37,8 @@ impl WorldCtx {
             is_panicking: core::sync::atomic::AtomicBool::new(false),
             owning_thread: std::thread::current().id(),
             world_dead: Arc::new(Mutex::new(false)),
+            #[cfg(feature = "flecs_safety_locks")]
+            safety_locks: crate::core::SafetyLocks::new(),
         }
     }
 

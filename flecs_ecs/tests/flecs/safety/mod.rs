@@ -2,6 +2,7 @@
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
 
+mod multithreaded;
 mod pairs;
 
 #[derive(Clone, Component)]

@@ -1,6 +1,55 @@
 use crate::core::*;
 use crate::sys;
 
+#[cfg(feature = "flecs_safety_locks")]
+use core::ptr::NonNull;
+
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(always)]
+fn lock_target_begin(
+    world: &WorldRef,
+    locks: NonNull<StageLocks>,
+    si: &SafetyInfo,
+) {
+    match si {
+        SafetyInfo::Read(si) => {
+            if !si.cr.is_null() {
+                sparse_id_record_lock_read_begin(world, locks, si.cr);
+            } else {
+                get_table_column_lock_read_begin(world, locks, si.table, si.column_index);
+            }
+        }
+        SafetyInfo::Write(si) => {
+            if !si.cr.is_null() {
+                sparse_id_record_lock_write_begin(world, locks, si.cr);
+            } else {
+                get_table_column_lock_write_begin(world, locks, si.table, si.column_index);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(always)]
+fn lock_target_end(locks: NonNull<StageLocks>, si: &SafetyInfo) {
+    match si {
+        SafetyInfo::Read(si) => {
+            if !si.cr.is_null() {
+                sparse_id_record_lock_read_end(locks, si.cr);
+            } else {
+                table_column_lock_read_end(locks, si.table, si.column_index);
+            }
+        }
+        SafetyInfo::Write(si) => {
+            if !si.cr.is_null() {
+                sparse_id_record_lock_write_end(locks, si.cr);
+            } else {
+                table_column_lock_write_end(locks, si.table, si.column_index);
+            }
+        }
+    }
+}
+
 pub(crate) fn rw_locking<T: GetTuple, Return, const MULTITHREADED: bool>(
     world: &WorldRef,
     callback: impl FnOnce(<T as GetTuple>::TupleType<'_>) -> Return,
@@ -9,49 +58,17 @@ pub(crate) fn rw_locking<T: GetTuple, Return, const MULTITHREADED: bool>(
 ) -> Return {
     let components = tuple_data.component_ptrs();
     let safety_info = tuple_data.safety_info();
+    // Resolve the stage map from the calling context's world: inside a
+    // multithreaded system callback this is the stage world, so each worker
+    // uses its own stage map.
+    let locks = stage_locks::<MULTITHREADED>(world);
     let world = world.real_world();
-    let stage_id = if MULTITHREADED {
-        world.stage_id()
-    } else {
-        0 // stage_id is not used in single-threaded mode
-    };
 
     for (index, si) in safety_info.iter().enumerate() {
-        use crate::core::SafetyInfo;
-
         if unsafe { components.get_unchecked(index).is_null() } {
             continue;
         }
-        match si {
-            SafetyInfo::Read(si) => {
-                if !si.cr.is_null() {
-                    use crate::core::sparse_id_record_lock_read_begin;
-
-                    sparse_id_record_lock_read_begin::<MULTITHREADED>(&world, si.cr);
-                } else {
-                    use crate::core::get_table_column_lock_read_begin;
-
-                    get_table_column_lock_read_begin::<MULTITHREADED>(
-                        &world,
-                        si.table,
-                        si.column_index,
-                        stage_id,
-                    );
-                }
-            }
-            SafetyInfo::Write(si) => {
-                if !si.cr.is_null() {
-                    sparse_id_record_lock_write_begin::<MULTITHREADED>(&world, si.cr);
-                } else {
-                    get_table_column_lock_write_begin::<MULTITHREADED>(
-                        &world,
-                        si.table,
-                        si.column_index,
-                        stage_id,
-                    );
-                }
-            }
-        }
+        lock_target_begin(&world, locks, si);
     }
 
     world.defer_begin();
@@ -62,30 +79,7 @@ pub(crate) fn rw_locking<T: GetTuple, Return, const MULTITHREADED: bool>(
         if unsafe { components.get_unchecked(index).is_null() } {
             continue;
         }
-        match si {
-            SafetyInfo::Read(si) => {
-                if !si.cr.is_null() {
-                    sparse_id_record_lock_read_end::<MULTITHREADED>(si.cr);
-                } else {
-                    table_column_lock_read_end::<MULTITHREADED>(
-                        si.table,
-                        si.column_index,
-                        stage_id,
-                    );
-                }
-            }
-            SafetyInfo::Write(si) => {
-                if !si.cr.is_null() {
-                    sparse_id_record_lock_write_end::<MULTITHREADED>(si.cr);
-                } else {
-                    table_column_lock_write_end::<MULTITHREADED>(
-                        si.table,
-                        si.column_index,
-                        stage_id,
-                    );
-                }
-            }
-        }
+        lock_target_end(locks, si);
     }
     ret
 }
@@ -97,11 +91,7 @@ pub(crate) fn clone_locking<const MULTITHREADED: bool>(
     components: &[*mut core::ffi::c_void],
     safety_info: &[sys::ecs_lock_target_t],
 ) {
-    let stage_id = if MULTITHREADED {
-        world.stage_id()
-    } else {
-        0 // stage_id is not used in single-threaded mode
-    };
+    let locks = stage_locks::<MULTITHREADED>(&world);
 
     for (index, si) in safety_info.iter().enumerate() {
         // skip missing components
@@ -109,19 +99,14 @@ pub(crate) fn clone_locking<const MULTITHREADED: bool>(
             continue;
         }
 
+        // transient read: verify no write is present, then release immediately
         if !si.cr.is_null() {
-            sparse_id_record_lock_read_begin::<MULTITHREADED>(&world, si.cr);
-            sparse_id_record_lock_read_end::<MULTITHREADED>(si.cr);
+            sparse_id_record_lock_read_begin(&world, locks, si.cr);
+            sparse_id_record_lock_read_end(locks, si.cr);
             continue;
         }
 
-        //check if no writes are present so we can clone
-        get_table_column_lock_read_begin::<MULTITHREADED>(
-            &world,
-            si.table,
-            si.column_index,
-            stage_id,
-        );
-        table_column_lock_read_end::<MULTITHREADED>(si.table, si.column_index, stage_id);
+        get_table_column_lock_read_begin(&world, locks, si.table, si.column_index);
+        table_column_lock_read_end(locks, si.table, si.column_index);
     }
 }

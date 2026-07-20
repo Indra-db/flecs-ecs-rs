@@ -632,6 +632,10 @@ impl World {
         unsafe {
             sys::ecs_set_stage_count(self.raw_world.as_ptr(), stages);
         }
+        #[cfg(feature = "flecs_safety_locks")]
+        self.world_ctx()
+            .safety_locks
+            .set_stage_count(unsafe { sys::ecs_get_stage_count(self.raw_world.as_ptr()) });
     }
 
     /// Get number of configured stages.
