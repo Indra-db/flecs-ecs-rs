@@ -103,6 +103,9 @@ impl Drop for World {
             return;
         }
 
+        #[cfg(feature = "flecs_safety_locks")]
+        crate::core::invalidate_stage_locks_cache();
+
         let world_ptr = self.raw_world.as_ptr();
         if unsafe { sys::flecs_poly_release_(world_ptr as *mut c_void) } == 0 {
             if unsafe { sys::ecs_stage_get_id(world_ptr) } == -1 {
@@ -264,6 +267,8 @@ impl Drop for AsyncStage<'_> {
         if std::thread::panicking() {
             return;
         }
+        #[cfg(feature = "flecs_safety_locks")]
+        crate::core::invalidate_stage_locks_cache();
         // SAFETY: this handle exclusively owns the stage and the lifetime `'a`
         // guarantees the world the stage belongs to is still alive.
         unsafe { sys::ecs_stage_free(self.stage.raw_world.as_ptr()) };

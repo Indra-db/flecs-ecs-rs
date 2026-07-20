@@ -42,23 +42,24 @@ const WRITE_FLAG: u16 = 1 << 15;
 const READ_MASK: u16 = WRITE_FLAG - 1;
 
 /// Identifies the storage region a component pointer originates from.
-/// Dense: `(table id << 16) | column`. Sparse: `(1 << 127) | component id`.
-/// Keys never collide across the two shapes because of the tag bit, and the
-/// maps are world-owned so ids from different worlds never meet.
+/// Dense: `(table ptr << 16) | column`. Sparse: `(1 << 127) | component
+/// record ptr`. Pointer-based keys need no FFI to derive and never collide
+/// across the two shapes thanks to the tag bit; both pointers are stable for
+/// the world's lifetime and the maps are world-owned. Entries are balanced
+/// begin/end pairs, so no key outlives the storage it names.
 #[cfg(feature = "flecs_safety_locks")]
 pub(crate) type LockKey = u128;
 
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
 pub(crate) fn dense_lock_key(table: *mut sys::ecs_table_t, column: i16) -> LockKey {
-    let table_id = unsafe { sys::flecs_table_id(table) };
-    ((table_id as u128) << 16) | (column as u16 as u128)
+    ((table as usize as u128) << 16) | (column as u16 as u128)
 }
 
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
-pub(crate) fn sparse_lock_key(component_id: u64) -> LockKey {
-    (1u128 << 127) | (component_id as u128)
+pub(crate) fn sparse_lock_key(cr: *mut sys::ecs_component_record_t) -> LockKey {
+    (1u128 << 127) | (cr as usize as u128)
 }
 
 /// Read/write counters for one stage. Not thread-safe by design: each stage
@@ -158,6 +159,7 @@ impl SafetyLocks {
     /// guard is alive (the C `ecs_set_stage_count` / `ecs_set_threads`
     /// contract): resizing may move the stage maps.
     pub(crate) fn set_stage_count(&self, count: i32) {
+        invalidate_stage_locks_cache();
         let count = count.max(1) as usize;
         // SAFETY: single-threaded per the function contract; no `stage()`
         // pointer is alive because no lock guard exists outside iteration.
@@ -178,6 +180,35 @@ impl SafetyLocks {
     }
 }
 
+// One-slot cache for the single-threaded stage-map resolve: (world ptr,
+// StageLocks ptr). Sound because the safe API confines component access to
+// the world-owning thread plus flecs workers (joined before world teardown),
+// and the slot is cleared whenever a world is dropped on this thread or a
+// stage-map vec is resized (both of which can invalidate the cached pointer).
+#[cfg(feature = "flecs_safety_locks")]
+std::thread_local! {
+    static STAGE_LOCKS_CACHE: core::cell::Cell<(usize, usize)> =
+        const { core::cell::Cell::new((0, 0)) };
+}
+
+#[cfg(feature = "flecs_safety_locks")]
+pub(crate) fn invalidate_stage_locks_cache() {
+    STAGE_LOCKS_CACHE.with(|cache| cache.set((0, 0)));
+}
+
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(never)]
+#[cold]
+fn stage_locks_resolve(world: &WorldRef, stage_index: i32) -> NonNull<StageLocks> {
+    // ecs_get_binding_ctx resolves stage pointers to the world itself, so no
+    // separate real_world() round-trip is needed.
+    let ctx = unsafe {
+        &*(sys::ecs_get_binding_ctx(world.raw_world.as_ptr())
+            as *const crate::core::world_ctx::WorldCtx)
+    };
+    ctx.safety_locks.stage(stage_index)
+}
+
 /// Resolve the current calling context's stage lock map.
 ///
 /// `world` must be the world pointer of the calling context: inside a
@@ -186,14 +217,22 @@ impl SafetyLocks {
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
 pub(crate) fn stage_locks<const MULTITHREADED: bool>(world: &WorldRef) -> NonNull<StageLocks> {
-    let stage_index = if MULTITHREADED { world.stage_id() } else { 0 };
-    // ecs_get_binding_ctx resolves stage pointers to the world itself, so no
-    // separate real_world() round-trip is needed.
-    let ctx = unsafe {
-        &*(sys::ecs_get_binding_ctx(world.raw_world.as_ptr())
-            as *const crate::core::world_ctx::WorldCtx)
-    };
-    ctx.safety_locks.stage(stage_index)
+    if MULTITHREADED {
+        // resolved per batch, amortized; workers each hit their own stage
+        return stage_locks_resolve(world, world.stage_id());
+    }
+    let key = world.raw_world.as_ptr() as usize;
+    STAGE_LOCKS_CACHE.with(|cache| {
+        let (cached_key, cached_locks) = cache.get();
+        if cached_key == key {
+            // SAFETY: slot is cleared on world drop and stage resize, so a
+            // hit means the pointer is still live.
+            return unsafe { NonNull::new_unchecked(cached_locks as *mut StageLocks) };
+        }
+        let locks = stage_locks_resolve(world, 0);
+        cache.set((key, locks.as_ptr() as usize));
+        locks
+    })
 }
 
 /// [`stage_locks`] with the multithreaded branch resolved at runtime.
@@ -260,9 +299,8 @@ pub(crate) fn sparse_id_record_lock_read_begin(
     locks: NonNull<StageLocks>,
     cr: *mut sys::ecs_component_record_t,
 ) {
-    let component_id = sparse_component_id(cr);
-    if unsafe { (*locks.as_ptr()).read_begin(sparse_lock_key(component_id)) } {
-        alias_violation_panic(world, component_id, false);
+    if unsafe { (*locks.as_ptr()).read_begin(sparse_lock_key(cr)) } {
+        alias_violation_panic(world, sparse_component_id(cr), false);
     }
 }
 
@@ -272,7 +310,7 @@ pub(crate) fn sparse_id_record_lock_read_end(
     locks: NonNull<StageLocks>,
     cr: *mut sys::ecs_component_record_t,
 ) {
-    unsafe { (*locks.as_ptr()).read_end(sparse_lock_key(sparse_component_id(cr))) }
+    unsafe { (*locks.as_ptr()).read_end(sparse_lock_key(cr)) }
 }
 
 #[cfg(feature = "flecs_safety_locks")]
@@ -282,9 +320,8 @@ pub(crate) fn sparse_id_record_lock_write_begin(
     locks: NonNull<StageLocks>,
     cr: *mut sys::ecs_component_record_t,
 ) {
-    let component_id = sparse_component_id(cr);
-    if unsafe { (*locks.as_ptr()).write_begin(sparse_lock_key(component_id)) } {
-        alias_violation_panic(world, component_id, true);
+    if unsafe { (*locks.as_ptr()).write_begin(sparse_lock_key(cr)) } {
+        alias_violation_panic(world, sparse_component_id(cr), true);
     }
 }
 
@@ -294,7 +331,7 @@ pub(crate) fn sparse_id_record_lock_write_end(
     locks: NonNull<StageLocks>,
     cr: *mut sys::ecs_component_record_t,
 ) {
-    unsafe { (*locks.as_ptr()).write_end(sparse_lock_key(sparse_component_id(cr))) }
+    unsafe { (*locks.as_ptr()).write_end(sparse_lock_key(cr)) }
 }
 
 /// Panicking read lock on a dense table column.
@@ -429,7 +466,14 @@ fn __internal_do_read_write_locks<
     ) {
         // if component_id is set, this term is a row (sparse) term
         if any_sparse_terms && info.component_id != 0 {
-            let key = sparse_lock_key(info.component_id);
+            // batch-level resolve; keys must match the cr-keyed FieldAt /
+            // rw_locking sparse paths, which never pay this lookup per row.
+            // flecs_components_get requires the real world, not a stage.
+            let cr = unsafe {
+                let real_world = sys::ecs_get_world(world.raw_world.as_ptr() as *const _);
+                sys::flecs_components_get(real_world, info.component_id)
+            };
+            let key = sparse_lock_key(cr);
             let map = unsafe { &mut *locks.as_ptr() };
             if READONLY {
                 if INCREMENT {
@@ -521,10 +565,12 @@ mod tests {
 
     #[test]
     fn dense_and_sparse_keys_never_collide() {
-        // sparse keys carry the tag bit, dense keys never can (table ids are
-        // far below 2^111)
-        let sparse = sparse_lock_key(u64::MAX);
+        // sparse keys carry the tag bit, dense keys never can (pointers stay
+        // far below 2^111 even after the column shift)
+        let sparse = sparse_lock_key(usize::MAX as *mut sys::ecs_component_record_t);
         assert!(sparse >> 127 == 1);
+        let dense = dense_lock_key(usize::MAX as *mut sys::ecs_table_t, i16::MAX);
+        assert!(dense >> 127 == 0);
     }
 
     #[test]
