@@ -94,6 +94,30 @@ pub fn get_mut(criterion: &mut Criterion) {
     group.finish();
 }
 
+pub fn get_sparse(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("flecs");
+
+    bench_loop_entities!(
+        group,
+        "get_sparse_not_found",
+        ENTITY_COUNT
+        ; (set_components_sparse, (C, 1, 1)), (set_components_dont_fragment, (C, 1, 1)) // Registration
+        ; // no preparation, entities have nothing added
+        ; (get_component_range, (C, 1, 1)) // Benchmark
+    );
+
+    bench_loop_entities!(
+        group,
+        "get_sparse",
+        ENTITY_COUNT
+        ; (set_components_sparse, (C, 1, 1)), (set_components_dont_fragment, (C, 1, 1)) // Registration
+        ; (add_component_range, (C, 1, 1)) // Preparation
+        ; (get_component_range, (C, 1, 1)) // Benchmark
+    );
+
+    group.finish();
+}
+
 pub fn get_inherited_w_depth(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("flecs");
 

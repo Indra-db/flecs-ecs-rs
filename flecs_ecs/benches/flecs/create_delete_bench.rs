@@ -1,6 +1,33 @@
 use crate::common_bench::*;
 use flecs_ecs::sys;
 
+macro_rules! bench_instantiate_root_components {
+    ($group:expr, $label:expr, $start:expr, $end:expr, $inherit:expr) => {{
+        $group.bench_function($label, |bencher| {
+            let world = World::new();
+
+            register_component_range!(world, C, $start, $end);
+            if $inherit {
+                set_components_inheritable!(&world, C, $start, $end);
+            }
+
+            let root = world.prefab();
+            set_component_range!(&world, root, C, $start, $end);
+
+            bencher.iter_custom(|iters| {
+                let start = Instant::now();
+                for _ in 0..iters {
+                    let e = world.entity().is_a(root);
+                    e.destruct();
+                }
+                start.elapsed() / 2
+            });
+
+            reset_world_arrays(&world);
+        });
+    }};
+}
+
 pub fn entity_new_delete(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("flecs");
 
@@ -43,6 +70,22 @@ pub fn entity_new_w_name_delete(criterion: &mut Criterion) {
 
 pub fn create_delete(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("flecs");
+
+    group.bench_function("create_delete_empty", |bencher| {
+        let world = World::new();
+
+        bencher.iter_custom(|iters| {
+            let start = Instant::now();
+            for _ in 0..iters {
+                for _ in 0..ENTITY_COUNT {
+                    let entity = world.entity();
+                    entity.destruct();
+                }
+            }
+            let elapsed = start.elapsed();
+            elapsed / (ENTITY_COUNT * 2)
+        });
+    });
 
     // tags
     bench_create_delete_entity!(group, "tag_1", ENTITY_COUNT, T, 1, 1, add_component_range);
@@ -171,6 +214,46 @@ pub fn instantiate_delete_tree(criterion: &mut Criterion) {
             );
         }
     }
+
+    group.bench_function("instantiate_override_0_components", |bencher| {
+        let world = World::new();
+        let root = world.prefab();
+
+        bencher.iter_custom(|iters| {
+            let start = Instant::now();
+            for _ in 0..iters {
+                let e = world.entity().is_a(root);
+                e.destruct();
+            }
+            start.elapsed() / 2
+        });
+    });
+
+    bench_instantiate_root_components!(group, "instantiate_override_1_components", 1, 1, false);
+    bench_instantiate_root_components!(group, "instantiate_override_8_components", 1, 8, false);
+    bench_instantiate_root_components!(group, "instantiate_override_32_components", 1, 32, false);
+    bench_instantiate_root_components!(group, "instantiate_override_64_components", 1, 64, false);
+
+    group.bench_function("instantiate_inherit_0_components", |bencher| {
+        let world = World::new();
+        let root = world.prefab();
+
+        bencher.iter_custom(|iters| {
+            let start = Instant::now();
+            for _ in 0..iters {
+                let e = world.entity().is_a(root);
+                e.destruct();
+            }
+            start.elapsed() / 2
+        });
+    });
+
+    bench_instantiate_root_components!(group, "instantiate_inherit_1_components", 1, 1, true);
+    bench_instantiate_root_components!(group, "instantiate_inherit_8_components", 1, 8, true);
+    bench_instantiate_root_components!(group, "instantiate_inherit_32_components", 1, 32, true);
+    bench_instantiate_root_components!(group, "instantiate_inherit_64_components", 1, 64, true);
+
+    bench_instantiate_root_components!(group, "instantiate_tree_w0_d0", 1, 3, false);
 
     group.finish();
 }

@@ -54,6 +54,57 @@ pub fn emit(criterion: &mut Criterion) {
             });
         });
     }
+
+    for term_count in [2, 4, 8] {
+        let observer_count = 50;
+        group.bench_function(
+            format!("emit_multi_{term_count}_100_observers"),
+            |bencher| {
+                reset_srand();
+                let world = World::new();
+                let ids = create_ids(&world, 8, 0, true, false, true);
+                let mut entities: Vec<EntityView<'_>> = Vec::with_capacity(ENTITY_COUNT as usize);
+
+                for i in 0..ENTITY_COUNT {
+                    let e = world.entity();
+                    unsafe { e.add_id_unchecked(ids[0]) };
+
+                    for id in &ids[1..] {
+                        if flip_coin() {
+                            unsafe { e.add_id_unchecked(*id) };
+                        }
+                    }
+
+                    entities.push(e);
+                }
+
+                for _ in 0..observer_count {
+                    let mut o = world.observer::<Event, ()>();
+
+                    for id in &ids[..term_count] {
+                        o.with(*id).self_();
+                    }
+
+                    o.run(|_| {});
+                }
+
+                bencher.iter_custom(|iters| {
+                    let start = Instant::now();
+                    for _ in 0..iters {
+                        for entity in &entities {
+                            world
+                                .event::<Event>()
+                                .add(ids[0])
+                                .entity(*entity)
+                                .emit(&Event);
+                        }
+                    }
+                    let elapsed = start.elapsed();
+                    elapsed / ENTITY_COUNT //time average per entity operation
+                });
+            },
+        );
+    }
 }
 
 pub fn emit_propagate(criterion: &mut Criterion) {

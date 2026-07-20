@@ -17,7 +17,9 @@ mod get_bench;
 mod has_bench;
 mod observer_bench;
 mod query_bench;
+mod ref_bench;
 mod set_bench;
+mod world_bench;
 
 use add_remove_bench::*;
 use commands_bench::*;
@@ -28,7 +30,9 @@ use has_bench::*;
 use observer_bench::*;
 use parenting_names_bench::*;
 use query_bench::*;
+use ref_bench::*;
 use set_bench::*;
+use world_bench::*;
 
 fn ecs_default_criterion() -> Criterion {
     let mut criterion_config = Criterion::default().configure_from_args();
@@ -51,8 +55,10 @@ criterion_main!(
     g_parenting,
     g_has,
     g_set,
+    g_ref,
     g_observers,
-    g_query
+    g_query,
+    g_world
 );
 
 criterion_group!(
@@ -60,6 +66,15 @@ criterion_group!(
     config = ecs_default_criterion();
     targets =
     query_iter,
+    query_init_fini,
+    query_iter_read,
+    query_iter_empty,
+    query_iter_up,
+    query_inheritance,
+    query_special,
+    query_transform,
+    query_toggle,
+    query_rematch,
 );
 
 criterion_group!(
@@ -86,6 +101,7 @@ criterion_group!(
     get,
     get_pair,
     get_mut,
+    get_sparse,
     get_target,
     get_parent,
     get_inherited_w_depth,
@@ -117,7 +133,28 @@ criterion_group!(
     config = ecs_default_criterion();
     targets =
     set,
-    set_remove
+    set_remove,
+    ensure,
+    set_id,
+    ensure_remove
+);
+
+criterion_group!(
+    name = g_ref;
+    config = ecs_default_criterion();
+    targets =
+    ref_init,
+    ref_get
+);
+
+criterion_group!(
+    name = g_world;
+    config = ecs_default_criterion();
+    targets =
+    world_init_fini,
+    progress_tasks,
+    progress_systems,
+    cleanup_tables
 );
 
 criterion_group!(
