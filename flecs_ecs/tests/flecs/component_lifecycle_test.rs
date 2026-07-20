@@ -3773,6 +3773,13 @@ fn component_lifecycle_compare_WithoutOperators() {
     compare_WithoutOperators();
 }
 
+// ─── test_2_components_add_remove ─────────────────────────────────────────────
+
+#[test]
+fn component_lifecycle_2_components_add_remove() {
+    test_2_components_add_remove();
+}
+
 // ─── struct_w_string_add_2_remove ─────────────────────────────────────────────
 
 #[test]

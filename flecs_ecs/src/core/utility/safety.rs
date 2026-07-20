@@ -89,7 +89,7 @@ pub(crate) fn rw_locking<T: GetTuple, Return, const MULTITHREADED: bool>(
 pub(crate) fn clone_locking<const MULTITHREADED: bool>(
     world: WorldRef<'_>,
     components: &[*mut core::ffi::c_void],
-    safety_info: &[sys::ecs_lock_target_t],
+    safety_info: &[sys::ecs_rust_lock_target_t],
 ) {
     let locks = stage_locks::<MULTITHREADED>(&world);
 

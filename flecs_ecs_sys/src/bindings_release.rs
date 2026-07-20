@@ -2148,7 +2148,7 @@ pub struct ecs_type_hooks_t {
     pub on_set: ecs_iter_action_t,
     #[doc = "Callback that is invoked when an instance of the component is removed.\n This callback is invoked after the observers are invoked, and before the\n destructor is invoked."]
     pub on_remove: ecs_iter_action_t,
-    #[doc = "Callback that is invoked with the existing and new value before the\n value is assigned. Invoked after on_add and before on_set. Registering\n an on_replace hook prevents using operations that return a mutable\n pointer to the component, like get_mut(), ensure(), and emplace().\n The iterator's other_table field is set to the table of the entity\n before the operation. To find out whether the component existed before\n the operation, call ecs_table_has_id() on other_table."]
+    #[doc = "Callback that is invoked with the existing and new value before the\n value is assigned. Invoked after on_add and before on_set. Registering\n an on_replace hook prevents using operations that return a mutable\n pointer to the component, like get_mut(), ensure(), and emplace()."]
     pub on_replace: ecs_iter_action_t,
     #[doc = "Callback that is invoked before the on_set/OnSet hooks and observers are\n invoked. When the callback returns false, the on_set/OnSet hooks and\n observers are not invoked for the entity."]
     pub on_validate: ecs_on_validate_t,
@@ -2763,21 +2763,6 @@ pub struct ecs_table_diff_t {
     pub added_flags: ecs_flags32_t,
     pub removed_flags: ecs_flags32_t,
 }
-#[doc = "safety information of where the ptr from `get` functions originates from.\n when component record is null, that means it comes from a table.\n when table is null, that means it comes from a sparse storage.\n this is used for column locking / component record locking."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ecs_lock_target_t {
-    pub cr: *mut ecs_component_record_t,
-    pub table: *mut ecs_table_t,
-    pub column_index: i16,
-}
-#[doc = "a wrapper around a void* which represents a component pointer.\n When FLECS_MUT_ALIAS_LOCKS is defined, then this also provides additional safety information about the pointer."]
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ecs_get_ptr_t {
-    pub ptr: *mut ::core::ffi::c_void,
-    pub lock_target: ecs_lock_target_t,
-}
 #[doc = "Tracks which and how many non-fragmenting children are stored in a table for a parent."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -2812,24 +2797,7 @@ unsafe extern "C-unwind" {
     pub fn ecs_read_end(record: *const ecs_record_t);
 }
 unsafe extern "C-unwind" {
-    #[doc = "Get an immutable pointer to a component by providing the entity record.\n This operation obtains a const pointer to the requested component. The\n operation accepts the component entity id.\n\n This operation can return inherited components reachable through an `IsA`\n relationship.\n\n @param world The world.\n @param entity The entity.\n @param r The entity record.\n @param component The component to get.\n @return The component pointer, NULL if the entity does not have the component.\n\n @see ecs_get_id()\n @see ecs_get_mut_id()\n @see flecs_record_get_mut_id()"]
-    pub fn flecs_record_get_id(
-        world: *const ecs_world_t,
-        entity: ecs_entity_t,
-        r: *const ecs_record_t,
-        component: ecs_id_t,
-    ) -> ecs_get_ptr_t;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Get a mutable pointer to a component, providing the entity record.\n This operation obtains a mutable pointer to the requested component. The\n operation accepts the component entity id.\n\n Unlike flecs_record_get_id(), this operation does not return inherited components.\n This is to prevent errors where an application accidentally resolves an\n inherited component shared with many entities and modifies it, while thinking\n it is modifying an owned component.\n\n @param world The world.\n @param r The entity record.\n @param component The component to get.\n @return The component pointer, NULL if the entity does not have the component.\n\n @see flecs_record_get_id()\n @see ecs_get_mut_id()\n @see ecs_get_id()"]
-    pub fn flecs_record_get_mut_id(
-        world: *const ecs_world_t,
-        r: *const ecs_record_t,
-        component: ecs_id_t,
-    ) -> ecs_get_ptr_t;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Get component from entity record.\n This operation returns a pointer to a component for the entity\n associated with the provided record. For safe access to the component, obtain\n the record with ecs_read_begin() or ecs_write_begin().\n\n Obtaining a component from a record is faster than obtaining it from the\n entity handle, as it reduces the number of lookups required.\n\n @param world The world.\n @param record Record to the entity.\n @param id The (component) ID.\n @return Pointer to component, or NULL if entity does not have the component.\n\n @see ecs_record_ensure_id()"]
+    #[doc = "Get a component from an entity record.\n This operation returns a pointer to a component for the entity\n associated with the provided record. For safe access to the component, obtain\n the record with ecs_read_begin() or ecs_write_begin().\n\n Obtaining a component from a record is faster than obtaining it from the\n entity handle, as it reduces the number of lookups required.\n\n @param world The world.\n @param record Record to the entity.\n @param id The (component) ID.\n @return Pointer to component, or NULL if entity does not have the component.\n\n @see ecs_record_ensure_id()"]
     pub fn ecs_record_get_id(
         world: *const ecs_world_t,
         record: *const ecs_record_t,
@@ -2958,89 +2926,6 @@ unsafe extern "C-unwind" {
         id_ptr: *mut ecs_id_t,
         diff: *mut ecs_table_diff_t,
     ) -> *mut ecs_table_t;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin read lock on sparse component record.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_read_begin(cr: *mut ecs_component_record_t) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End read lock on sparse component record.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_read_end(cr: *mut ecs_component_record_t) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin write lock on sparse component record.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_write_begin(cr: *mut ecs_component_record_t) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End write lock on sparse component record.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_write_end(cr: *mut ecs_component_record_t) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin read lock on table column.\n\n @param table The table.\n @param column_index The column index in the table.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_read_begin(table: *mut ecs_table_t, column_index: i16) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End read lock on table column.\n\n @param table The table.\n @param column_index The column index in the table.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_read_end(table: *mut ecs_table_t, column_index: i16) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin write lock on table column.\n\n @param table The table.\n @param column_index The column index in the table.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_write_begin(table: *mut ecs_table_t, column_index: i16) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End write lock on table column.\n\n @param table The table.\n @param column_index The column index in the table.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_write_end(table: *mut ecs_table_t, column_index: i16) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin read lock on sparse component record in multithreaded context.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_read_begin_multithreaded(cr: *mut ecs_component_record_t)
-    -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End read lock on sparse component record in multithreaded context.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_read_end_multithreaded(cr: *mut ecs_component_record_t) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin write lock on sparse component record in multithreaded context.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_write_begin_multithreaded(
-        cr: *mut ecs_component_record_t,
-    ) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End write lock on sparse component record in multithreaded context.\n a sparse id is a component marked either as sparse or non-fragmenting\n\n @param cr The component record.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_sparse_id_record_write_end_multithreaded(cr: *mut ecs_component_record_t) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin read lock on table column in multithreaded context.\n\n @param table The table.\n @param column_index The column index in the table.\n @param stage_id The stage id of the calling thread.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_read_begin_multithreaded(
-        table: *mut ecs_table_t,
-        column_index: i16,
-        stage_id: i32,
-    ) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End read lock on table column in multithreaded context.\n\n @param table The table.\n @param column_index The column index in the table.\n @param stage_id The stage id of the calling thread.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_read_end_multithreaded(
-        table: *mut ecs_table_t,
-        column_index: i16,
-        stage_id: i32,
-    ) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "Begin write lock on table column in multithreaded context.\n\n @param table The table.\n @param column_index The column index in the table.\n @param stage_id The stage id of the calling thread.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_write_begin_multithreaded(
-        table: *mut ecs_table_t,
-        column_index: i16,
-        stage_id: i32,
-    ) -> bool;
-}
-unsafe extern "C-unwind" {
-    #[doc = "End write lock on table column in multithreaded context.\n\n @param table The table.\n @param column_index The column index in the table.\n @param stage_id The stage id of the calling thread.\n @return true if the mut alias was violated, false otherwise."]
-    pub fn flecs_table_column_write_end_multithreaded(
-        table: *mut ecs_table_t,
-        column_index: i16,
-        stage_id: i32,
-    ) -> bool;
 }
 #[doc = "Value of a dynamic type.\n See the meta addon for functions to create, assign and destruct values."]
 #[repr(C)]
@@ -4260,7 +4145,7 @@ unsafe extern "C-unwind" {
     ) -> *const ::core::ffi::c_void;
 }
 unsafe extern "C-unwind" {
-    #[doc = "Get a mutable pointer to a component.\n This operation obtains a mutable pointer to the requested component. The\n operation accepts the component entity ID.\n\n Unlike ecs_get_id(), this operation does not return inherited components.\n This is to prevent errors where an application accidentally resolves an\n inherited component shared with many entities and modifies it, while thinking\n it is modifying an owned component.\n\n @param world The world.\n @param entity The entity.\n @param component The component to get.\n @return The component pointer, NULL if the entity does not have the component.\n\n @see ecs_get_id()"]
+    #[doc = "Get a mutable pointer to a component.\n This operation obtains a mutable pointer to the requested component. The\n operation accepts the component entity ID.\n\n Unlike ecs_get_id(), this operation does not return inherited components.\n This is to prevent errors where an application accidentally resolves an\n inherited component shared with many entities and modifies it, while thinking\n it is modifying an owned component.\n\n @param world The world.\n @param entity The entity.\n @param component The component to get.\n @return The component pointer, NULL if the entity does not have the component."]
     pub fn ecs_get_mut_id(
         world: *const ecs_world_t,
         entity: ecs_entity_t,
@@ -9795,14 +9680,46 @@ unsafe extern "C-unwind" {
         size: usize,
     ) -> ecs_rust_set_t;
 }
+#[doc = "Identifies the storage a component pointer originates from, so the Rust\n side can key its mut-alias tracking. cr set: sparse / non-fragmenting\n storage. table set: dense table column (which may belong to an IsA base\n entity's table for inherited reads)."]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ecs_rust_lock_target_t {
+    pub cr: *mut ecs_component_record_t,
+    pub table: *mut ecs_table_t,
+    pub column_index: i16,
+}
+#[doc = "Component pointer plus its storage origin. ptr is NULL when the entity\n does not have the component."]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ecs_rust_get_ptr_t {
+    pub ptr: *mut ::core::ffi::c_void,
+    pub lock_target: ecs_rust_lock_target_t,
+}
 unsafe extern "C-unwind" {
-    #[doc = "Fast path for compile-time-known sparse / dont_fragment components without\n the (OnInstantiate, Inherit) trait. Mirrors ecs_get_sparse_id() but returns\n an ecs_get_ptr_t so lock-target info is available under\n FLECS_MUT_ALIAS_LOCKS."]
+    #[doc = "Get an immutable component pointer by entity record, including components\n inherited through an IsA relationship. Mirrors ecs_get_id() but skips the\n repeat record lookup and reports the storage origin."]
+    pub fn ecs_rust_record_get_id(
+        world: *const ecs_world_t,
+        entity: ecs_entity_t,
+        r: *const ecs_record_t,
+        component: ecs_id_t,
+    ) -> ecs_rust_get_ptr_t;
+}
+unsafe extern "C-unwind" {
+    #[doc = "Get a mutable component pointer by entity record. Does not return\n inherited components, mirroring ecs_get_mut_id()."]
+    pub fn ecs_rust_record_get_mut_id(
+        world: *const ecs_world_t,
+        r: *const ecs_record_t,
+        component: ecs_id_t,
+    ) -> ecs_rust_get_ptr_t;
+}
+unsafe extern "C-unwind" {
+    #[doc = "Fast path for compile-time-known sparse / dont_fragment components without\n the (OnInstantiate, Inherit) trait. Mirrors ecs_get_sparse_id() but reports\n the storage origin."]
     pub fn ecs_rust_get_sparse_id(
         world: *const ecs_world_t,
         entity: ecs_entity_t,
         id: ecs_id_t,
         size: usize,
-    ) -> ecs_get_ptr_t;
+    ) -> ecs_rust_get_ptr_t;
 }
 unsafe extern "C-unwind" {
     #[doc = "ABI guards: C-side sizeof for structs with FLECS_DEBUG-gated fields, so the\n Rust side can assert its bindings match the compiled profile."]

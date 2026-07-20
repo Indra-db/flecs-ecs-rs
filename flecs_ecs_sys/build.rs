@@ -198,11 +198,6 @@ fn generate_bindings(c_debug: bool, out_file: &str) {
         bindings = bindings.clang_arg("-DFLECS_JOURNAL");
     }
 
-    #[cfg(feature = "flecs_safety_locks")]
-    {
-        bindings = bindings.clang_arg("-DFLECS_MUT_ALIAS_LOCKS");
-    }
-
     let term_count_max = if cfg!(feature = "flecs_term_count_64") {
         64
     } else {
@@ -323,9 +318,6 @@ fn main() {
 
         #[cfg(feature = "flecs_journal")]
         build.define("FLECS_JOURNAL", None);
-
-        #[cfg(feature = "flecs_safety_locks")]
-        build.define("FLECS_MUT_ALIAS_LOCKS", None);
 
         if release_c {
             build

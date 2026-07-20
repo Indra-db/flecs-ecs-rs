@@ -32,12 +32,46 @@ ecs_rust_set_t ecs_rust_set(
     const void *new_ptr,
     size_t size);
 
-/* Fast path for compile-time-known sparse / dont_fragment components without
- * the (OnInstantiate, Inherit) trait. Mirrors ecs_get_sparse_id() but returns
- * an ecs_get_ptr_t so lock-target info is available under
- * FLECS_MUT_ALIAS_LOCKS. */
+/* Identifies the storage a component pointer originates from, so the Rust
+ * side can key its mut-alias tracking. cr set: sparse / non-fragmenting
+ * storage. table set: dense table column (which may belong to an IsA base
+ * entity's table for inherited reads). */
+typedef struct ecs_rust_lock_target_t {
+    ecs_component_record_t *cr;
+    ecs_table_t *table;
+    int16_t column_index;
+} ecs_rust_lock_target_t;
+
+/* Component pointer plus its storage origin. ptr is NULL when the entity
+ * does not have the component. */
+typedef struct ecs_rust_get_ptr_t {
+    void *ptr;
+    ecs_rust_lock_target_t lock_target;
+} ecs_rust_get_ptr_t;
+
+/* Get an immutable component pointer by entity record, including components
+ * inherited through an IsA relationship. Mirrors ecs_get_id() but skips the
+ * repeat record lookup and reports the storage origin. */
 FLECS_API
-ecs_get_ptr_t ecs_rust_get_sparse_id(
+ecs_rust_get_ptr_t ecs_rust_record_get_id(
+    const ecs_world_t *world,
+    ecs_entity_t entity,
+    const ecs_record_t *r,
+    ecs_id_t component);
+
+/* Get a mutable component pointer by entity record. Does not return
+ * inherited components, mirroring ecs_get_mut_id(). */
+FLECS_API
+ecs_rust_get_ptr_t ecs_rust_record_get_mut_id(
+    const ecs_world_t *world,
+    const ecs_record_t *r,
+    ecs_id_t component);
+
+/* Fast path for compile-time-known sparse / dont_fragment components without
+ * the (OnInstantiate, Inherit) trait. Mirrors ecs_get_sparse_id() but reports
+ * the storage origin. */
+FLECS_API
+ecs_rust_get_ptr_t ecs_rust_get_sparse_id(
     const ecs_world_t *world,
     ecs_entity_t entity,
     ecs_id_t id,

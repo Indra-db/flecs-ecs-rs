@@ -8,45 +8,29 @@ use crate::sys;
 use flecs_ecs_derive::tuples;
 use sys::ecs_record_t;
 
-/* Without flecs_safety_locks, ecs_get_ptr_t degrades to a bare void*
- * (mirror of C's ECS_GET_PTR_PTR / ECS_GET_PTR_NULL macros). */
-#[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
-pub(crate) fn get_ptr_raw(get_ptr: &sys::ecs_get_ptr_t) -> *mut c_void {
+pub(crate) fn get_ptr_raw(get_ptr: &sys::ecs_rust_get_ptr_t) -> *mut c_void {
     get_ptr.ptr
 }
 
-#[cfg(not(feature = "flecs_safety_locks"))]
 #[inline(always)]
-pub(crate) fn get_ptr_raw(get_ptr: &sys::ecs_get_ptr_t) -> *mut c_void {
-    *get_ptr
-}
-
-#[cfg(feature = "flecs_safety_locks")]
-#[inline(always)]
-pub(crate) fn get_ptr_null() -> sys::ecs_get_ptr_t {
-    sys::ecs_get_ptr_t::default()
-}
-
-#[cfg(not(feature = "flecs_safety_locks"))]
-#[inline(always)]
-pub(crate) fn get_ptr_null() -> sys::ecs_get_ptr_t {
-    core::ptr::null_mut()
+pub(crate) fn get_ptr_null() -> sys::ecs_rust_get_ptr_t {
+    sys::ecs_rust_get_ptr_t::default()
 }
 
 #[cfg(feature = "flecs_safety_locks")]
 #[derive(Debug, Copy, Clone)]
 #[doc(hidden)]
 pub enum SafetyInfo {
-    Read(sys::ecs_lock_target_t),
-    Write(sys::ecs_lock_target_t),
+    Read(sys::ecs_rust_lock_target_t),
+    Write(sys::ecs_rust_lock_target_t),
 }
 
 #[cfg(feature = "flecs_safety_locks")]
 impl Default for SafetyInfo {
     #[inline]
     fn default() -> Self {
-        SafetyInfo::Read(sys::ecs_lock_target_t::default())
+        SafetyInfo::Read(sys::ecs_rust_lock_target_t::default())
     }
 }
 
@@ -90,7 +74,7 @@ impl<T: GetTuple, const LEN: usize> GetComponentPointers<T> for ComponentsData<T
         let mut array_components = [core::ptr::null::<c_void>() as *mut c_void; LEN];
 
         #[cfg(feature = "flecs_safety_locks")]
-        let mut safety_info = [SafetyInfo::Read(sys::ecs_lock_target_t::default()); LEN];
+        let mut safety_info = [SafetyInfo::Read(sys::ecs_rust_lock_target_t::default()); LEN];
 
         // SAFETY: same contract as this function — record is the entity's
         // record from the same world, guaranteed by the caller.
@@ -118,7 +102,7 @@ impl<T: GetTuple, const LEN: usize> GetComponentPointers<T> for ComponentsData<T
         let mut array_components = [core::ptr::null::<c_void>() as *mut c_void; LEN];
 
         #[cfg(feature = "flecs_safety_locks")]
-        let mut safety_info = [SafetyInfo::Read(sys::ecs_lock_target_t::default()); LEN];
+        let mut safety_info = [SafetyInfo::Read(sys::ecs_rust_lock_target_t::default()); LEN];
 
         let has_all_components = T::populate_array_ptrs_singleton::<SHOULD_PANIC>(
             world,
@@ -329,7 +313,7 @@ pub trait GetTuple: Sized {
                     let pair_id = ecs_pair(flecs::Constant::ID, *id_underlying_type);
                     let record = unsafe { sys::ecs_record_find(world_ptr, target) };
                     let constant_value =
-                        unsafe { sys::flecs_record_get_id(world_ptr, target, record, pair_id) };
+                        unsafe { sys::ecs_rust_record_get_id(world_ptr, target, record, pair_id) };
                     ecs_assert!(
                         !get_ptr_raw(&constant_value).is_null(),
                         FlecsErrorCode::InternalError,
@@ -345,7 +329,7 @@ pub trait GetTuple: Sized {
                 {
                     // get constant value from constant entity
                     let constant_value =
-                        unsafe { sys::flecs_record_get_id(world_ptr, entity, record, id) };
+                        unsafe { sys::ecs_rust_record_get_id(world_ptr, entity, record, id) };
 
                     ecs_assert!(
                         !get_ptr_raw(&constant_value).is_null(),
@@ -358,7 +342,7 @@ pub trait GetTuple: Sized {
                 }
             } else {
                 // if there is no matching pair for (r,*), try just r
-                unsafe { sys::flecs_record_get_id(world_ptr, entity, record, id) }
+                unsafe { sys::ecs_rust_record_get_id(world_ptr, entity, record, id) }
             }
         } else if const {
             // mirrors the C++ `is_get_sparse_component` fast path: sparse /
@@ -383,9 +367,9 @@ pub trait GetTuple: Sized {
                 )
             }
         } else if T::IS_IMMUTABLE {
-            unsafe { sys::flecs_record_get_id(world_ptr, entity, record, id) }
+            unsafe { sys::ecs_rust_record_get_id(world_ptr, entity, record, id) }
         } else {
-            /* flecs_record_get_mut_id rejects wildcard ids; resolve (R, *) /
+            /* ecs_rust_record_get_mut_id rejects wildcard ids; resolve (R, *) /
              * (R, Any) to the concrete pair on the entity first. Only pairs
              * can contain a wildcard, so non-pair ids skip the check. */
             let id = if ecs_is_pair(id) {
@@ -409,7 +393,7 @@ pub trait GetTuple: Sized {
             if id == 0 {
                 get_ptr_null()
             } else {
-                unsafe { sys::flecs_record_get_mut_id(world_ptr, record, id) }
+                unsafe { sys::ecs_rust_record_get_mut_id(world_ptr, record, id) }
             }
         };
 
