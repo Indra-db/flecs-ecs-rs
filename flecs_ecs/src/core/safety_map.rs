@@ -417,38 +417,45 @@ pub(crate) fn table_column_lock_write_end(
     unsafe { (*locks.as_ptr()).write_end(dense_lock_key(table, column)) }
 }
 
+/// Take the term borrows for one table batch, returning the stage map they
+/// were registered in so the matching release does not have to resolve it
+/// again: that resolve is a thread-local lookup and, at two per batch, was
+/// the bulk of the per-batch cost.
 #[inline]
 #[cfg(feature = "flecs_safety_locks")]
-pub(crate) fn do_read_write_locks<
-    const INCREMENT: bool,
-    const ANY_SPARSE_TERMS: bool,
-    T: QueryTuple,
->(
+pub(crate) fn acquire_batch_locks<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
     world: &WorldRef,
     table_records: &[super::TableColumnSafety],
-) {
-    if world.is_currently_multithreaded() {
-        __internal_do_read_write_locks::<INCREMENT, true, ANY_SPARSE_TERMS, T>(
-            world,
-            table_records,
-        );
+) -> NonNull<StageLocks> {
+    let locks = if world.is_currently_multithreaded() {
+        stage_locks::<true>(world)
     } else {
-        __internal_do_read_write_locks::<INCREMENT, false, ANY_SPARSE_TERMS, T>(
-            world,
-            table_records,
-        );
-    }
+        stage_locks::<false>(world)
+    };
+    __internal_do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(world, locks, table_records);
+    locks
+}
+
+/// Release borrows taken by [`acquire_batch_locks`] into the same stage map.
+#[inline]
+#[cfg(feature = "flecs_safety_locks")]
+pub(crate) fn release_batch_locks<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
+    world: &WorldRef,
+    locks: NonNull<StageLocks>,
+    table_records: &[super::TableColumnSafety],
+) {
+    __internal_do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(world, locks, table_records);
 }
 
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
 fn __internal_do_read_write_locks<
     const INCREMENT: bool,
-    const MULTITHREADED: bool,
     const ANY_SPARSE_TERMS: bool,
     T: QueryTuple,
 >(
     world: &WorldRef<'_>,
+    locks: NonNull<StageLocks>,
     table_records: &[super::TableColumnSafety],
 ) {
     let count_immutable: usize = const { T::COUNT_IMMUTABLE };
@@ -465,8 +472,6 @@ fn __internal_do_read_write_locks<
             + T::COUNT_OPTIONAL_IMMUTABLE
             + T::COUNT_OPTIONAL_MUTABLE
     };
-
-    let locks = stage_locks::<MULTITHREADED>(world);
 
     #[inline(always)]
     fn term_lock<const INCREMENT: bool, const READONLY: bool>(

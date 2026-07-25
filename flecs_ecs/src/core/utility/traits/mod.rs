@@ -24,7 +24,7 @@ use crate::core::{
     TableIter, ecs_assert,
 };
 #[cfg(feature = "flecs_safety_locks")]
-use crate::core::{DECREMENT, INCREMENT, do_read_write_locks};
+use crate::core::{acquire_batch_locks, release_batch_locks};
 #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
 use crate::core::{FlecsErrorCode, IterTableLock};
 use crate::sys;
@@ -572,7 +572,7 @@ pub(crate) fn internal_each_generic<
     );
 
     #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+    let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
         _world,
         components_data.safety_table_records(),
     );
@@ -591,8 +591,9 @@ pub(crate) fn internal_each_generic<
     }
 
     #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+    release_batch_locks::<ANY_SPARSE_TERMS, T>(
         _world,
+        __locks,
         components_data.safety_table_records(),
     );
 }
@@ -663,7 +664,7 @@ pub(crate) fn internal_each_iter<
         };
 
         #[cfg(feature = "flecs_safety_locks")]
-        do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+        let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
             world,
             components_data.safety_table_records(),
         );
@@ -694,8 +695,9 @@ pub(crate) fn internal_each_iter<
         }
 
         #[cfg(feature = "flecs_safety_locks")]
-        do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+        release_batch_locks::<ANY_SPARSE_TERMS, T>(
             world,
+            __locks,
             components_data.safety_table_records(),
         );
     }

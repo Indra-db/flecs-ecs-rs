@@ -1495,7 +1495,7 @@ where
 
         let result = {
             #[cfg(feature = "flecs_safety_locks")]
-            do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+            let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
                 &world,
                 components_data.safety_table_records(),
             );
@@ -1511,8 +1511,9 @@ where
             let ret = func(tuple);
 
             #[cfg(feature = "flecs_safety_locks")]
-            do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+            release_batch_locks::<ANY_SPARSE_TERMS, T>(
                 &world,
+                __locks,
                 components_data.safety_table_records(),
             );
             ret
@@ -1542,7 +1543,7 @@ where
 
     let result = {
         #[cfg(feature = "flecs_safety_locks")]
-        do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+        let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
             &world,
             components_data.safety_table_records(),
         );
@@ -1558,8 +1559,9 @@ where
         let ret = Some(func(tuple));
 
         #[cfg(feature = "flecs_safety_locks")]
-        do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+        release_batch_locks::<ANY_SPARSE_TERMS, T>(
             &world,
+            __locks,
             components_data.safety_table_records(),
         );
         ret
@@ -1585,7 +1587,7 @@ fn __internal_find_entity_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     let iter_count = iter.count as usize;
 
     #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+    let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
         components_data.safety_table_records(),
     );
@@ -1627,8 +1629,9 @@ fn __internal_find_entity_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     }
 
     #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+    release_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
+        __locks,
         components_data.safety_table_records(),
     );
 }
@@ -1647,7 +1650,7 @@ fn __internal_find_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     let iter_count = iter.count as usize;
 
     #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+    let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
         components_data.safety_table_records(),
     );
@@ -1685,8 +1688,9 @@ fn __internal_find_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     }
 
     #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+    release_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
+        __locks,
         components_data.safety_table_records(),
     );
 }
