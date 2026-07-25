@@ -474,11 +474,30 @@ ecs_rust_get_ptr_t ecs_rust_record_get_id(
     ecs_table_t *table = r->table;
     ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);
 
-    /* Inline pre-test so a plain component id never pays for the out-of-line
-     * ecs_id_is_wildcard call on this hot path. */
-    if ((component == EcsWildcard) || (component == EcsAny) ||
+    if (component < FLECS_HI_COMPONENT_ID) {
+        /* EcsWildcard and EcsAny are FLECS_HI_COMPONENT_ID + 14/15 and a
+         * wildcard pair carries the pair flag, so nothing that reaches this
+         * branch can be a wildcard: the fast path never pays for the test
+         * below. */
+        if (!world->non_trivial_lookup[component]) {
+            ecs_assert(table->component_map != NULL, ECS_INTERNAL_ERROR, NULL);
+            int16_t column_index = table->component_map[component];
+            if (column_index > 0) {
+                column_index --;
+                ecs_column_t *column = &table->data.columns[column_index];
+                return ECS_RUST_GET_PTR(
+                    ECS_ELEM(column->data, column->ti->size,
+                        ECS_RECORD_TO_ROW(r->row)),
+                    NULL, table, column_index);
+            }
+            return ECS_RUST_GET_PTR_NULL;
+        }
+    } else if ((component == EcsWildcard) || (component == EcsAny) ||
         (ECS_IS_PAIR(component) && ecs_id_is_wildcard(component)))
     {
+        /* Resolve a wildcard to the concrete id the entity's table holds, so
+         * the lock key we hand back names the same storage a concrete get
+         * would. */
         ecs_type_t type = table->type;
         int32_t i, count = type.count;
         for (i = 0; i < count; i ++) {
@@ -498,22 +517,6 @@ ecs_rust_get_ptr_t ecs_rust_record_get_id(
             }
         }
         if (i == count) {
-            return ECS_RUST_GET_PTR_NULL;
-        }
-    }
-
-    if (component < FLECS_HI_COMPONENT_ID) {
-        if (!world->non_trivial_lookup[component]) {
-            ecs_assert(table->component_map != NULL, ECS_INTERNAL_ERROR, NULL);
-            int16_t column_index = table->component_map[component];
-            if (column_index > 0) {
-                column_index --;
-                ecs_column_t *column = &table->data.columns[column_index];
-                return ECS_RUST_GET_PTR(
-                    ECS_ELEM(column->data, column->ti->size,
-                        ECS_RECORD_TO_ROW(r->row)),
-                    NULL, table, column_index);
-            }
             return ECS_RUST_GET_PTR_NULL;
         }
     }
