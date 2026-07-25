@@ -4,6 +4,67 @@ use core::ffi::c_void;
 use crate::core::*;
 use crate::sys;
 
+/// Owns a raw iterator for the duration of one iteration and releases it on
+/// drop unless the iteration ran to completion, in which case the C side
+/// already released it. Without this a panicking user callback would leak the
+/// iterator's cursor into the stage stack allocator, which flecs reports as a
+/// leak when the world is destroyed.
+pub(crate) struct IterGuard {
+    iter: sys::ecs_iter_t,
+    live: bool,
+}
+
+impl IterGuard {
+    #[inline(always)]
+    pub(crate) fn new(iter: sys::ecs_iter_t) -> IterGuard {
+        IterGuard { iter, live: true }
+    }
+
+    /// Advance the iterator with `next`. Returning `false` means the C side
+    /// finalized the iterator, so the guard stops owning it; leaving the loop
+    /// any other way keeps the guard armed.
+    #[inline(always)]
+    pub(crate) fn next(&mut self, next: impl FnOnce(&mut sys::ecs_iter_t) -> bool) -> bool {
+        let more = next(&mut self.iter);
+        self.live &= more;
+        more
+    }
+
+    /// Finalize now instead of on drop.
+    #[inline(always)]
+    pub(crate) fn fini(&mut self) {
+        if self.live {
+            self.live = false;
+            // SAFETY: the iterator came from `retrieve_iter` and has not been
+            // finalized yet.
+            unsafe { sys::ecs_iter_fini(&mut self.iter) };
+        }
+    }
+}
+
+impl core::ops::Deref for IterGuard {
+    type Target = sys::ecs_iter_t;
+
+    #[inline(always)]
+    fn deref(&self) -> &sys::ecs_iter_t {
+        &self.iter
+    }
+}
+
+impl core::ops::DerefMut for IterGuard {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut sys::ecs_iter_t {
+        &mut self.iter
+    }
+}
+
+impl Drop for IterGuard {
+    #[inline(always)]
+    fn drop(&mut self) {
+        self.fini();
+    }
+}
+
 /// An iterator over a query, bound to the world or stage it was created with.
 ///
 /// `QueryIter` holds raw world/iterator pointers and is therefore

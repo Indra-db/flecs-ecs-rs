@@ -61,9 +61,11 @@ fn mutation_in_try_get_callback_is_deferred() {
     ON_SET_COUNT.store(0, Ordering::Relaxed);
 
     let world = World::new();
-    world.observer::<flecs::OnSet, &Bar>().each_entity(|_e, _b| {
-        ON_SET_COUNT.fetch_add(1, Ordering::Relaxed);
-    });
+    world
+        .observer::<flecs::OnSet, &Bar>()
+        .each_entity(|_e, _b| {
+            ON_SET_COUNT.fetch_add(1, Ordering::Relaxed);
+        });
 
     let e = world.entity().set(Foo(1));
 
@@ -86,9 +88,11 @@ fn mutation_in_world_get_callback_is_deferred() {
     ON_SET_COUNT.store(0, Ordering::Relaxed);
 
     let world = World::new();
-    world.observer::<flecs::OnSet, &Bar>().each_entity(|_e, _b| {
-        ON_SET_COUNT.fetch_add(1, Ordering::Relaxed);
-    });
+    world
+        .observer::<flecs::OnSet, &Bar>()
+        .each_entity(|_e, _b| {
+            ON_SET_COUNT.fetch_add(1, Ordering::Relaxed);
+        });
 
     world.set(Foo(1));
 
@@ -132,7 +136,10 @@ fn archetype_move_in_own_get_callback_keeps_borrow_valid() {
 
     assert!(e.has(MoveTag::id()));
     e.get::<&Foo>(|foo| {
-        assert_eq!(foo.0, 99, "value written through the borrow must survive the move");
+        assert_eq!(
+            foo.0, 99,
+            "value written through the borrow must survive the move"
+        );
     });
 }
 
@@ -193,7 +200,10 @@ fn remove_in_get_callback_fires_observer_after() {
             0,
             "on_remove must not run while the borrow is live"
         );
-        assert!(e.has(Bar::id()), "deferred remove must not land mid-callback");
+        assert!(
+            e.has(Bar::id()),
+            "deferred remove must not land mid-callback"
+        );
         foo.0 += 1;
     });
 

@@ -15,6 +15,10 @@ use crate::sys;
 #[derive(Debug, Clone, Copy)]
 pub struct CachedRef<'a, T> {
     pub(crate) world: WorldRef<'a>,
+    /// The world the ref was created from, which may be a stage. Borrow
+    /// tracking and returned views use it so a ref used inside a
+    /// multithreaded system stays on its worker's stage.
+    pub(crate) stage_world: WorldRef<'a>,
     pub(crate) component_ref: sys::ecs_ref_t,
     pub(crate) component_id: sys::ecs_id_t,
     /// Cached storage lock key, valid while the ref stays in
@@ -79,6 +83,7 @@ impl<'a, T> CachedRef<'a, T> {
         );
         CachedRef::<T> {
             world,
+            stage_world,
             component_ref,
             component_id: id,
             #[cfg(feature = "flecs_safety_locks")]
@@ -91,12 +96,12 @@ impl<'a, T> CachedRef<'a, T> {
 
     /// Return entity associated with reference.
     pub fn entity(&self) -> EntityView<'a> {
-        EntityView::new_from(self.world, self.component_ref.entity)
+        EntityView::new_from(self.stage_world, self.component_ref.entity)
     }
 
     /// Return component associated with reference.
     pub fn component(&self) -> IdView<'a> {
-        IdView::new_from_id(self.world, self.component_id)
+        IdView::new_from_id(self.stage_world, self.component_id)
     }
 
     pub fn has(&mut self) -> bool {
@@ -110,8 +115,9 @@ impl<'a, T> CachedRef<'a, T> {
         .is_null()
     }
 
+    #[allow(clippy::misnamed_getters)]
     pub fn world(&self) -> WorldRef<'a> {
-        self.world
+        self.stage_world
     }
 
     /// Resolve the component pointer and open the access scope
@@ -125,7 +131,8 @@ impl<'a, T> CachedRef<'a, T> {
         let cached_table_id = self.component_ref.table_id;
 
         let get_ptr = unsafe {
-            sys::ecs_rust_ref_get_scope_begin(
+            sys::ecs_rust_ref_get_stage_scope_begin(
+                self.stage_world.world_ptr_mut(),
                 self.world.world_ptr_mut(),
                 &mut self.component_ref,
                 self.component_id,
@@ -145,33 +152,25 @@ impl<'a, T> CachedRef<'a, T> {
     /// Register the write borrow for the scope opened by [`Self::scope_begin`].
     #[cfg(feature = "flecs_safety_locks")]
     #[inline(always)]
-    fn write_begin(&self) -> NonNull<StageLocks> {
-        let locks = stage_locks_dyn(&self.world);
-        // SAFETY: stage map is owned by this thread.
-        if unsafe { (*locks.as_ptr()).write_begin(self.lock_key) } {
-            alias_violation_panic(&self.world, self.component_id, true);
-        }
-        locks
-    }
-
-    #[cfg(feature = "flecs_safety_locks")]
-    #[inline(always)]
-    fn write_end(&self, locks: NonNull<StageLocks>) {
-        // SAFETY: stage map is owned by this thread.
-        unsafe { (*locks.as_ptr()).write_end(self.lock_key) };
+    fn write_begin(&self) -> WriteLockGuard {
+        let locks = stage_locks_dyn(&self.stage_world);
+        WriteLockGuard::acquire(&self.stage_world, locks, self.lock_key, self.component_id)
     }
 }
 
 macro_rules! ref_access {
     ($self:ident, $ptr:ident, $callback:ident) => {{
         let _scope = ScopeEndGuard {
-            world: $self.world,
+            world: $self.stage_world,
         };
         #[cfg(feature = "flecs_safety_locks")]
         {
-            let locks = $self.write_begin();
+            // The guard only covers an unwinding callback; the normal path
+            // disarms it and releases inline, so it costs nothing but the
+            // landing pad.
+            let lock = $self.write_begin();
             let ret = $callback($ptr);
-            $self.write_end(locks);
+            lock.release();
             ret
         }
         #[cfg(not(feature = "flecs_safety_locks"))]

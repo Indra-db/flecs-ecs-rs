@@ -474,6 +474,34 @@ ecs_rust_get_ptr_t ecs_rust_record_get_id(
     ecs_table_t *table = r->table;
     ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);
 
+    /* Inline pre-test so a plain component id never pays for the out-of-line
+     * ecs_id_is_wildcard call on this hot path. */
+    if ((component == EcsWildcard) || (component == EcsAny) ||
+        (ECS_IS_PAIR(component) && ecs_id_is_wildcard(component)))
+    {
+        ecs_type_t type = table->type;
+        int32_t i, count = type.count;
+        for (i = 0; i < count; i ++) {
+            ecs_id_t id = type.array[i];
+            if (ecs_id_match(id, component) ||
+                (component == EcsAny) ||
+                (ECS_IS_PAIR(id) && ECS_IS_PAIR(component) &&
+                    ((ECS_PAIR_FIRST(component) == EcsWildcard) ||
+                        (ECS_PAIR_FIRST(component) == EcsAny) ||
+                        (ECS_PAIR_FIRST(component) == ECS_PAIR_FIRST(id))) &&
+                    ((ECS_PAIR_SECOND(component) == EcsWildcard) ||
+                        (ECS_PAIR_SECOND(component) == EcsAny) ||
+                        (ECS_PAIR_SECOND(component) == ECS_PAIR_SECOND(id)))))
+            {
+                component = id;
+                break;
+            }
+        }
+        if (i == count) {
+            return ECS_RUST_GET_PTR_NULL;
+        }
+    }
+
     if (component < FLECS_HI_COMPONENT_ID) {
         if (!world->non_trivial_lookup[component]) {
             ecs_assert(table->component_map != NULL, ECS_INTERNAL_ERROR, NULL);
@@ -617,6 +645,43 @@ ecs_rust_get_ptr_t ecs_rust_ref_get_scope_begin(
     }
 
     ecs_record_t *r = flecs_entities_get_any(w, ref->entity);
+    ecs_assert(r != NULL, ECS_INTERNAL_ERROR, NULL);
+    ecs_table_t *table = r->table;
+    ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);
+    const ecs_table_record_t *tr = flecs_component_get_table(cr, table);
+    ecs_assert(tr != NULL && tr->column != -1, ECS_INTERNAL_ERROR, NULL);
+
+    return (ecs_rust_get_ptr_t){
+        .ptr = ptr, .lock_key = ECS_RUST_DENSE_KEY(table, tr->column) };
+}
+
+ecs_rust_get_ptr_t ecs_rust_ref_get_stage_scope_begin(
+    ecs_world_t *stage,
+    ecs_world_t *world,
+    ecs_ref_t *ref,
+    ecs_id_t id,
+    uint64_t cached_key_table_id)
+{
+    void *ptr = ecs_ref_get_id(world, ref, id);
+    if (!ptr) {
+        return ECS_RUST_GET_PTR_NULL;
+    }
+
+    ecs_defer_begin(stage);
+
+    if (ref->table_id == cached_key_table_id) {
+        return (ecs_rust_get_ptr_t){ .ptr = ptr, .lock_key = 0 };
+    }
+
+    ecs_component_record_t *cr = flecs_components_get(world, id);
+    ecs_assert(cr != NULL, ECS_INTERNAL_ERROR, NULL);
+
+    if (cr->flags & (EcsIdSparse|EcsIdDontFragment)) {
+        return (ecs_rust_get_ptr_t){
+            .ptr = ptr, .lock_key = ECS_RUST_SPARSE_KEY(cr) };
+    }
+
+    ecs_record_t *r = flecs_entities_get_any(world, ref->entity);
     ecs_assert(r != NULL, ECS_INTERNAL_ERROR, NULL);
     ecs_table_t *table = r->table;
     ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);

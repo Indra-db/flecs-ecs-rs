@@ -9721,6 +9721,13 @@ unsafe extern "C-unwind" {
         id: ecs_id_t,
         cached_key_table_id: u64,
     ) -> ecs_rust_get_ptr_t;
+    pub fn ecs_rust_ref_get_stage_scope_begin(
+        stage: *mut ecs_world_t,
+        world: *mut ecs_world_t,
+        ref_: *mut ecs_ref_t,
+        id: ecs_id_t,
+        cached_key_table_id: u64,
+    ) -> ecs_rust_get_ptr_t;
 }
 unsafe extern "C-unwind" {
     #[doc = "Combined entity-record lookup + defer_begin, the entry half of a component\n access scope (ecs_rust_scope_end is the exit half). Returns NULL without\n starting a defer scope when the entity is not alive."]

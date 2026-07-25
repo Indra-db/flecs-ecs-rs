@@ -14,6 +14,9 @@ struct SparseCounter(u64);
 struct DenseCounter(u64);
 
 #[derive(Component)]
+struct StageProbe(u64);
+
+#[derive(Component)]
 struct TagA;
 
 #[derive(Component)]
@@ -52,7 +55,9 @@ fn spawn_across_tables(world: &World, f: impl Fn(EntityView)) {
 #[test]
 fn par_each_mut_sparse_disjoint_entities_no_violation() {
     let world = World::new();
-    world.component::<SparseCounter>().add_trait::<flecs::Sparse>();
+    world
+        .component::<SparseCounter>()
+        .add_trait::<flecs::Sparse>();
 
     spawn_across_tables(&world, |e| {
         e.set(SparseCounter(0));
@@ -106,7 +111,9 @@ fn par_each_mut_dense_disjoint_entities_no_violation() {
 #[should_panic(expected = "Cannot set write")]
 fn conflict_detection_still_active_after_multithreaded_run() {
     let world = World::new();
-    world.component::<SparseCounter>().add_trait::<flecs::Sparse>();
+    world
+        .component::<SparseCounter>()
+        .add_trait::<flecs::Sparse>();
 
     let e = world.entity().set(SparseCounter(0));
 
@@ -123,4 +130,44 @@ fn conflict_detection_still_active_after_multithreaded_run() {
     e.get::<&mut SparseCounter>(|_outer| {
         e.get::<&mut SparseCounter>(|_inner| {});
     });
+}
+
+#[test]
+fn par_each_entity_cached_ref_preserves_worker_stage() {
+    let world = World::new();
+    spawn_across_tables(&world, |entity| {
+        entity.set(DenseCounter(0)).set(StageProbe(0));
+    });
+    world.set_threads(4);
+
+    world
+        .system::<&mut DenseCounter>()
+        .par_each_entity(move |entity, _| {
+            let mut cached = entity.cached_ref(StageProbe::id());
+            let cached_stage = cached.world().stage_id();
+            cached.get(|probe| {
+                assert_eq!(cached_stage, entity.world().stage_id());
+                probe.0 += 1;
+            });
+        });
+
+    world.progress();
+}
+
+#[test]
+fn par_each_iter_entity_preserves_worker_stage() {
+    let world = World::new();
+    spawn_across_tables(&world, |entity| {
+        entity.set(DenseCounter(0));
+    });
+    world.set_threads(4);
+
+    world
+        .system::<&mut DenseCounter>()
+        .par_each_iter(move |iter, row, _| {
+            let entity = iter.entity(row);
+            assert_eq!(entity.world().stage_id(), iter.world().stage_id());
+        });
+
+    world.progress();
 }

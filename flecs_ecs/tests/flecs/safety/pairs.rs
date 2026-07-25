@@ -7,6 +7,22 @@ mod wildcard_into_id {
         use super::*;
 
         #[test]
+        fn sparse_wildcard_read_concrete_write_panics() {
+            let world = World::new();
+            world.component::<Foo>().add_trait::<flecs::Sparse>();
+            let bar_id = world.component::<Bar>().id();
+            let entity = world.entity().set_first(Foo(0), bar_id);
+
+            let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
+                entity.get::<&(Foo, flecs::Wildcard)>(|_| {
+                    entity.get::<&mut (Foo, Bar)>(|_| {});
+                });
+            }));
+
+            assert!(result.is_err());
+        }
+
+        #[test]
         fn read_read() {
             let world = World::new();
             let bar_id = world.component::<Bar>().id();

@@ -157,7 +157,7 @@ where
         if ptr.is_null() {
             panic!("no entity at row {row}");
         }
-        unsafe { EntityView::new_from(self.real_world(), *ptr) }
+        unsafe { EntityView::new_from(self.world(), *ptr) }
     }
 
     /// Obtain mutable handle to entity being iterated over.
@@ -170,7 +170,7 @@ where
         if ptr.is_null() {
             return None;
         }
-        Some(unsafe { EntityView::new_from(self.real_world(), *ptr) })
+        Some(unsafe { EntityView::new_from(self.world(), *ptr) })
     }
 
     /// Obtain entity id being iterated over. Can return Entity with id 0 if the entity at the specified row is not found.
@@ -2500,5 +2500,34 @@ pub(crate) fn table_unlock(_world_ptr: *mut sys::ecs_world_t, _table_ptr: *mut s
     #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
     unsafe {
         sys::ecs_table_unlock(_world_ptr, _table_ptr);
+    }
+}
+
+/// Balances [`table_lock`] with [`table_unlock`] across early returns and
+/// unwinds. Like both of those it compiles to nothing when the flecs table
+/// asserts are disabled.
+pub(crate) struct IterTableLock {
+    world_ptr: *mut sys::ecs_world_t,
+    table_ptr: *mut sys::ecs_table_t,
+}
+
+impl IterTableLock {
+    #[inline(always)]
+    pub(crate) fn new(
+        world_ptr: *mut sys::ecs_world_t,
+        table_ptr: *mut sys::ecs_table_t,
+    ) -> IterTableLock {
+        table_lock(world_ptr, table_ptr);
+        IterTableLock {
+            world_ptr,
+            table_ptr,
+        }
+    }
+}
+
+impl Drop for IterTableLock {
+    #[inline(always)]
+    fn drop(&mut self) {
+        table_unlock(self.world_ptr, self.table_ptr);
     }
 }

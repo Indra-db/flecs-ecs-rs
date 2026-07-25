@@ -24,9 +24,9 @@ use crate::core::{
     TableIter, ecs_assert,
 };
 #[cfg(feature = "flecs_safety_locks")]
-use crate::core::{DECREMENT, INCREMENT, do_read_write_locks};
+use crate::core::acquire_read_write_locks;
 #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
-use crate::core::{FlecsErrorCode, table_lock, table_unlock};
+use crate::core::{FlecsErrorCode, IterTableLock};
 use crate::sys;
 
 #[doc(hidden)]
@@ -571,8 +571,10 @@ pub(crate) fn internal_each_generic<
         }
     );
 
+    // SAFETY: the guard drops before `components_data`, which owns the
+    // records it points at.
     #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+    let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
         _world,
         components_data.safety_table_records(),
     );
@@ -580,9 +582,7 @@ pub(crate) fn internal_each_generic<
     // only lock/unlock in debug or forced‑assert builds, and only
     // if we’re not in the “called from run” path:
     #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
-    if !CALLED_FROM_RUN {
-        table_lock(world_ptr, iter.table);
-    }
+    let _table_lock = (!CALLED_FROM_RUN).then(|| IterTableLock::new(world_ptr, iter.table));
 
     if !is_any_array.a_ref && !is_any_array.a_row {
         each_plain::<T, E, F>(&extractor, &mut components_data, iter, count, &mut func);
@@ -591,17 +591,6 @@ pub(crate) fn internal_each_generic<
     } else {
         each_ref::<T, E, F>(&extractor, &mut components_data, iter, count, &mut func);
     }
-
-    #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
-    if !CALLED_FROM_RUN {
-        table_unlock(world_ptr, iter.table);
-    }
-
-    #[cfg(feature = "flecs_safety_locks")]
-    do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
-        _world,
-        components_data.safety_table_records(),
-    );
 }
 
 #[inline(always)]
@@ -669,8 +658,10 @@ pub(crate) fn internal_each_iter<
             iter.count as usize
         };
 
+        // SAFETY: the guard drops before `components_data`, which owns the
+        // records it points at.
         #[cfg(feature = "flecs_safety_locks")]
-        do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+        let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
             world,
             components_data.safety_table_records(),
         );
@@ -678,9 +669,7 @@ pub(crate) fn internal_each_iter<
         // only lock/unlock in debug or forced‑assert builds, and only
         // if we’re not in the “called from run” path:
         #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
-        if !CALLED_FROM_RUN {
-            table_lock(world_ptr, iter.table);
-        }
+        let _table_lock = (!CALLED_FROM_RUN).then(|| IterTableLock::new(world_ptr, iter.table));
 
         if !is_any_array.a_ref && !is_any_array.a_row {
             for i in 0..count {
@@ -701,16 +690,5 @@ pub(crate) fn internal_each_iter<
                 func(iter_t, FieldIndex(i), tuple);
             }
         }
-
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
-        if !CALLED_FROM_RUN {
-            table_unlock(world_ptr, iter.table);
-        }
-
-        #[cfg(feature = "flecs_safety_locks")]
-        do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
-            world,
-            components_data.safety_table_records(),
-        );
     }
 }

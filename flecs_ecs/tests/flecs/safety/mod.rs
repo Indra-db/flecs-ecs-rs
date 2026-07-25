@@ -6,6 +6,7 @@ mod cached_ref;
 mod get_scope;
 mod multithreaded;
 mod pairs;
+mod panic_cleanup;
 
 #[derive(Clone, Component)]
 struct Foo(u8);

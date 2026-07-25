@@ -81,6 +81,7 @@ pub use observer_builder::{ObserverBuilder, ObserverUpdater};
 pub use query::{Query, QueryHandle};
 pub use query_builder::*;
 pub use query_iter::{ChainedIter, QueryIter};
+pub(crate) use query_iter::IterGuard;
 #[doc(hidden)]
 pub use query_tuple::*;
 #[cfg(feature = "flecs_safety_locks")]

@@ -86,6 +86,14 @@ ecs_rust_get_ptr_t ecs_rust_ref_get_scope_begin(
     ecs_id_t id,
     uint64_t cached_key_table_id);
 
+FLECS_API
+ecs_rust_get_ptr_t ecs_rust_ref_get_stage_scope_begin(
+    ecs_world_t *stage,
+    ecs_world_t *world,
+    ecs_ref_t *ref,
+    ecs_id_t id,
+    uint64_t cached_key_table_id);
+
 /* Combined entity-record lookup + defer_begin, the entry half of a component
  * access scope (ecs_rust_scope_end is the exit half). Returns NULL without
  * starting a defer scope when the entity is not alive. */
