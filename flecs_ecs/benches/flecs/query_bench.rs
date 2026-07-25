@@ -445,3 +445,112 @@ fn c_query_iter_read_4(
         }
     });
 }
+
+/// Iteration through the Rust `each` API. The `query_iter_*` benchmarks above
+/// drive the C iterator directly, so they measure flecs itself and never touch
+/// the binding's per-batch work: term pointer setup, borrow registration and
+/// tuple construction. These cover that path, with a matching raw-C baseline
+/// so the binding's share can be read off directly.
+pub fn query_each(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("flecs");
+
+    let world = World::new();
+    let mut seed: u64 = 0x1234_5678_9abc_def0;
+    let mut coin = move || {
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (seed >> 33) & 1 == 0
+    };
+    for i in 0..QUERY_ENTITY_COUNT {
+        let e = world.entity();
+        seq!(P in 1..=10 {
+            if coin() {
+                e.set(C~P(i));
+            }
+        });
+    }
+
+    let q1 = world.new_query::<&C1>();
+    let q4 = world.new_query::<(&C1, &C2, &C3, &C4)>();
+    let q4w = world.new_query::<(&mut C1, &C2, &C3, &C4)>();
+
+    group.bench_function("query_each_1_term", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q1.each(|a| sum += a.0 as u64);
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("query_each_4_terms", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q4.each(|(a, b_, c, d)| sum += (a.0 + b_.0 + c.0 + d.0) as u64);
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("query_each_4_terms_1_write", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q4w.each(|(a, b_, c, d)| {
+                a.0 = a.0.wrapping_add(1);
+                sum += (a.0 + b_.0 + c.0 + d.0) as u64;
+            });
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("query_each_entity_4_terms", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q4.each_entity(|e, (a, b_, c, d)| {
+                sum += (a.0 + b_.0 + c.0 + d.0) as u64 + *e.id();
+            });
+            black_box(sum)
+        });
+    });
+
+    // Same work through the C iterator: the floor the binding is measured against.
+    group.bench_function("query_each_4_terms_raw_c", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            unsafe {
+                let qptr = q4.query_ptr() as *mut sys::ecs_query_t;
+                let mut it = sys::ecs_query_iter(world.ptr_mut(), qptr);
+                while sys::ecs_query_next(&mut it) {
+                    let n = it.count as usize;
+                    let a = sys::ecs_field_w_size(&it, 4, 0) as *const u32;
+                    let b_ = sys::ecs_field_w_size(&it, 4, 1) as *const u32;
+                    let c = sys::ecs_field_w_size(&it, 4, 2) as *const u32;
+                    let d = sys::ecs_field_w_size(&it, 4, 3) as *const u32;
+                    for i in 0..n {
+                        sum += (*a.add(i) + *b_.add(i) + *c.add(i) + *d.add(i)) as u64;
+                    }
+                }
+            }
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("query_each_1_term_raw_c", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            unsafe {
+                let qptr = q1.query_ptr() as *mut sys::ecs_query_t;
+                let mut it = sys::ecs_query_iter(world.ptr_mut(), qptr);
+                while sys::ecs_query_next(&mut it) {
+                    let n = it.count as usize;
+                    let a = sys::ecs_field_w_size(&it, 4, 0) as *const u32;
+                    for i in 0..n {
+                        sum += *a.add(i) as u64;
+                    }
+                }
+            }
+            black_box(sum)
+        });
+    });
+
+    group.finish();
+}

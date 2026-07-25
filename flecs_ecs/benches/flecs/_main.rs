@@ -60,6 +60,7 @@ criterion_group!(
     config = ecs_default_criterion();
     targets =
     query_iter,
+    query_each,
 );
 
 criterion_group!(
