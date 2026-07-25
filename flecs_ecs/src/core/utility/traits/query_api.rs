@@ -1494,10 +1494,8 @@ where
         let (is_any_array, mut components_data) = T::create_ptrs(&it);
 
         let result = {
-            // SAFETY: the guard is dropped inside this block, well before
-            // `components_data` the records point into.
             #[cfg(feature = "flecs_safety_locks")]
-            let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
+            do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
                 &world,
                 components_data.safety_table_records(),
             );
@@ -1510,7 +1508,14 @@ where
                 components_data.get_tuple_with_ref(0)
             };
 
-            func(tuple)
+            let ret = func(tuple);
+
+            #[cfg(feature = "flecs_safety_locks")]
+            do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+                &world,
+                components_data.safety_table_records(),
+            );
+            ret
         };
 
         // Clean up iterator resources safely
@@ -1536,10 +1541,8 @@ where
     let (is_any_array, mut components_data) = T::create_ptrs(&it);
 
     let result = {
-        // SAFETY: the guard is dropped inside this block, well before
-        // `components_data` the records point into.
         #[cfg(feature = "flecs_safety_locks")]
-        let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
+        do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
             &world,
             components_data.safety_table_records(),
         );
@@ -1552,7 +1555,14 @@ where
             components_data.get_tuple_with_ref(0)
         };
 
-        Some(func(tuple))
+        let ret = Some(func(tuple));
+
+        #[cfg(feature = "flecs_safety_locks")]
+        do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+            &world,
+            components_data.safety_table_records(),
+        );
+        ret
     };
 
     // Clean up iterator resources safely
@@ -1574,10 +1584,8 @@ fn __internal_find_entity_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     let (is_any_array, mut components_data) = T::create_ptrs(&iter);
     let iter_count = iter.count as usize;
 
-    // SAFETY: the guard drops before `components_data`, which owns the
-    // records it points at.
     #[cfg(feature = "flecs_safety_locks")]
-    let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
+    do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
         world,
         components_data.safety_table_records(),
     );
@@ -1617,6 +1625,12 @@ fn __internal_find_entity_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
             }
         }
     }
+
+    #[cfg(feature = "flecs_safety_locks")]
+    do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+        world,
+        components_data.safety_table_records(),
+    );
 }
 
 #[inline(always)]
@@ -1632,10 +1646,8 @@ fn __internal_find_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     let (is_any_array, mut components_data) = T::create_ptrs(&iter);
     let iter_count = iter.count as usize;
 
-    // SAFETY: the guard drops before `components_data`, which owns the
-    // records it points at.
     #[cfg(feature = "flecs_safety_locks")]
-    let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
+    do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
         world,
         components_data.safety_table_records(),
     );
@@ -1671,6 +1683,12 @@ fn __internal_find_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
             }
         }
     }
+
+    #[cfg(feature = "flecs_safety_locks")]
+    do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+        world,
+        components_data.safety_table_records(),
+    );
 }
 
 #[inline(always)]

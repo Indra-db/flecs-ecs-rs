@@ -299,6 +299,11 @@ fn sparse_component_id(cr: *mut sys::ecs_component_record_t) -> u64 {
 }
 
 #[cfg(feature = "flecs_safety_locks")]
+pub(super) const INCREMENT: bool = true;
+#[cfg(feature = "flecs_safety_locks")]
+pub(super) const DECREMENT: bool = false;
+
+#[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
 pub(crate) fn sparse_id_record_lock_read_begin(
     world: &WorldRef,
@@ -412,203 +417,178 @@ pub(crate) fn table_column_lock_write_end(
     unsafe { (*locks.as_ptr()).write_end(dense_lock_key(table, column)) }
 }
 
-/// Take or release the borrow for one query term. Returns `true` when an
-/// acquire conflicts; releases never fail.
-#[cfg(feature = "flecs_safety_locks")]
-#[inline(always)]
-fn term_lock<const ACQUIRE: bool, const READONLY: bool>(
-    world: &WorldRef<'_>,
-    locks: NonNull<StageLocks>,
-    info: &super::TableColumnSafety,
-    any_sparse_terms: bool,
-) -> bool {
-    // if component_id is set, this term is a row (sparse) term
-    let key = if any_sparse_terms && info.component_id != 0 {
-        // batch-level resolve; keys must match the cr-keyed FieldAt /
-        // rw_locking sparse paths, which never pay this lookup per row.
-        // flecs_components_get requires the real world, not a stage.
-        let cr = unsafe {
-            let real_world = sys::ecs_get_world(world.raw_world.as_ptr() as *const _);
-            sys::flecs_components_get(real_world, info.component_id)
-        };
-        sparse_lock_key(cr)
-    } else if info.table.is_null() {
-        return false;
-    } else {
-        dense_lock_key(info.table, info.column)
-    };
-
-    // SAFETY: stage map is owned by this thread.
-    let map = unsafe { &mut *locks.as_ptr() };
-    if READONLY {
-        if ACQUIRE {
-            return map.read_begin(key);
-        }
-        map.read_end(key);
-    } else if ACQUIRE {
-        return map.write_begin(key);
-    } else {
-        map.write_end(key);
-    }
-    false
-}
-
-/// Roll back the terms acquired before `index`, then report the violation.
-#[cfg(feature = "flecs_safety_locks")]
-#[cold]
-#[inline(never)]
-fn acquire_violation<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
-    world: &WorldRef<'_>,
-    locks: NonNull<StageLocks>,
-    table_records: &[super::TableColumnSafety],
-    index: usize,
-    write: bool,
-) -> ! {
-    release_terms::<ANY_SPARSE_TERMS, T>(world, locks, table_records, index);
-    // SAFETY: index is a term index the caller just visited.
-    let info = unsafe { table_records.get_unchecked(index) };
-    let id = if ANY_SPARSE_TERMS && info.component_id != 0 {
-        info.component_id
-    } else {
-        dense_component_id(info.table, info.column)
-    };
-    alias_violation_panic(world, id, write);
-}
-
-/// Terms are laid out as four contiguous runs: immutable, mutable, optional
-/// immutable, optional mutable. `upto` clamps every run so a partially
-/// acquired batch releases exactly what it took.
-#[cfg(feature = "flecs_safety_locks")]
-#[inline(always)]
-fn release_terms<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
-    world: &WorldRef<'_>,
-    locks: NonNull<StageLocks>,
-    table_records: &[super::TableColumnSafety],
-    upto: usize,
-) {
-    let end_immutable: usize = const { T::COUNT_IMMUTABLE };
-    let end_mutable: usize = const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE };
-    let end_optional_immutable: usize =
-        const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE + T::COUNT_OPTIONAL_IMMUTABLE };
-    let end_optional_mutable: usize = const {
-        T::COUNT_IMMUTABLE
-            + T::COUNT_MUTABLE
-            + T::COUNT_OPTIONAL_IMMUTABLE
-            + T::COUNT_OPTIONAL_MUTABLE
-    };
-
-    unsafe {
-        for i in 0..end_immutable.min(upto) {
-            let info = table_records.get_unchecked(i);
-            term_lock::<false, true>(world, locks, info, ANY_SPARSE_TERMS);
-        }
-        for i in end_immutable..end_mutable.min(upto) {
-            let info = table_records.get_unchecked(i);
-            term_lock::<false, false>(world, locks, info, ANY_SPARSE_TERMS);
-        }
-        for i in end_mutable..end_optional_immutable.min(upto) {
-            let info = table_records.get_unchecked(i);
-            term_lock::<false, true>(world, locks, info, ANY_SPARSE_TERMS);
-        }
-        for i in end_optional_immutable..end_optional_mutable.min(upto) {
-            let info = table_records.get_unchecked(i);
-            term_lock::<false, false>(world, locks, info, ANY_SPARSE_TERMS);
-        }
-    }
-}
-
-#[cfg(feature = "flecs_safety_locks")]
-#[inline(always)]
-fn acquire_terms<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
-    world: &WorldRef<'_>,
-    locks: NonNull<StageLocks>,
-    table_records: &[super::TableColumnSafety],
-) {
-    let end_immutable: usize = const { T::COUNT_IMMUTABLE };
-    let end_mutable: usize = const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE };
-    let end_optional_immutable: usize =
-        const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE + T::COUNT_OPTIONAL_IMMUTABLE };
-    let end_optional_mutable: usize = const {
-        T::COUNT_IMMUTABLE
-            + T::COUNT_MUTABLE
-            + T::COUNT_OPTIONAL_IMMUTABLE
-            + T::COUNT_OPTIONAL_MUTABLE
-    };
-
-    unsafe {
-        for i in 0..end_immutable {
-            let info = table_records.get_unchecked(i);
-            if term_lock::<true, true>(world, locks, info, ANY_SPARSE_TERMS) {
-                acquire_violation::<ANY_SPARSE_TERMS, T>(world, locks, table_records, i, false);
-            }
-        }
-        for i in end_immutable..end_mutable {
-            let info = table_records.get_unchecked(i);
-            if term_lock::<true, false>(world, locks, info, ANY_SPARSE_TERMS) {
-                acquire_violation::<ANY_SPARSE_TERMS, T>(world, locks, table_records, i, true);
-            }
-        }
-        for i in end_mutable..end_optional_immutable {
-            let info = table_records.get_unchecked(i);
-            if term_lock::<true, true>(world, locks, info, ANY_SPARSE_TERMS) {
-                acquire_violation::<ANY_SPARSE_TERMS, T>(world, locks, table_records, i, false);
-            }
-        }
-        for i in end_optional_immutable..end_optional_mutable {
-            let info = table_records.get_unchecked(i);
-            if term_lock::<true, false>(world, locks, info, ANY_SPARSE_TERMS) {
-                acquire_violation::<ANY_SPARSE_TERMS, T>(world, locks, table_records, i, true);
-            }
-        }
-    }
-}
-
-/// Releases a batch's term borrows when the scope ends, including when the
-/// iteration callback unwinds.
-#[cfg(feature = "flecs_safety_locks")]
-pub(crate) struct QueryLockGuard<'a, T: QueryTuple, const ANY_SPARSE_TERMS: bool> {
-    world: WorldRef<'a>,
-    locks: NonNull<StageLocks>,
-    table_records: *const super::TableColumnSafety,
-    len: usize,
-    _marker: core::marker::PhantomData<fn() -> T>,
-}
-
-#[cfg(feature = "flecs_safety_locks")]
-impl<T: QueryTuple, const ANY_SPARSE_TERMS: bool> Drop for QueryLockGuard<'_, T, ANY_SPARSE_TERMS> {
-    #[inline(always)]
-    fn drop(&mut self) {
-        // SAFETY: the guard never outlives the `ComponentsData` the records
-        // live in, and the stage map is owned by this thread.
-        let table_records = unsafe { core::slice::from_raw_parts(self.table_records, self.len) };
-        release_terms::<ANY_SPARSE_TERMS, T>(&self.world, self.locks, table_records, usize::MAX);
-    }
-}
-
-/// Take the borrows for one table batch. The returned guard releases them,
-/// so a panic in the iteration callback cannot leak a borrow.
-///
-/// The guard borrows `table_records` as a raw pointer: callers must keep the
-/// owning `ComponentsData` alive for the guard's whole lifetime, which drop
-/// order gives them for free when the guard is declared after it.
-#[cfg(feature = "flecs_safety_locks")]
 #[inline]
-pub(crate) fn acquire_read_write_locks<'a, T: QueryTuple, const ANY_SPARSE_TERMS: bool>(
-    world: &WorldRef<'a>,
+#[cfg(feature = "flecs_safety_locks")]
+pub(crate) fn do_read_write_locks<
+    const INCREMENT: bool,
+    const ANY_SPARSE_TERMS: bool,
+    T: QueryTuple,
+>(
+    world: &WorldRef,
     table_records: &[super::TableColumnSafety],
-) -> QueryLockGuard<'a, T, ANY_SPARSE_TERMS> {
-    let locks = if world.is_currently_multithreaded() {
-        stage_locks::<true>(world)
+) {
+    if world.is_currently_multithreaded() {
+        __internal_do_read_write_locks::<INCREMENT, true, ANY_SPARSE_TERMS, T>(
+            world,
+            table_records,
+        );
     } else {
-        stage_locks::<false>(world)
+        __internal_do_read_write_locks::<INCREMENT, false, ANY_SPARSE_TERMS, T>(
+            world,
+            table_records,
+        );
+    }
+}
+
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(always)]
+fn __internal_do_read_write_locks<
+    const INCREMENT: bool,
+    const MULTITHREADED: bool,
+    const ANY_SPARSE_TERMS: bool,
+    T: QueryTuple,
+>(
+    world: &WorldRef<'_>,
+    table_records: &[super::TableColumnSafety],
+) {
+    let count_immutable: usize = const { T::COUNT_IMMUTABLE };
+    let start_index_mutable: usize = const { T::COUNT_IMMUTABLE };
+    let start_index_optional_immutable: usize = const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE };
+    let start_index_optional_mutable: usize =
+        const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE + T::COUNT_OPTIONAL_IMMUTABLE };
+    let end_index_mutable: usize = const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE };
+    let end_index_optional_immutable: usize =
+        const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE + T::COUNT_OPTIONAL_IMMUTABLE };
+    let end_index_optional_mutable: usize = const {
+        T::COUNT_IMMUTABLE
+            + T::COUNT_MUTABLE
+            + T::COUNT_OPTIONAL_IMMUTABLE
+            + T::COUNT_OPTIONAL_MUTABLE
     };
-    acquire_terms::<ANY_SPARSE_TERMS, T>(world, locks, table_records);
-    QueryLockGuard {
-        world: *world,
-        locks,
-        table_records: table_records.as_ptr(),
-        len: table_records.len(),
-        _marker: core::marker::PhantomData,
+
+    let locks = stage_locks::<MULTITHREADED>(world);
+
+    #[inline(always)]
+    fn term_lock<const INCREMENT: bool, const READONLY: bool>(
+        world: &WorldRef<'_>,
+        locks: NonNull<StageLocks>,
+        info: &super::TableColumnSafety,
+        any_sparse_terms: bool,
+    ) {
+        // if component_id is set, this term is a row (sparse) term
+        if any_sparse_terms && info.component_id != 0 {
+            // batch-level resolve; keys must match the cr-keyed FieldAt /
+            // rw_locking sparse paths, which never pay this lookup per row.
+            // flecs_components_get requires the real world, not a stage.
+            let cr = unsafe {
+                let real_world = sys::ecs_get_world(world.raw_world.as_ptr() as *const _);
+                sys::flecs_components_get(real_world, info.component_id)
+            };
+            let key = sparse_lock_key(cr);
+            let map = unsafe { &mut *locks.as_ptr() };
+            if READONLY {
+                if INCREMENT {
+                    if map.read_begin(key) {
+                        alias_violation_panic(world, info.component_id, false);
+                    }
+                } else {
+                    map.read_end(key);
+                }
+            } else if INCREMENT {
+                if map.write_begin(key) {
+                    alias_violation_panic(world, info.component_id, true);
+                }
+            } else {
+                map.write_end(key);
+            }
+            return;
+        }
+
+        if info.table.is_null() {
+            return;
+        }
+
+        if READONLY {
+            if INCREMENT {
+                get_table_column_lock_read_begin(world, locks, info.table, info.column);
+            } else {
+                table_column_lock_read_end(locks, info.table, info.column);
+            }
+        } else if INCREMENT {
+            get_table_column_lock_write_begin(world, locks, info.table, info.column);
+        } else {
+            table_column_lock_write_end(locks, info.table, info.column);
+        }
+    }
+
+    unsafe {
+        for i in 0..count_immutable {
+            let info = table_records.get_unchecked(i);
+            term_lock::<INCREMENT, true>(world, locks, info, ANY_SPARSE_TERMS);
+        }
+        for i in start_index_mutable..end_index_mutable {
+            let info = table_records.get_unchecked(i);
+            term_lock::<INCREMENT, false>(world, locks, info, ANY_SPARSE_TERMS);
+        }
+        for i in start_index_optional_immutable..end_index_optional_immutable {
+            let info = table_records.get_unchecked(i);
+            term_lock::<INCREMENT, true>(world, locks, info, ANY_SPARSE_TERMS);
+        }
+        for i in start_index_optional_mutable..end_index_optional_mutable {
+            let info = table_records.get_unchecked(i);
+            term_lock::<INCREMENT, false>(world, locks, info, ANY_SPARSE_TERMS);
+        }
+    }
+}
+
+/// Restores a stage's borrow map if iteration unwinds.
+///
+/// Query batches take and release their term borrows with plain calls, which
+/// keeps the per-table path free of any drop obligation: a live guard across
+/// the row loop measurably slows batches that write components. Unwind safety
+/// is instead handled once per iteration call by this scope, which snapshots
+/// the map on entry and restores it if a callback panics. Nothing is done on
+/// the normal path.
+#[cfg(feature = "flecs_safety_locks")]
+pub(crate) struct StageLocksScope {
+    locks: NonNull<StageLocks>,
+    len: usize,
+    saved: Vec<u16>,
+}
+
+#[cfg(feature = "flecs_safety_locks")]
+impl StageLocksScope {
+    #[inline(always)]
+    pub(crate) fn new(world: &WorldRef<'_>) -> StageLocksScope {
+        let locks = stage_locks_dyn(world);
+        // SAFETY: stage map is owned by this thread.
+        let entries = unsafe { &(*locks.as_ptr()).entries };
+        // A borrow held across the whole iteration is the only way entries
+        // exist on entry, which is rare; the empty case allocates nothing.
+        let saved = entries.iter().map(|entry| entry.1).collect();
+        StageLocksScope {
+            locks,
+            len: entries.len(),
+            saved,
+        }
+    }
+
+    /// Undo anything the interrupted iteration left registered.
+    ///
+    /// Entries below `len` belong to borrows that outlive this scope, so they
+    /// are never removed while it is open (their counts cannot reach zero) and
+    /// keep their slots: restoring counts and truncating is exact.
+    #[inline(always)]
+    pub(crate) fn restore(&self) {
+        // SAFETY: stage map is owned by this thread.
+        let entries = unsafe { &mut (*self.locks.as_ptr()).entries };
+        if entries.len() == self.len {
+            return;
+        }
+        entries.truncate(self.len);
+        for (entry, count) in entries.iter_mut().zip(self.saved.iter()) {
+            entry.1 = *count;
+        }
     }
 }
 

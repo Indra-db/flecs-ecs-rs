@@ -24,7 +24,7 @@ use crate::core::{
     TableIter, ecs_assert,
 };
 #[cfg(feature = "flecs_safety_locks")]
-use crate::core::acquire_read_write_locks;
+use crate::core::{DECREMENT, INCREMENT, do_read_write_locks};
 #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
 use crate::core::{FlecsErrorCode, IterTableLock};
 use crate::sys;
@@ -571,10 +571,8 @@ pub(crate) fn internal_each_generic<
         }
     );
 
-    // SAFETY: the guard drops before `components_data`, which owns the
-    // records it points at.
     #[cfg(feature = "flecs_safety_locks")]
-    let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
+    do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
         _world,
         components_data.safety_table_records(),
     );
@@ -591,6 +589,12 @@ pub(crate) fn internal_each_generic<
     } else {
         each_ref::<T, E, F>(&extractor, &mut components_data, iter, count, &mut func);
     }
+
+    #[cfg(feature = "flecs_safety_locks")]
+    do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+        _world,
+        components_data.safety_table_records(),
+    );
 }
 
 #[inline(always)]
@@ -658,10 +662,8 @@ pub(crate) fn internal_each_iter<
             iter.count as usize
         };
 
-        // SAFETY: the guard drops before `components_data`, which owns the
-        // records it points at.
         #[cfg(feature = "flecs_safety_locks")]
-        let _locks = acquire_read_write_locks::<T, ANY_SPARSE_TERMS>(
+        do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
             world,
             components_data.safety_table_records(),
         );
@@ -690,5 +692,11 @@ pub(crate) fn internal_each_iter<
                 func(iter_t, FieldIndex(i), tuple);
             }
         }
+
+        #[cfg(feature = "flecs_safety_locks")]
+        do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+            world,
+            components_data.safety_table_records(),
+        );
     }
 }

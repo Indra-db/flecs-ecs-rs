@@ -12,12 +12,29 @@ use crate::sys;
 pub(crate) struct IterGuard {
     iter: sys::ecs_iter_t,
     live: bool,
+    /// Snapshot of the stage's borrow map, restored if the iteration is cut
+    /// short. Query batches take and release their term borrows with plain
+    /// calls so the per-table path carries no drop obligation; recovering
+    /// from a panicking callback happens here instead, once per iteration.
+    #[cfg(feature = "flecs_safety_locks")]
+    scope: StageLocksScope,
 }
 
 impl IterGuard {
     #[inline(always)]
     pub(crate) fn new(iter: sys::ecs_iter_t) -> IterGuard {
-        IterGuard { iter, live: true }
+        #[cfg(feature = "flecs_safety_locks")]
+        let scope = {
+            // SAFETY: the iterator carries the world of the calling context.
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            StageLocksScope::new(&world)
+        };
+        IterGuard {
+            iter,
+            live: true,
+            #[cfg(feature = "flecs_safety_locks")]
+            scope,
+        }
     }
 
     /// Advance the iterator with `next`. Returning `false` means the C side
@@ -61,6 +78,8 @@ impl core::ops::DerefMut for IterGuard {
 impl Drop for IterGuard {
     #[inline(always)]
     fn drop(&mut self) {
+        #[cfg(feature = "flecs_safety_locks")]
+        self.scope.restore();
         self.fini();
     }
 }
