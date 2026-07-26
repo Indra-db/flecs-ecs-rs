@@ -86,6 +86,15 @@ pub(crate) use query_iter::IterGuard;
 pub use query_tuple::*;
 #[cfg(feature = "flecs_safety_locks")]
 pub(crate) use safety_map::*;
+
+/// No-op without the safety-lock bookkeeping: no guards exist, so no pin can be
+/// live and shared-register writes keep their immediate semantics. Lives here
+/// (not in `safety_map`, which is compiled out entirely without the feature) so
+/// callers resolve in both configurations.
+#[cfg(not(feature = "flecs_safety_locks"))]
+#[inline(always)]
+pub(crate) fn ensure_write_episode(_world: &WorldRef) {}
+
 #[doc(hidden)]
 pub use sparse_query::SparseQuery;
 #[doc(hidden)]

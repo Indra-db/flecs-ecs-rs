@@ -505,3 +505,90 @@ fn insert_default_component_drops_transient_default_no_leak() {
     // Plus the stored value at world teardown.
     assert_eq!(INSERT_DEFAULT_DROP.load(SeqCst), 2);
 }
+
+#[cfg(feature = "flecs_safety_locks")]
+mod live_guard {
+    use super::*;
+
+    /// `spawn` must refuse while a guard pins storage on this stage:
+    /// `ecs_bulk_init` grows tables and can reallocate the pinned column.
+    #[test]
+    #[should_panic(expected = "while component guards are live")]
+    fn spawn_panics_with_live_guard() {
+        let world = World::new();
+        let e = world.spawn((Pos { x: 1, y: 2 }, Vel { x: 3, y: 4 }));
+        let _g = e.get_ref::<&Pos>().unwrap();
+        let _ = world.spawn((Pos { x: 5, y: 6 }, Vel { x: 7, y: 8 }));
+    }
+
+    #[test]
+    #[should_panic(expected = "while component guards are live")]
+    fn spawn_batch_panics_with_live_guard() {
+        let world = World::new();
+        let e = world.spawn((CPos { x: 1, y: 2 }, CHealth(9)));
+        let _g = e.get_ref::<&CPos>().unwrap();
+        let _ = world.spawn_batch((CPos { x: 5, y: 6 }, CHealth(1)), 10);
+    }
+
+    #[test]
+    #[should_panic(expected = "while the world is deferred")]
+    fn spawn_panics_in_defer_scope() {
+        let world = World::new();
+        world.defer(|| {
+            let _ = world.spawn((Pos { x: 1, y: 2 },));
+        });
+    }
+
+    /// `insert` under a live guard routes through the write episode: the guard
+    /// stays valid across the call, nothing applies (and no observer fires)
+    /// while the guard is live, and the bundle (with its `OnAdd` / `OnSet`) applies
+    /// when the last guard drops.
+    #[test]
+    fn insert_under_live_guard_defers_and_applies_at_guard_drop() {
+        let world = World::new();
+        let e = world.entity().set(Pos { x: 11, y: 22 });
+
+        let on_add = Arc::new(AtomicUsize::new(0));
+        let on_set = Arc::new(AtomicUsize::new(0));
+        {
+            let a = on_add.clone();
+            world
+                .observer::<flecs::OnAdd, ()>()
+                .with(Vel::id())
+                .each(move |_| {
+                    a.fetch_add(1, SeqCst);
+                });
+        }
+        {
+            let s = on_set.clone();
+            world.observer::<flecs::OnSet, &Vel>().each(move |_| {
+                s.fetch_add(1, SeqCst);
+            });
+        }
+
+        {
+            let g = e.get_ref::<&Pos>().unwrap();
+            e.insert((Vel { x: 3, y: 4 }, Health(5)));
+
+            // Guard data stays valid and unmoved across the call.
+            assert_eq!(g.x, 11);
+            assert_eq!(g.y, 22);
+
+            // Nothing applied, no observer fired while the guard pins storage.
+            assert!(!e.has(Vel::id()), "insert must defer under a live guard");
+            assert!(!e.has(Health::id()), "insert must defer under a live guard");
+            assert_eq!(on_add.load(SeqCst), 0, "OnAdd must wait for guard drop");
+            assert_eq!(on_set.load(SeqCst), 0, "OnSet must wait for guard drop");
+        }
+
+        // Last guard dropped: the episode closes and the bundle applies.
+        assert!(e.has(Vel::id()));
+        assert!(e.has(Health::id()));
+        assert_eq!(on_add.load(SeqCst), 1, "OnAdd fires once after guard drop");
+        assert_eq!(on_set.load(SeqCst), 1, "OnSet fires once after guard drop");
+        e.get::<(&Vel, &Health)>(|(v, h)| {
+            assert_eq!(*v, Vel { x: 3, y: 4 });
+            assert_eq!(*h, Health(5));
+        });
+    }
+}

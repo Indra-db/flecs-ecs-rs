@@ -87,6 +87,53 @@ pub trait Bundle: private::Sealed + Sized + 'static {
     fn write_after_commit(self, entity: EntityView, added_mask: &[bool]);
 }
 
+/// Refuses a bulk construction op while any shared-register guard is live on
+/// the current stage. `ecs_bulk_init` appends rows to (and can therefore
+/// reallocate the columns of) existing tables, which would dangle a live
+/// [`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut)
+/// pointing into one of those columns. `spawn` / `spawn_batch` cannot be
+/// deferred behind the guard episode (their contract returns the created ids
+/// immediately), so the only sound answer is to refuse.
+///
+/// Compiled out without `flecs_safety_locks` (no guards exist to pin storage,
+/// but the unchecked-build contract also removes this refusal).
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(always)]
+fn assert_no_live_guards(world: &WorldRef, op: &str) {
+    let locks = crate::core::stage_locks_dyn(world);
+    // SAFETY: the stage map is owned by the calling thread.
+    if unsafe { (*locks.as_ptr()).has_live_pin() } {
+        bundle_live_guard_panic(op);
+    }
+}
+
+#[cfg(not(feature = "flecs_safety_locks"))]
+#[inline(always)]
+fn assert_no_live_guards(_world: &WorldRef, _op: &str) {}
+
+#[cfg(feature = "flecs_safety_locks")]
+#[cold]
+#[inline(never)]
+fn bundle_live_guard_panic(op: &str) -> ! {
+    panic!(
+        "cannot {op} while component guards are live on this stage: `ecs_bulk_init` \
+         appends rows to existing tables and can reallocate a pinned column, which would \
+         dangle the guard. Drop all `Ref` / `Mut` guards (from `get_ref` / `try_get_ref`) \
+         before calling {op}"
+    );
+}
+
+#[cold]
+#[inline(never)]
+fn bundle_deferred_panic(op: &str) -> ! {
+    panic!(
+        "cannot {op} while the world is deferred: the operation must create and observe \
+         its entity ids immediately, which `ecs_bulk_init` cannot do under an open defer \
+         scope. Call {op} outside `defer()` / deferred callbacks and with no live \
+         write-episode guards"
+    );
+}
+
 /// Adds and sets a single bundle element on `entity`, dispatching on whether the
 /// component is a zero-sized tag at runtime.
 ///
@@ -305,7 +352,20 @@ pub trait WorldBundleExt {
     ///
     /// Panics if the bundle contains a duplicate component type, if the bundle
     /// arity exceeds 31, or if the world is in its multithreaded execution
-    /// phase. Must be called on an immediate (non-deferred) world.
+    /// phase.
+    ///
+    /// Also panics, like a `RefCell` borrow conflict, if any shared-register
+    /// guard ([`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut)
+    /// from `get_ref` / `try_get_ref`) is live on the current stage, or if the
+    /// world is deferred: `ecs_bulk_init` grows existing tables (which can
+    /// reallocate a pinned column out from under a live guard) and must observe
+    /// its entity ids immediately (so it cannot be queued behind the guard's
+    /// write episode or an open `defer()` scope). Drop all guards and leave any
+    /// defer scope before spawning.
+    ///
+    /// The live-guard check is part of the `flecs_safety_locks` bookkeeping;
+    /// building without that feature compiles the check out along with the
+    /// guards themselves (the unchecked-build contract).
     fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_>;
 
     /// Constructs `count` entities from one bundle in a single `ecs_bulk_init`
@@ -323,7 +383,11 @@ pub trait WorldBundleExt {
     ///
     /// Panics if the bundle contains a duplicate component type, if the bundle
     /// arity exceeds 31, or if the world is in its multithreaded execution
-    /// phase. Must be called on an immediate (non-deferred) world.
+    /// phase.
+    ///
+    /// Also panics under a live shared-register guard or an open defer scope,
+    /// for the same reasons as [`spawn`](WorldBundleExt::spawn) (and with the
+    /// same `flecs_safety_locks` unchecked-build contract for the guard check).
     fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity>;
 }
 
@@ -339,6 +403,10 @@ impl WorldBundleExt for World {
         let world = self.world();
         let world_ptr = self.raw_world.as_ptr();
         crate::core::assert_not_in_multithreaded_phase(world_ptr);
+        assert_no_live_guards(&world, "World::spawn");
+        if self.is_deferred() {
+            bundle_deferred_panic("World::spawn");
+        }
 
         let arity = B::ARITY;
         let mut ids = [0u64; ID_BUF];
@@ -392,15 +460,21 @@ impl WorldBundleExt for World {
             );
         }
 
+        let world = self.world();
+        let world_ptr = self.raw_world.as_ptr();
+        crate::core::assert_not_in_multithreaded_phase(world_ptr);
+        // Checked before the count == 0 early return so misuse fails
+        // deterministically instead of depending on the requested count.
+        assert_no_live_guards(&world, "World::spawn_batch");
+        if self.is_deferred() {
+            bundle_deferred_panic("World::spawn_batch");
+        }
+
         if count == 0 {
             // Nothing is stored; drop the bundle normally.
             drop(bundle);
             return Vec::new();
         }
-
-        let world = self.world();
-        let world_ptr = self.raw_world.as_ptr();
-        crate::core::assert_not_in_multithreaded_phase(world_ptr);
 
         let arity = B::ARITY;
         let mut ids = [0u64; ID_BUF];
@@ -509,6 +583,15 @@ pub trait EntityBundleExt: Sized {
     /// separate transition. The result is identical; only the number of internal
     /// moves differs.
     ///
+    /// Live guards: `insert` is a shared-register write, so it first runs the
+    /// write-episode hook (spec §3.6). If any
+    /// [`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut)
+    /// guard is live on this stage, the hook lazily opens the episode's defer
+    /// level and `insert` takes the deferred path above: nothing moves storage
+    /// while the guard pins it, the guard's data stays valid across the call,
+    /// and the bundle (with its `OnAdd` / `OnSet` events) applies when the last
+    /// guard drops.
+    ///
     /// The bundle's values are **moved** into storage; they are not dropped on
     /// the Rust side.
     ///
@@ -535,6 +618,12 @@ impl<'a> EntityBundleExt for EntityView<'a> {
         let mut ids = [0u64; ID_BUF];
         B::resolve_ids(world, &mut ids[..arity]);
         record_bundle_ids::<B>(&world, &ids[..arity]);
+
+        // Shared-register write hook (spec §3.6): with a live guard on this
+        // stage this lazily opens the episode's defer level, so the branch below
+        // routes to the deferred path and no table move can reallocate storage
+        // out from under the guard. With no live guard it is a no-op.
+        crate::core::ensure_write_episode(&world);
 
         if world.is_deferred() {
             // `ecs_commit` cannot run while deferred; apply per component and let
