@@ -870,6 +870,48 @@ macro_rules! impl_iterable {
 
 tuples!(impl_iterable, 0, 32);
 
+/// Marker for a single query term that only *reads* its component: `&T`,
+/// `Option<&T>`, or a tag accessed as `&Tag`. Deliberately not implemented for
+/// `&mut T` or `Option<&mut T>`.
+///
+/// This is the per-element building block that
+/// [`ReadOnlyTerms`] lifts over term tuples (via the `tuples!` macro) to decide
+/// whether a [`QueryHandle`](crate::core::QueryHandle) may be shared across
+/// threads.
+pub trait ReadOnlyTerm {}
+
+impl<T> ReadOnlyTerm for &T where T: ComponentOrPairId {}
+impl<T> ReadOnlyTerm for Option<&T> where T: ComponentOrPairId {}
+
+/// Marker for a query term set whose every term is a [`ReadOnlyTerm`].
+///
+/// This is the bound that makes [`QueryHandle`](crate::core::QueryHandle)
+/// `Sync`. A handle may be shared across threads only when concurrent iteration
+/// cannot hand out a `&mut` term: the per-stage safety-lock maps are
+/// structurally blind across stages, so a mutable term iterated from two stages
+/// would alias undetected. Read-only terms only ever produce shared references,
+/// which cannot alias mutably.
+///
+/// Implemented for a bare read-only term and, via the crate's `tuples!` macro,
+/// for every tuple whose elements are all [`ReadOnlyTerm`].
+#[diagnostic::on_unimplemented(
+    message = "the query terms `{Self}` are not all read-only, so a `QueryHandle` over them is not `Sync`",
+    label = "this term set contains a `&mut T` or `Option<&mut T>` term",
+    note = "a `QueryHandle` is `Sync` only when every term is read-only (`&T`, `Option<&T>`, or a tag)",
+    note = "to mutate across threads, use a partitioned `par_*` system or an `unsafe` twin"
+)]
+pub trait ReadOnlyTerms {}
+
+impl<A> ReadOnlyTerms for A where A: ReadOnlyTerm {}
+
+macro_rules! impl_read_only_terms {
+    ($($t:ident),*) => {
+        impl<$($t: ReadOnlyTerm),*> ReadOnlyTerms for ($($t,)*) {}
+    };
+}
+
+tuples!(impl_read_only_terms, 0, 32);
+
 // #[cfg(test)]
 // mod count_tests {
 //     use super::*;

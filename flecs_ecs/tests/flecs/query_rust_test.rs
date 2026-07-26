@@ -241,6 +241,29 @@ fn query_handle_in_single_threaded_system() {
 }
 
 #[test]
+fn query_handle_read_only_is_shareable_across_threads() {
+    let world = World::new();
+    world
+        .entity()
+        .set(Position { x: 1, y: 2 })
+        .set(Velocity { x: 3, y: 4 });
+
+    // A handle whose every term is read-only is `Sync`, so `&handle` can be
+    // captured by multiple scoped threads (capturing `&QueryHandle` requires
+    // `QueryHandle: Send`, which holds iff `QueryHandle: Sync`).
+    let handle = world.new_query::<(&Position, &Velocity)>().handle();
+    let handle_ref = &handle;
+
+    std::thread::scope(|s| {
+        for _ in 0..4 {
+            s.spawn(move || {
+                core::hint::black_box(handle_ref);
+            });
+        }
+    });
+}
+
+#[test]
 fn query_handle_concurrent_drop_stress() {
     #[derive(Component, Debug)]
     struct Comp(usize);
