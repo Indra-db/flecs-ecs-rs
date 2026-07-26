@@ -18,6 +18,7 @@
 //!
 //! ```
 //! use flecs_ecs::prelude::*;
+//! use flecs_ecs::experimental::prelude::*;
 //!
 //! #[derive(Component)]
 //! #[flecs(meta)]
@@ -32,11 +33,12 @@
 //! let entity = world.entity().set(Position { x: 10.0, y: 20.0 });
 //!
 //! // Serialize component to JSON
-//! entity.get::<&Position>(|pos| {
-//!     let json = world.to_json::<Position>(pos);
+//! {
+//!     let pos = entity.get_ref::<&Position>().unwrap();
+//!     let json = world.to_json::<Position>(&*pos);
 //!     println!("Position: {}", json);
 //!     // Output: Position: {"x":10, "y":20}
-//! });
+//! }
 //!
 //! // Serialize entire entity to JSON
 //! let entity_json = entity.to_json(None);

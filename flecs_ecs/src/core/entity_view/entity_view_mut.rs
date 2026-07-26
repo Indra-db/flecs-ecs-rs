@@ -426,6 +426,7 @@ impl<'a> EntityView<'a> {
     ///
     /// ```no_run
     /// use flecs_ecs::prelude::*;
+    /// use flecs_ecs::experimental::prelude::*;
     ///
     /// #[derive(Component)]
     /// struct InWorld;
@@ -448,9 +449,10 @@ impl<'a> EntityView<'a> {
     /// // no relationship
     /// entity.set_id(Position { x: 1.0, y: 2.0 }, position);
     ///
-    /// entity.get::<&(InWorld, Position)>(|pos| {
+    /// {
+    ///     let _pos = entity.get_ref::<&(InWorld, Position)>().unwrap();
     ///     // ...
-    /// });
+    /// }
     /// ```
     ///
     /// # See also
@@ -486,6 +488,7 @@ impl<'a> EntityView<'a> {
     ///
     /// ```no_run
     /// use flecs_ecs::prelude::*;
+    /// use flecs_ecs::experimental::prelude::*;
     ///
     /// #[derive(Component)]
     /// struct InWorld;
@@ -502,9 +505,10 @@ impl<'a> EntityView<'a> {
     ///
     /// entity.set_pair::<InWorld, _>(Position { x: 1.0, y: 2.0 });
     ///
-    /// entity.get::<&(InWorld, Position)>(|pos| {
+    /// {
+    ///     let _pos = entity.get_ref::<&(InWorld, Position)>().unwrap();
     ///     // ...
-    /// });
+    /// }
     /// ```
     pub fn set_pair<First, Second>(
         self,
@@ -1126,40 +1130,6 @@ impl<'a> EntityView<'a> {
         }
     }
 
-    /// Get reference to a id. If it's a component, it provides a typed interface, otherwise an untyped (`c_void`) interface.
-    /// A reference allows for quick and safe access to a component value, and is
-    /// a faster alternative to repeatedly calling 'get' for the same component.
-    ///
-    /// ```no_run
-    /// use flecs_ecs::prelude::*;
-    ///
-    /// #[derive(Component)]
-    /// struct Position {
-    ///     x: f32,
-    ///     y: f32,
-    /// };
-    ///
-    /// let world = World::new();
-    ///
-    /// let entity = world.entity().set(Position { x: 10.0, y: 20.0 });
-    ///
-    /// let mut pos_ref = entity.cached_ref(Position::id());
-    ///
-    /// pos_ref.get(|pos| {
-    ///     println!("Position: ({}, {})", pos.x, pos.y);
-    /// });
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `component` - The component id.
-    ///
-    /// # Returns
-    ///
-    /// The cached reference.
-    pub fn cached_ref<T: IntoId>(&self, component: T) -> CachedRef<'a, <T as IntoId>::CastType> {
-        CachedRef::<<T as IntoId>::CastType>::new(self.world, *self.id, component)
-    }
 
     /// Clear an entity.
     ///

@@ -1,6 +1,7 @@
 use core::hint::black_box;
 pub use core::time::Duration;
 pub use criterion::{Criterion, criterion_group, criterion_main};
+pub use flecs_ecs::experimental::prelude::EntityGuardExt;
 pub use flecs_ecs::macros::*;
 pub use flecs_ecs::prelude::*;
 use flecs_ecs::sys;
@@ -340,9 +341,7 @@ macro_rules! owns_component_range {
 macro_rules! get_component_range {
         ($world:expr, $entity:expr, $component:ty, $start:expr, $end:expr) => {{
             seq!(P in $start..=$end {
-                $entity.try_get::<(#(&$component~P,)*)>(|x| {
-                    core::hint::black_box(x);
-                });
+                core::hint::black_box($entity.get_ref::<(#(&$component~P,)*)>());
             });
         }}
     }
@@ -350,7 +349,7 @@ macro_rules! get_component_range {
 macro_rules! get_mut_component_range {
         ($world:expr, $entity:expr, $component:ty, $start:expr, $end:expr) => {{
             seq!(P in $start..=$end {
-                $entity.try_get::<(#(&mut $component~P,)*)>(|x| {core::hint::black_box(x);});
+                core::hint::black_box($entity.get_ref::<(#(&mut $component~P,)*)>());
             });
         }};
     }

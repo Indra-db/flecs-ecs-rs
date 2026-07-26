@@ -418,14 +418,14 @@ fn meta_ser_deser_flecs_entity() {
     let e1 = world.entity_named("ent1");
     let e2 = world.entity_named("ent2");
 
-    let mut v = e1;
+    let mut v: Entity = e1.id();
     let json = world.to_json::<Entity>(&e1);
     assert_eq!(json, "\"ent1\"");
 
     world.from_json::<Entity>(&mut v, "\"ent2\"", None);
     let json = world.to_json::<Entity>(&v);
     assert_eq!(json, "\"ent2\"");
-    assert_eq!(v, e2);
+    assert_eq!(v, e2.id());
 }
 
 #[test]

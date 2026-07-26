@@ -9,8 +9,6 @@
 //! - **[`world::World`]** - The container for all ECS data. Create one with `World::new()`.
 //! - **[`entity_view::EntityView`]** - A lightweight, `Copy`able handle to an entity, used to
 //!   add/remove/get components, build relationships and traverse hierarchies.
-//! - **[`entity_view::EntityViewGet`]** - Extension trait for reading component data off an
-//!   `EntityView`.
 //! - **[`id::Id`]** / **[`id_view::IdView`]** - Identifiers for anything that can be added to an
 //!   entity: components, tags, pair (relationship) ids and id flags.
 //! - **[`query::Query`]** / **[`query_builder`]** - Build and iterate queries over entities that
@@ -70,7 +68,6 @@ pub use component_registration::*;
 pub use components::*;
 pub use entity::Entity;
 pub use entity_view::EntityView;
-pub use entity_view::EntityViewGet;
 pub use event::EventBuilder;
 pub use get_tuple::GetTuple;
 pub(crate) use get_tuple::*;
@@ -115,5 +112,4 @@ pub use utility::*;
 pub use world::AsyncStage;
 pub(crate) use world::FlecsArray;
 pub use world::World;
-pub use world::WorldGet;
 pub(crate) use world_ctx::*;

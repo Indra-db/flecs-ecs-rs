@@ -411,20 +411,12 @@ pub fn query_experimental(criterion: &mut Criterion) {
     let q4 = world.new_query::<(&C1, &C2, &C3, &C4)>();
     let q4w = world.new_query::<(&mut C1, &C2, &C3, &C4)>();
 
-    // --- entity access: guard get vs closure get ---
+    // --- entity access: guard get ---
 
     group.bench_function("exp_entity_get_ref_1", |b| {
         b.iter(|| {
             let g = world.entity_from_id(e_id).get_ref::<&C1>().unwrap();
             black_box(g.0)
-        });
-    });
-
-    group.bench_function("exp_entity_closure_get_1", |b| {
-        b.iter(|| {
-            let mut v = 0u32;
-            world.entity_from_id(e_id).get::<&C1>(|c| v = c.0);
-            black_box(v)
         });
     });
 

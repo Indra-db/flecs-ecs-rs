@@ -282,11 +282,15 @@ pub(crate) fn expand_ecs_rust_trait(name: Ident) -> TokenStream {
                 let data_ptr = data_ptr as usize;
 
                 // Retrieve the stored vtable from the component's trait data
-                let vtable_ptr = entity
-                    .world()
-                    .component_untyped_from(*derived_id)
-                    .cloned::<&(Self, Self)>()
-                    .vtable;
+                let vtable_ptr = {
+                    use flecs_ecs::experimental::prelude::EntityGuardExt;
+                    entity
+                        .world()
+                        .component_untyped_from(*derived_id)
+                        .get_ref::<&(Self, Self)>()
+                        .expect("entity does not have the component identified by `derived_id`")
+                        .vtable
+                };
 
                 // SAFETY: `data_ptr` is non-null and, per the caller's contract, points to a live
                 // component whose concrete type registered `vtable_ptr` via `register_vtable`.
@@ -343,11 +347,15 @@ pub(crate) fn expand_ecs_rust_trait(name: Ident) -> TokenStream {
                 let data_ptr = data_ptr as usize;
 
                 // Retrieve the stored vtable from the component's trait data
-                let vtable_ptr = entity
-                    .world()
-                    .component_untyped_from(*derived_id)
-                    .cloned::<&(Self, Self)>()
-                    .vtable;
+                let vtable_ptr = {
+                    use flecs_ecs::experimental::prelude::EntityGuardExt;
+                    entity
+                        .world()
+                        .component_untyped_from(*derived_id)
+                        .get_ref::<&(Self, Self)>()
+                        .expect("entity does not have the component identified by `derived_id`")
+                        .vtable
+                };
 
                 // SAFETY: `data_ptr` is non-null and, per the caller's contract, points to a live,
                 // uniquely-borrowed component whose concrete type registered `vtable_ptr` via

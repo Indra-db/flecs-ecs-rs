@@ -28,7 +28,6 @@ mod singleton;
 mod system;
 mod world;
 
-pub use singleton::*;
 pub use world::*;
 
 /// An entity id range created with [`World::entity_range_new()`].

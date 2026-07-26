@@ -559,6 +559,7 @@ pub mod on_instantiate {
     /// # Example
     /// ```
     /// # use flecs_ecs::prelude::*;
+    /// # use flecs_ecs::experimental::prelude::*;
     ///
     /// #[derive(Component, Clone, PartialEq)]
     /// struct Mass {
@@ -575,7 +576,7 @@ pub mod on_instantiate {
     /// let inst = world.entity().is_a(base); // Mass is copied to inst
     ///
     /// assert!(inst.owns(Mass::id()));
-    /// assert!(base.cloned::<&Mass>() == inst.cloned::<&Mass>());
+    /// assert!(base.cloned_owned::<&Mass>() == inst.cloned_owned::<&Mass>());
     /// ```
     #[derive(Debug, Default, Clone)]
     pub struct Override;
@@ -592,6 +593,7 @@ pub mod on_instantiate {
     /// # Example
     /// ```
     /// # use flecs_ecs::prelude::*;
+    /// # use flecs_ecs::experimental::prelude::*;
     /// #[derive(Component, Clone, PartialEq)]
     /// struct Mass {
     ///     value: f32,
@@ -609,7 +611,7 @@ pub mod on_instantiate {
     /// assert!(inst.has(Mass::id()));
     /// assert!(!inst.owns(Mass::id()));
     /// // Inherited component points to the same data
-    /// assert!(base.cloned::<&Mass>() == inst.cloned::<&Mass>());
+    /// assert!(base.cloned_owned::<&Mass>() == inst.cloned_owned::<&Mass>());
     /// ```
     #[derive(Debug, Default, Clone)]
     pub struct Inherit;
@@ -627,6 +629,7 @@ pub mod on_instantiate {
     /// # Example
     /// ```
     /// # use flecs_ecs::prelude::*;
+    /// # use flecs_ecs::experimental::prelude::*;
     /// # let world = World::new();
     /// # #[derive(Component, Clone, PartialEq)]
     /// # struct Mass {
@@ -642,7 +645,7 @@ pub mod on_instantiate {
     ///
     /// assert!(!inst.has(Mass::id()));
     /// assert!(!inst.owns(Mass::id()));
-    /// assert!(inst.try_get::<&Mass>(|mass| {}).is_none());
+    /// assert!(inst.get_ref::<&Mass>().is_none());
     /// ```
     #[derive(Debug, Default, Clone)]
     pub struct DontInherit;

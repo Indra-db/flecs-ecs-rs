@@ -38,9 +38,7 @@ pub fn get_pair(criterion: &mut Criterion) {
             let start = Instant::now();
             for _ in 0..iters {
                 for e in &entities {
-                    e.get::<&(C1, T1)>(|c1| {
-                        core::hint::black_box(c1);
-                    });
+                    core::hint::black_box(e.get_ref::<&(C1, T1)>().unwrap());
                 }
             }
             let elapsed = start.elapsed();
@@ -117,9 +115,7 @@ pub fn get_inherited_w_depth(criterion: &mut Criterion) {
                 let start = Instant::now();
                 for _ in 0..iters {
                     for entity in &entities {
-                        entity.get::<&C1>(|c1| {
-                            core::hint::black_box(c1);
-                        });
+                        core::hint::black_box(entity.get_ref::<&C1>().unwrap());
                     }
                 }
                 let elapsed = start.elapsed();
