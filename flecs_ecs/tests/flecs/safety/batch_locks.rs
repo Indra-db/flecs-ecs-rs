@@ -10,6 +10,7 @@
 //! batch keys never alias.
 
 use super::*;
+use flecs_ecs::experimental::QuerySharedExt;
 
 #[derive(Component)]
 struct A(u8);
@@ -31,7 +32,7 @@ fn seed(world: &World) {
 fn batch_write_term_view_read() {
     let world = World::new();
     seed(&world);
-    query!(world, &mut A, &B).build().each_entity(|entity, _| {
+    query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
         entity.get::<&A>(|_| {});
     });
 }
@@ -42,7 +43,7 @@ fn batch_write_term_view_read() {
 fn batch_write_term_view_write() {
     let world = World::new();
     seed(&world);
-    query!(world, &mut A, &B).build().each_entity(|entity, _| {
+    query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
         entity.get::<&mut A>(|_| {});
     });
 }
@@ -53,7 +54,7 @@ fn batch_write_term_view_write() {
 fn batch_read_term_view_write() {
     let world = World::new();
     seed(&world);
-    query!(world, &A, &B).build().each_entity(|entity, _| {
+    query!(world, &A, &B).build().each_entity_shared(&world, |entity, _| {
         entity.get::<&mut A>(|_| {});
     });
 }
@@ -63,7 +64,7 @@ fn batch_read_term_view_write() {
 fn batch_read_term_view_read_ok() {
     let world = World::new();
     seed(&world);
-    query!(world, &A, &B).build().each_entity(|entity, _| {
+    query!(world, &A, &B).build().each_entity_shared(&world, |entity, _| {
         entity.get::<&A>(|_| {});
     });
 }
@@ -74,7 +75,7 @@ fn batch_read_term_view_read_ok() {
 fn batch_disjoint_view_ok() {
     let world = World::new();
     seed(&world);
-    query!(world, &mut A, &B).build().each_entity(|entity, _| {
+    query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
         entity.get::<&mut C>(|_| {});
     });
 }
@@ -88,7 +89,7 @@ fn write_held_across_batch_read_term() {
     let world = World::new();
     let entity = world.entity().set(A(0)).set(B(0));
     entity.get::<&mut A>(|_| {
-        query!(world, &A, &B).build().each(|_| {});
+        query!(world, &A, &B).build().each_shared(&world, |_| {});
     });
 }
 
@@ -99,7 +100,7 @@ fn read_held_across_batch_read_term_ok() {
     let world = World::new();
     let entity = world.entity().set(A(0)).set(B(0));
     entity.get::<&A>(|_| {
-        query!(world, &A, &B).build().each(|_| {});
+        query!(world, &A, &B).build().each_shared(&world, |_| {});
     });
 }
 
@@ -120,7 +121,7 @@ mod sparse {
     fn batch_write_term_view_read() {
         let world = World::new();
         seed_sparse(&world);
-        query!(world, &mut A, &B).build().each_entity(|entity, _| {
+        query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
             entity.get::<&A>(|_| {});
         });
     }
@@ -132,7 +133,7 @@ mod sparse {
     fn batch_disjoint_view_ok() {
         let world = World::new();
         seed_sparse(&world);
-        query!(world, &mut A, &B).build().each_entity(|entity, _| {
+        query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
             entity.get::<&mut C>(|_| {});
         });
     }

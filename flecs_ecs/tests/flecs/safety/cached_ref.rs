@@ -3,6 +3,7 @@
 
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
+use flecs_ecs::experimental::QuerySharedExt;
 
 #[derive(Component)]
 struct Pos(i32);
@@ -47,7 +48,7 @@ fn ref_nested_in_query_iteration_panics() {
     let mut r = e.cached_ref(Pos::id());
 
     let q = world.new_query::<&mut Pos>();
-    q.each(|_pos| {
+    q.each_shared(&world, |_pos| {
         r.get(|_inner| {});
     });
 }

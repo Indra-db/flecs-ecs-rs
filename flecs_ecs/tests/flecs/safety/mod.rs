@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
+use flecs_ecs::experimental::QuerySharedExt;
 
 mod batch_locks;
 mod cached_ref;
@@ -39,23 +40,23 @@ fn running_conflicting_queries_no_violations() {
     let write1 = query!(world, &mut Foo).build();
 
     // running queries that overlap individually is ok
-    read.run(|iter| {
+    read.run_shared(&world, |iter| {
         iter.fini();
     });
-    write0.run(|iter| {
+    write0.run_shared(&world, |iter| {
         iter.fini();
     });
-    write1.run(|iter| {
+    write1.run_shared(&world, |iter| {
         iter.fini();
     });
 
-    read.each(|_| {});
-    write0.each(|_| {});
-    write1.each(|_| {});
+    read.each_shared(&world, |_| {});
+    write0.each_shared(&world, |_| {});
+    write1.each_shared(&world, |_| {});
 
-    read.each_entity(|_, _| {});
-    write0.each_entity(|_, _| {});
-    write1.each_entity(|_, _| {});
+    read.each_entity_shared(&world, |_, _| {});
+    write0.each_entity_shared(&world, |_, _| {});
+    write1.each_entity_shared(&world, |_, _| {});
 
     read.each_iter(|_, _, _| {});
     write0.each_iter(|_, _, _| {});
@@ -159,7 +160,7 @@ mod entity_view {
         fn query_write_view_clone() {
             let world = World::new();
             world.entity().set(Foo(0));
-            query!(world, &mut Foo).build().each_entity(|entity, _| {
+            query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
                 let _ = entity.cloned::<&Foo>();
             });
         }
@@ -172,7 +173,7 @@ mod entity_view {
             fn query_read_view_write() {
                 let world = World::new();
                 world.entity().set(Foo(0));
-                query!(world, &Foo).build().each_entity(|entity, _| {
+                query!(world, &Foo).build().each_entity_shared(&world, |entity, _| {
                     entity.get::<&mut Foo>(|_| {});
                 });
             }
@@ -182,7 +183,7 @@ mod entity_view {
             fn query_write_view_read() {
                 let world = World::new();
                 world.entity().set(Foo(0));
-                query!(world, &mut Foo).build().each_entity(|entity, _| {
+                query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
                     entity.get::<&Foo>(|_| {});
                 });
             }
@@ -192,7 +193,7 @@ mod entity_view {
             fn query_write_view_write() {
                 let world = World::new();
                 world.entity().set(Foo(0));
-                query!(world, &mut Foo).build().each_entity(|entity, _| {
+                query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
                     entity.get::<&mut Foo>(|_| {});
                 });
             }
@@ -206,7 +207,7 @@ mod entity_view {
             fn query_read_view_write() {
                 let world = World::new();
                 world.entity().set(Foo(0));
-                query!(world, &Foo).build().each_entity(|entity, _| {
+                query!(world, &Foo).build().each_entity_shared(&world, |entity, _| {
                     entity.try_get::<&mut Foo>(|_| {});
                 });
             }
@@ -216,7 +217,7 @@ mod entity_view {
             fn query_write_view_read() {
                 let world = World::new();
                 world.entity().set(Foo(0));
-                query!(world, &mut Foo).build().each_entity(|entity, _| {
+                query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
                     entity.try_get::<&Foo>(|_| {});
                 });
             }
@@ -226,7 +227,7 @@ mod entity_view {
             fn query_write_view_write() {
                 let world = World::new();
                 world.entity().set(Foo(0));
-                query!(world, &mut Foo).build().each_entity(|entity, _| {
+                query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
                     entity.try_get::<&mut Foo>(|_| {});
                 });
             }
@@ -415,7 +416,7 @@ mod table_iter {
         fn field() {
             let world = World::new();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     let _ = iter.field::<Foo>(0);
                 }
@@ -427,7 +428,7 @@ mod table_iter {
         fn double_field() {
             let world = World::new();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     let _x = iter.field_mut::<Foo>(0);
                     let _y = iter.field_mut::<Foo>(0);
@@ -440,7 +441,7 @@ mod table_iter {
         fn query_read_field() {
             let world = World::new();
             world.entity().set(Foo(0));
-            query!(world, &Foo).build().run(|mut iter| {
+            query!(world, &Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     let _x = iter.field::<Foo>(0);
                     let _y = iter.field_mut::<Foo>(0);
@@ -452,7 +453,7 @@ mod table_iter {
         fn query_write_field() {
             let world = World::new();
             world.entity().set(Foo(0));
-            query!(world, &mut Foo).build().run(|mut iter| {
+            query!(world, &mut Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     let _ = iter.field_mut::<Foo>(0);
                 }
@@ -469,7 +470,7 @@ mod table_iter {
 
             world.component::<Foo>().add_trait::<flecs::Sparse>();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         iter.field_at::<Foo>(0, 0usize);
@@ -484,7 +485,7 @@ mod table_iter {
 
             world.component::<Foo>().add_trait::<flecs::DontFragment>();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         iter.field_at::<Foo>(0, 0usize);
@@ -498,7 +499,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::Sparse>();
             world.entity().set(Foo(0));
-            query!(world, &Foo).build().run(|mut iter| {
+            query!(world, &Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x1 = iter.field_at::<Foo>(0, 0usize);
@@ -513,7 +514,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::DontFragment>();
             world.entity().set(Foo(0));
-            query!(world, &Foo).build().run(|mut iter| {
+            query!(world, &Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x1 = iter.field_at::<Foo>(0, 0usize);
@@ -529,7 +530,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::Sparse>();
             world.entity().set(Foo(0));
-            query!(world, &mut Foo).build().run(|mut iter| {
+            query!(world, &mut Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at::<Foo>(0, 0usize);
@@ -545,7 +546,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::DontFragment>();
             world.entity().set(Foo(0));
-            query!(world, &mut Foo).build().run(|mut iter| {
+            query!(world, &mut Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at::<Foo>(0, 0usize);
@@ -564,7 +565,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::Sparse>();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         iter.field_at_mut::<Foo>(0, 0usize);
@@ -578,7 +579,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::DontFragment>();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         iter.field_at_mut::<Foo>(0, 0usize);
@@ -593,7 +594,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::Sparse>();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at_mut::<Foo>(0, 0usize);
@@ -609,7 +610,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::DontFragment>();
             world.entity().set(Foo(0));
-            query!(world, Foo).build().run(|mut iter| {
+            query!(world, Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at_mut::<Foo>(0, 0usize);
@@ -625,7 +626,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::Sparse>();
             world.entity().set(Foo(0));
-            query!(world, &Foo).build().run(|mut iter| {
+            query!(world, &Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at_mut::<Foo>(0, 0usize);
@@ -641,7 +642,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::DontFragment>();
             world.entity().set(Foo(0));
-            query!(world, &Foo).build().run(|mut iter| {
+            query!(world, &Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at_mut::<Foo>(0, 0usize);
@@ -657,7 +658,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::Sparse>();
             world.entity().set(Foo(0));
-            query!(world, &mut Foo).build().run(|mut iter| {
+            query!(world, &mut Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at::<Foo>(0, 0usize);
@@ -673,7 +674,7 @@ mod table_iter {
             let world = World::new();
             world.component::<Foo>().add_trait::<flecs::DontFragment>();
             world.entity().set(Foo(0));
-            query!(world, &mut Foo).build().run(|mut iter| {
+            query!(world, &mut Foo).build().run_shared(&world, |mut iter| {
                 while iter.next() {
                     for _ in iter.iter() {
                         let _x = iter.field_at::<Foo>(0, 0usize);
@@ -697,8 +698,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &Foo).build();
             let query1 = query!(world, &mut Foo).build();
-            query0.run(|iter| {
-                query1.run(|iter| {
+            query0.run_shared(&world, |iter| {
+                query1.run_shared(&world, |iter| {
                     iter.fini();
                 });
                 iter.fini();
@@ -712,8 +713,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &Foo).build();
             let query1 = query!(world, &mut Foo).build();
-            query0.each(|_| {
-                query1.each(|_| {});
+            query0.each_shared(&world, |_| {
+                query1.each_shared(&world, |_| {});
             });
         }
 
@@ -724,8 +725,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &Foo).build();
             let query1 = query!(world, &mut Foo).build();
-            query0.each_entity(|_, _| {
-                query1.each_entity(|_, _| {});
+            query0.each_entity_shared(&world, |_, _| {
+                query1.each_entity_shared(&world, |_, _| {});
             });
         }
 
@@ -751,8 +752,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &mut Foo).build();
             let query1 = query!(world, &Foo).build();
-            query0.run(|iter| {
-                query1.run(|iter| {
+            query0.run_shared(&world, |iter| {
+                query1.run_shared(&world, |iter| {
                     iter.fini();
                 });
                 iter.fini();
@@ -766,8 +767,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &mut Foo).build();
             let query1 = query!(world, &Foo).build();
-            query0.each(|_| {
-                query1.each(|_| {});
+            query0.each_shared(&world, |_| {
+                query1.each_shared(&world, |_| {});
             });
         }
 
@@ -778,8 +779,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &mut Foo).build();
             let query1 = query!(world, &Foo).build();
-            query0.each_entity(|_, _| {
-                query1.each_entity(|_, _| {});
+            query0.each_entity_shared(&world, |_, _| {
+                query1.each_entity_shared(&world, |_, _| {});
             });
         }
 
@@ -805,8 +806,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &mut Foo).build();
             let query1 = query!(world, &mut Foo).build();
-            query0.run(|iter| {
-                query1.run(|iter| {
+            query0.run_shared(&world, |iter| {
+                query1.run_shared(&world, |iter| {
                     iter.fini();
                 });
                 iter.fini();
@@ -820,8 +821,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &mut Foo).build();
             let query1 = query!(world, &mut Foo).build();
-            query0.each(|_| {
-                query1.each(|_| {});
+            query0.each_shared(&world, |_| {
+                query1.each_shared(&world, |_| {});
             });
         }
 
@@ -832,8 +833,8 @@ mod query_in_query {
             world.entity().set(Foo(0));
             let query0 = query!(world, &mut Foo).build();
             let query1 = query!(world, &mut Foo).build();
-            query0.each_entity(|_, _| {
-                query1.each_entity(|_, _| {});
+            query0.each_entity_shared(&world, |_, _| {
+                query1.each_entity_shared(&world, |_, _| {});
             });
         }
 
@@ -1520,7 +1521,7 @@ fn filter_does_not_panic() {
 
     world.entity().set(Foo(0));
 
-    query!(world, Foo).build().each_entity(|entity, _| {
+    query!(world, Foo).build().each_entity_shared(&world, |entity, _| {
         let _ = entity.cloned::<&Foo>();
     });
 }
@@ -1532,7 +1533,7 @@ mod dense_field_at_locks {
     fn filter_dense_read_read() {
         let world = World::new();
         world.entity().set(Foo(0));
-        query!(world, Foo).build().run(|mut iter| {
+        query!(world, Foo).build().run_shared(&world, |mut iter| {
             while iter.next() {
                 for _ in iter.iter() {
                     let _x1 = iter.field_at::<Foo>(0, 0usize);
@@ -1547,7 +1548,7 @@ mod dense_field_at_locks {
     fn filter_double_field_at_mut_dense() {
         let world = World::new();
         world.entity().set(Foo(0));
-        query!(world, Foo).build().run(|mut iter| {
+        query!(world, Foo).build().run_shared(&world, |mut iter| {
             while iter.next() {
                 for _ in iter.iter() {
                     let _x = iter.field_at_mut::<Foo>(0, 0usize);
@@ -1562,7 +1563,7 @@ mod dense_field_at_locks {
     fn filter_field_at_read_write_dense() {
         let world = World::new();
         world.entity().set(Foo(0));
-        query!(world, Foo).build().run(|mut iter| {
+        query!(world, Foo).build().run_shared(&world, |mut iter| {
             while iter.next() {
                 for _ in iter.iter() {
                     let _x = iter.field_at::<Foo>(0, 0usize);

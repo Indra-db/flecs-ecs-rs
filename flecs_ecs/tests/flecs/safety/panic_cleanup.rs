@@ -5,6 +5,7 @@ use alloc::sync::Arc;
 
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
+use flecs_ecs::experimental::{QueryExclusiveExt, QuerySharedExt};
 
 #[derive(Component)]
 struct Foo(i32);
@@ -87,12 +88,12 @@ fn query_panic_releases_safety_scope() {
     let query = world.new_query::<&mut Foo>();
 
     let result = catch_unwind(AssertUnwindSafe(|| {
-        query.each(|_| panic!("expected"));
+        query.each_shared(&world, |_| panic!("expected"));
     }));
 
     assert!(result.is_err());
-    query.each(|foo| foo.0 += 1);
-    query.each(|foo| assert_eq!(foo.0, 2));
+    query.each_shared(&world, |foo| foo.0 += 1);
+    query.each_shared(&world, |foo| assert_eq!(foo.0, 2));
 }
 
 #[test]
@@ -117,7 +118,7 @@ fn partial_tuple_acquisition_rolls_back_prior_keys() {
 /// entity creation works, and `progress` runs again cleanly.
 fn assert_world_usable(world: &mut World) {
     let mut seen = 0u32;
-    world.new_query::<&mut Foo>().each(|f| {
+    world.new_query::<&mut Foo>().each_exclusive(world, |f| {
         f.0 += 1;
         seen += 1;
     });
@@ -295,7 +296,7 @@ fn system_par_each_panic_surfaces_from_progress_multithreaded() {
         // parallel system again and a fresh query.
         world.progress();
         let mut seen = 0u32;
-        world.new_query::<&Foo>().each(|_| seen += 1);
+        world.new_query::<&Foo>().each_shared(&world, |_| seen += 1);
         assert!(seen > 0);
     }
     assert_eq!(counter.load(Ordering::Relaxed), 400);
@@ -331,7 +332,7 @@ fn observer_panic_surfaces_from_emit() {
 
         // World usable: a fresh mutable query does not spuriously conflict.
         let mut seen = 0u32;
-        world.new_query::<&mut Foo>().each(|foo| {
+        world.new_query::<&mut Foo>().each_shared(&world, |foo| {
             foo.0 += 1;
             seen += 1;
         });
@@ -359,14 +360,14 @@ fn order_by_comparator_panic_surfaces_from_iteration() {
                 .query::<&Foo>()
                 .order_by::<Foo>(|_e1, _a: &Foo, _e2, _b: &Foo| panic!("boom order_by"))
                 .build();
-            query.each(|_| {});
+            query.each_shared(&world, |_| {});
         }));
         let payload = result.expect_err("iteration should surface the comparator panic");
         assert_eq!(panic_message(&*payload), "boom order_by");
 
         // World usable afterwards: an unsorted query iterates fine.
         let mut seen = 0u32;
-        world.new_query::<&mut Foo>().each(|foo| {
+        world.new_query::<&mut Foo>().each_shared(&world, |foo| {
             foo.0 += 1;
             seen += 1;
         });
