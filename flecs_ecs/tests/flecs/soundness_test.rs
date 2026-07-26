@@ -166,6 +166,41 @@ fn observer_query_init_failure_reclaims_closure() {
     );
 }
 
+/// Component hook `_drop` trampolines used to run the closure destructor via
+/// `ptr::drop_in_place` on a leaked box, running the destructor but never
+/// deallocating. They now reconstruct the `Box` so the closure is freed. The
+/// destructor must run exactly once (a double free would double-panic here).
+#[test]
+fn component_hook_closure_dropped_exactly_once() {
+    struct DropCounter(Arc<AtomicUsize>);
+    impl Drop for DropCounter {
+        fn drop(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    {
+        let world = World::new();
+        let guard = DropCounter(Arc::clone(&counter));
+        world.component::<Position>().on_add(move |_e, _p| {
+            let _keep = &guard;
+        });
+        world.entity().set(Position { x: 1, y: 2 });
+    }
+
+    assert_eq!(
+        counter.load(Ordering::SeqCst),
+        1,
+        "hook closure destructor must run exactly once"
+    );
+    assert_eq!(
+        Arc::strong_count(&counter),
+        1,
+        "hook closure box must be reclaimed (Box::from_raw), not leaked"
+    );
+}
+
 #[derive(Component)]
 struct ArcPayload {
     tracker: Arc<()>,

@@ -1,7 +1,7 @@
 //! Registering and working with components
 
 use core::{
-    cmp::Ordering, ffi::c_void, fmt::Debug, fmt::Display, marker::PhantomData, ops::Deref, ptr,
+    cmp::Ordering, ffi::c_void, fmt::Debug, fmt::Display, marker::PhantomData, ops::Deref,
 };
 
 use crate::core::*;
@@ -176,7 +176,7 @@ impl<'a, T> Component<'a, T> {
     unsafe fn binding_ctx_drop(ptr: *mut c_void) {
         let ptr_struct: *mut ComponentBindingCtx = ptr as *mut ComponentBindingCtx;
         unsafe {
-            ptr::drop_in_place(ptr_struct);
+            drop(Box::from_raw(ptr_struct));
         }
     }
 
@@ -322,7 +322,7 @@ impl<'a, T> Component<'a, T> {
     {
         let ptr_func: *mut Func = func as *mut Func;
         unsafe {
-            ptr::drop_in_place(ptr_func);
+            drop(Box::from_raw(ptr_func));
         }
     }
 
@@ -357,7 +357,7 @@ impl<'a, T> Component<'a, T> {
     {
         let ptr_func: *mut Func = func as *mut Func;
         unsafe {
-            ptr::drop_in_place(ptr_func);
+            drop(Box::from_raw(ptr_func));
         }
     }
 
@@ -369,7 +369,7 @@ impl<'a, T> Component<'a, T> {
     {
         let ptr_func: *mut Func = func as *mut Func;
         unsafe {
-            ptr::drop_in_place(ptr_func);
+            drop(Box::from_raw(ptr_func));
         }
     }
 
@@ -381,7 +381,7 @@ impl<'a, T> Component<'a, T> {
     {
         let ptr_func: *mut Func = func as *mut Func;
         unsafe {
-            ptr::drop_in_place(ptr_func);
+            drop(Box::from_raw(ptr_func));
         }
     }
 
@@ -393,7 +393,7 @@ impl<'a, T> Component<'a, T> {
     {
         let ptr_func: *mut Func = func as *mut Func;
         unsafe {
-            ptr::drop_in_place(ptr_func);
+            drop(Box::from_raw(ptr_func));
         }
     }
 
