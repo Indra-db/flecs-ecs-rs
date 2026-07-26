@@ -57,6 +57,14 @@ pub mod core;
 
 pub mod addons;
 
+/// Prototype of the next-generation flecs Rust API surface.
+///
+/// Feature-gated behind `flecs_experimental` (default-on). Nothing here is
+/// stable; names are provisional. See the module docs for the two-register
+/// model, guard-based access, and the tier-0 disjointness reasoning.
+#[cfg(feature = "flecs_experimental")]
+pub mod experimental;
+
 /// Flecs Rust DSL documentation and examples.
 ///
 /// This module contains comprehensive documentation for the Flecs Rust DSL, including:
