@@ -49,7 +49,8 @@ const MAX_TRACKED_TERMS: usize = 64;
 /// — the query may still be disjoint in fact, but it could not be certified.
 ///
 /// `query` must be a live query pointer for `world`, e.g. from
-/// [`QueryAPI::query_ptr`](crate::core::QueryAPI::query_ptr). A null pointer
+/// `IterOperations::query_ptr` (doc-hidden plumbing on the query types). A null
+/// pointer
 /// yields `false`.
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub fn is_proven_disjoint<'a>(world: impl WorldProvider<'a>, query: *const sys::ecs_query_t) -> bool {

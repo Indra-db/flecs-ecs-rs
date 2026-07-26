@@ -85,7 +85,7 @@ impl core::error::Error for AccessError {}
 
 /// Shared, immutable access to a single component. On drop it releases its read
 /// borrow and decrements the stage pin (spec §7.1); it holds no defer level of
-/// its own. See the [module docs](self) for the `mem::forget` leak contract.
+/// its own. The `mem::forget` leak contract is described in this file's module comment.
 ///
 /// Provisional name; the intended final surface folds this into `get`. Deref
 /// to `&T`.
@@ -101,7 +101,7 @@ pub struct Ref<'w, T> {
 
 /// Shared, mutable access to a single component. On drop it releases its write
 /// borrow and decrements the stage pin (spec §7.1); it holds no defer level of
-/// its own. See the [module docs](self) for the `mem::forget` leak contract.
+/// its own. The `mem::forget` leak contract is described in this file's module comment.
 ///
 /// Provisional name; the intended final surface folds this into `get`. Deref /
 /// `DerefMut` to `&mut T`.
