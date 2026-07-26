@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Default, Component)]
@@ -21,20 +22,22 @@ fn main() {
     // Create a new entity, set value of position using reflection API
     let e = world.entity().add(Position::id());
 
-    e.get::<&mut Position>(|pos| {
-        let mut cur = world.cursor::<Position>(pos);
+    {
+        let mut pos = e.get_ref::<&mut Position>().unwrap();
+        let mut cur = world.cursor::<Position>(&mut pos);
         cur.push(); // {
         cur.set_float(10.0); //   10
         cur.next(); //   ,
         cur.set_float(20.0); //   20
         cur.pop(); // }
 
-        println!("{}", world.to_expr(pos));
-    });
+        println!("{}", world.to_expr(&*pos));
+    }
 
     // Use member names before assigning values
-    e.get::<&mut Position>(|pos| {
-        let mut cur = world.cursor::<Position>(pos);
+    {
+        let mut pos = e.get_ref::<&mut Position>().unwrap();
+        let mut cur = world.cursor::<Position>(&mut pos);
         cur.push(); // {
         cur.member("y"); //   y:
         cur.set_float(10.0); //   10
@@ -42,8 +45,8 @@ fn main() {
         cur.set_float(20.0); //   20
         cur.pop(); // }
 
-        println!("{}", world.to_expr(pos));
-    });
+        println!("{}", world.to_expr(&*pos));
+    }
 
     // Output:
     //  {x: 10, y: 20}

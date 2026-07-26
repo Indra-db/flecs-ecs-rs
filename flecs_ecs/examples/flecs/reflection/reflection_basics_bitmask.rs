@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Component)]
@@ -75,9 +76,8 @@ fn main() {
     });
 
     // Convert Sandwidth component to flecs expression string
-    e.get::<&Sandwich>(|val| {
-        println!("{}", world.to_expr(val));
-    });
+    let val = e.get_ref::<&Sandwich>().unwrap();
+    println!("{}", world.to_expr(&*val));
 
     // Output:
     //  {toppings: lettuce|bacon}
