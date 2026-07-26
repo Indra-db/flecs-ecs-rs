@@ -395,7 +395,8 @@ fn system_builder_string_term() {
         .each_entity(move |e, _| {
             count2.set(count2.get() + 1);
             assert_eq!(e.id(), e1);
-        });
+        })
+        .expect("valid system query expression");
 
     s.run();
 

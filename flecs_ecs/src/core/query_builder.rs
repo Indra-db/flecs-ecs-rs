@@ -312,6 +312,7 @@ use crate::sys;
 extern crate std;
 
 extern crate alloc;
+use alloc::string::{String, ToString};
 use alloc::{format, vec::Vec};
 use flecs_ecs_derive::extern_abi;
 
@@ -619,18 +620,14 @@ where
 }
 
 impl<'a, T: QueryTuple> QueryBuilder<'a, T> {
-    /// Attempts to build the query, returning `None` if the query is invalid.
+    /// Set a runtime query expression, transitioning to the fallible-build typestate.
     ///
-    /// This is a fallible version of [`build()`](Builder::build) that returns `None`
-    /// instead of panicking when query creation fails. Query creation can fail for
-    /// several reasons, most commonly:
-    /// - Invalid query expression syntax (when using `expr()`)
-    /// - Malformed query terms
-    ///
-    /// # Returns
-    ///
-    /// * `Some(Query<T>)` - Successfully created query
-    /// * `None` - Query creation failed
+    /// A purely-typed builder is infallible: [`build()`](Builder::build) returns a
+    /// [`Query`] directly. A runtime expression string can fail to parse, so calling
+    /// `expr()` consumes the builder and returns a [`FallibleQueryBuilder`] whose
+    /// terminal [`build()`](FallibleQueryBuilder::build) returns a
+    /// `Result<Query<T>, QueryBuildError>`. All remaining configuration methods are
+    /// still available on the returned builder.
     ///
     /// # Example
     ///
@@ -642,29 +639,139 @@ impl<'a, T: QueryTuple> QueryBuilder<'a, T> {
     ///
     /// let world = World::new();
     ///
-    /// // Valid query
-    /// let valid_query = world.query::<&Position>()
-    ///     .try_build();
-    /// assert!(valid_query.is_some());
-    ///
-    /// // Invalid query expression
-    /// let invalid_query = world.query::<()>()
-    ///     .expr("invalid syntax!!!")
-    ///     .try_build();
-    /// assert!(invalid_query.is_none());
+    /// // Invalid query expression surfaces as an error, not a panic.
+    /// let result = world.query::<()>().expr("invalid syntax!!!").build();
+    /// assert!(matches!(result, Err(QueryBuildError::InvalidExpr { .. })));
     /// ```
-    ///
-    /// # See also
-    ///
-    /// * [`build()`](Builder::build) - Panicking version that fails fast on invalid queries
-    pub fn try_build(&mut self) -> Option<Query<T>> {
-        let world = self.world;
-        let query = Query::<T>::try_new_from_desc(world, &mut self.desc)?;
-        for s in self.term_builder.str_ptrs_to_free.iter_mut() {
+    pub fn expr(mut self, expr: &str) -> FallibleQueryBuilder<'a, T> {
+        QueryBuilderImpl::expr(&mut self, expr);
+        FallibleQueryBuilder {
+            inner: self,
+            expr: expr.to_string(),
+        }
+    }
+}
+
+/// A malformed query construction reported by the fallible-build typestate.
+///
+/// Only a builder that took a runtime [`expr()`](QueryBuilder::expr) (or another
+/// runtime/dynamic term input) can produce this error; a purely-typed builder is
+/// infallible.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum QueryBuildError {
+    /// The runtime `expr()` string failed to parse or validate.
+    InvalidExpr {
+        /// The offending expression string.
+        expr: String,
+    },
+    /// A dynamically-constructed term was malformed (bad id, conflicting modifiers).
+    InvalidTerm {
+        /// The index of the offending term.
+        index: usize,
+    },
+    /// `ecs_query_init` rejected the descriptor for another reason.
+    Init,
+}
+
+impl core::fmt::Display for QueryBuildError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            QueryBuildError::InvalidExpr { expr } => {
+                write!(f, "invalid query expression: {expr:?}")
+            }
+            QueryBuildError::InvalidTerm { index } => {
+                write!(f, "invalid query term at index {index}")
+            }
+            QueryBuildError::Init => write!(f, "query initialization failed"),
+        }
+    }
+}
+
+impl core::error::Error for QueryBuildError {}
+
+/// The fallible-build typestate of [`QueryBuilder`], entered via
+/// [`QueryBuilder::expr()`].
+///
+/// It carries the same configuration surface as [`QueryBuilder`] (the query builder
+/// methods delegate to the wrapped builder), but its terminal
+/// [`build()`](FallibleQueryBuilder::build) returns a `Result` because the descriptor
+/// can be malformed.
+pub struct FallibleQueryBuilder<'a, T>
+where
+    T: QueryTuple,
+{
+    inner: QueryBuilder<'a, T>,
+    expr: String,
+}
+
+impl<T: QueryTuple> core::fmt::Debug for FallibleQueryBuilder<'_, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("FallibleQueryBuilder")
+            .field("terms", &debug_term_list(&self.inner.desc.terms))
+            .field("expr", &self.expr)
+            .finish()
+    }
+}
+
+#[doc(hidden)]
+impl<'a, T: QueryTuple> internals::QueryConfig<'a> for FallibleQueryBuilder<'a, T> {
+    #[inline(always)]
+    fn term_builder(&self) -> &TermBuilder {
+        self.inner.term_builder()
+    }
+
+    #[inline(always)]
+    fn term_builder_mut(&mut self) -> &mut TermBuilder {
+        self.inner.term_builder_mut()
+    }
+
+    #[inline(always)]
+    fn query_desc(&self) -> &sys::ecs_query_desc_t {
+        self.inner.query_desc()
+    }
+
+    #[inline(always)]
+    fn query_desc_mut(&mut self) -> &mut sys::ecs_query_desc_t {
+        self.inner.query_desc_mut()
+    }
+
+    #[inline(always)]
+    fn count_generic_terms(&self) -> i32 {
+        self.inner.count_generic_terms()
+    }
+}
+
+impl<'a, T: QueryTuple> TermBuilderImpl<'a> for FallibleQueryBuilder<'a, T> {}
+
+impl<'a, T: QueryTuple> QueryBuilderImpl<'a> for FallibleQueryBuilder<'a, T> {}
+
+impl<'a, T: QueryTuple> WorldProvider<'a> for FallibleQueryBuilder<'a, T> {
+    fn world(&self) -> WorldRef<'a> {
+        self.inner.world
+    }
+}
+
+impl<'a, T> Builder<'a> for FallibleQueryBuilder<'a, T>
+where
+    T: QueryTuple,
+{
+    type BuiltType = Result<Query<T>, QueryBuildError>;
+
+    /// Build the query, returning [`QueryBuildError`] if the descriptor is malformed.
+    fn build(&mut self) -> Self::BuiltType {
+        let world = self.inner.world;
+        let query = Query::<T>::try_new_from_desc(world, &mut self.inner.desc);
+        for s in self.inner.term_builder.str_ptrs_to_free.iter_mut() {
             unsafe { ManuallyDrop::drop(s) };
         }
-        self.term_builder.str_ptrs_to_free.clear();
-        Some(query)
+        self.inner.term_builder.str_ptrs_to_free.clear();
+        match query {
+            Some(query) => Ok(query),
+            None => Err(QueryBuildError::InvalidExpr {
+                expr: core::mem::take(&mut self.expr),
+            }),
+        }
     }
 }
 

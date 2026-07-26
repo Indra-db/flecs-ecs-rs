@@ -77,7 +77,9 @@ pub(crate) use get_tuple::*;
 pub use id::Id;
 pub use id_view::IdView;
 pub use observer::Observer;
-pub use observer_builder::{ObserverBuilder, ObserverUpdater};
+pub use observer_builder::{
+    FallibleObserverBuilder, ObserverBuildError, ObserverBuilder, ObserverUpdater,
+};
 pub use query::{Query, QueryDisjointCache, QueryHandle};
 pub use query_builder::*;
 pub use query_iter::{ChainedIter, QueryIter};

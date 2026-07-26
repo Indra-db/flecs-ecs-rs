@@ -1478,9 +1478,17 @@ fn flecs_docs_relationships_compile_test() {
     bob.has((eats, pears)); // true
 
     // Find all entities that eat apples
-    let q = world.query::<()>().expr("(Eats, Apples)").build();
+    let q = world
+        .query::<()>()
+        .expr("(Eats, Apples)")
+        .build()
+        .expect("valid query expression");
     // Find all entities that eat anything
-    let q = world.query::<()>().expr("(Eats, *)").build();
+    let q = world
+        .query::<()>()
+        .expr("(Eats, *)")
+        .build()
+        .expect("valid query expression");
     // With the query builder API:
     let q = world.query::<()>().with((eats, apples)).build();
     // Or when using pair types, when both relationship & target are compile time types, they can be represented as a tuple:
@@ -1575,7 +1583,11 @@ fn flecs_docs_relationships_compile_test() {
         );
     });
 
-    let q = world.query::<()>().expr("(likes, *)").build();
+    let q = world
+        .query::<()>()
+        .expr("(likes, *)")
+        .build()
+        .expect("valid query expression");
 
     // bob eats apples and pears
     let bob = world.entity();

@@ -5,6 +5,9 @@ use crate::core::internals::*;
 use crate::core::private::{internal_ParSystemAPI, internal_SystemAPI};
 use crate::core::*;
 
+extern crate alloc;
+use alloc::string::{String, ToString};
+
 /// `SystemBuilder` is a builder pattern for creating systems.
 pub struct SystemBuilder<'a, T>
 where
@@ -118,27 +121,22 @@ where
         self
     }
 
-    /// Attempts to build the system, returning `None` if system creation fails.
+    /// Set a runtime query expression, transitioning to the fallible-build typestate.
     ///
-    /// This is the fallible counterpart of [`build()`](Builder::build): it returns
-    /// `None` instead of a handle to an invalid entity when the underlying
-    /// `ecs_system_init` call fails, most commonly due to an invalid query
-    /// expression passed to `expr()`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if neither a callback nor a run function was set, like
-    /// [`build()`](Builder::build). Use `.each*` / `.run*` to set one.
-    ///
-    /// # See also
-    ///
-    /// * [`QueryBuilder::try_build()`]
-    pub fn try_build(&mut self) -> Option<System<'a>> {
-        let system = self.build();
-        if *system.id() == 0 {
-            None
-        } else {
-            Some(system)
+    /// A purely-typed system builder is infallible: its terminals (`each` / `run` /
+    /// ...) return a [`System`] directly. A runtime expression string can fail to
+    /// parse, so calling `expr()` consumes the builder and returns a
+    /// [`FallibleSystemBuilder`] whose terminals return
+    /// `Result<System, SystemBuildError>`. All remaining configuration methods are
+    /// still available on the returned builder.
+    pub fn expr(mut self, expr: &str) -> FallibleSystemBuilder<'a, T> {
+        QueryBuilderImpl::expr(&mut self, expr);
+        FallibleSystemBuilder {
+            desc: self.desc,
+            term_builder: core::mem::take(&mut self.term_builder),
+            world: self.world,
+            expr: expr.to_string(),
+            _phantom: core::marker::PhantomData,
         }
     }
 }
@@ -193,6 +191,15 @@ where
                 reclaim_leaked_binding_ctx(self.desc.callback_ctx, self.desc.callback_ctx_free);
                 reclaim_leaked_binding_ctx(self.desc.run_ctx, self.desc.run_ctx_free);
             }
+            for s in self.term_builder.str_ptrs_to_free.iter_mut() {
+                unsafe { core::mem::ManuallyDrop::drop(s) };
+            }
+            self.term_builder.str_ptrs_to_free.clear();
+            panic!(
+                "failed to initialize system: the descriptor was rejected by ecs_system_init. \
+                 A purely-typed system builder cannot produce this; use `expr()` for a fallible \
+                 build when passing a runtime query expression."
+            );
         }
         for s in self.term_builder.str_ptrs_to_free.iter_mut() {
             unsafe { core::mem::ManuallyDrop::drop(s) };
@@ -256,3 +263,151 @@ impl<'a, T: QueryTuple> WorldProvider<'a> for SystemUpdater<'a, T> {
 }
 
 implement_reactor_api!((), SystemUpdater<'a, T>);
+
+/// A malformed system construction reported by the fallible-build typestate.
+///
+/// Only a builder that took a runtime [`expr()`](SystemBuilder::expr) can produce
+/// this error; a purely-typed system builder is infallible.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SystemBuildError {
+    /// The runtime `expr()` string failed to parse or validate.
+    InvalidExpr {
+        /// The offending expression string.
+        expr: String,
+    },
+    /// `ecs_system_init` rejected the descriptor for another reason.
+    Init,
+}
+
+impl core::fmt::Display for SystemBuildError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SystemBuildError::InvalidExpr { expr } => {
+                write!(f, "invalid system query expression: {expr:?}")
+            }
+            SystemBuildError::Init => write!(f, "system initialization failed"),
+        }
+    }
+}
+
+impl core::error::Error for SystemBuildError {}
+
+/// The fallible-build typestate of [`SystemBuilder`], entered via
+/// [`SystemBuilder::expr()`].
+///
+/// It carries the same configuration surface as [`SystemBuilder`], but its terminals
+/// (`each` / `each_entity` / `each_iter` / `run` / `par_each` / ...) return a
+/// `Result<System, SystemBuildError>` because the descriptor can be malformed.
+pub struct FallibleSystemBuilder<'a, T>
+where
+    T: QueryTuple,
+{
+    pub(crate) desc: sys::ecs_system_desc_t,
+    term_builder: TermBuilder,
+    world: WorldRef<'a>,
+    expr: String,
+    _phantom: core::marker::PhantomData<&'a T>,
+}
+
+impl<'a, T> FallibleSystemBuilder<'a, T>
+where
+    T: QueryTuple,
+{
+    /// Specify in which phase the system should run.
+    pub fn kind(&mut self, phase: impl IntoEntity) -> &mut Self {
+        self.desc.phase = *phase.into_entity(self.world);
+        self
+    }
+
+    /// Specify in which enum phase the system should run.
+    pub fn kind_enum<Phase>(&mut self, phase: Phase) -> &mut Self
+    where
+        Phase: ComponentId + ComponentType<Enum> + EnumComponentInfo,
+    {
+        let enum_id = phase.id_variant(self.world());
+        self.kind(enum_id)
+    }
+
+    /// Specify whether system should be ran in staged context.
+    pub fn immediate(&mut self, value: bool) -> &mut Self {
+        self.desc.immediate = value;
+        self
+    }
+}
+
+#[doc(hidden)]
+impl<'a, T: QueryTuple> internals::QueryConfig<'a> for FallibleSystemBuilder<'a, T> {
+    #[inline(always)]
+    fn term_builder(&self) -> &TermBuilder {
+        &self.term_builder
+    }
+
+    #[inline(always)]
+    fn term_builder_mut(&mut self) -> &mut TermBuilder {
+        &mut self.term_builder
+    }
+
+    #[inline(always)]
+    fn query_desc(&self) -> &sys::ecs_query_desc_t {
+        &self.desc.query
+    }
+
+    #[inline(always)]
+    fn query_desc_mut(&mut self) -> &mut sys::ecs_query_desc_t {
+        &mut self.desc.query
+    }
+
+    #[inline(always)]
+    fn count_generic_terms(&self) -> i32 {
+        T::COUNT
+    }
+}
+
+impl<'a, T: QueryTuple> TermBuilderImpl<'a> for FallibleSystemBuilder<'a, T> {}
+
+impl<'a, T: QueryTuple> QueryBuilderImpl<'a> for FallibleSystemBuilder<'a, T> {}
+
+impl<'a, T: QueryTuple> WorldProvider<'a> for FallibleSystemBuilder<'a, T> {
+    fn world(&self) -> WorldRef<'a> {
+        self.world
+    }
+}
+
+impl<'a, T> Builder<'a> for FallibleSystemBuilder<'a, T>
+where
+    T: QueryTuple,
+{
+    type BuiltType = Result<System<'a>, SystemBuildError>;
+
+    #[doc(hidden)]
+    /// Build the system, returning [`SystemBuildError`] if the descriptor is malformed.
+    fn build(&mut self) -> Self::BuiltType {
+        if self.desc.callback.is_none() && self.desc.run.is_none() {
+            panic!("you should not call this fn manually. Use `.each` , `.run` instead")
+        }
+        let system = System::new(self.world(), self.desc);
+        let failed = *system.id() == 0;
+        if failed {
+            unsafe {
+                reclaim_leaked_binding_ctx(self.desc.ctx, self.desc.ctx_free);
+                reclaim_leaked_binding_ctx(self.desc.callback_ctx, self.desc.callback_ctx_free);
+                reclaim_leaked_binding_ctx(self.desc.run_ctx, self.desc.run_ctx_free);
+            }
+        }
+        for s in self.term_builder.str_ptrs_to_free.iter_mut() {
+            unsafe { core::mem::ManuallyDrop::drop(s) };
+        }
+        self.term_builder.str_ptrs_to_free.clear();
+        if failed {
+            Err(SystemBuildError::InvalidExpr {
+                expr: core::mem::take(&mut self.expr),
+            })
+        } else {
+            Ok(system)
+        }
+    }
+}
+
+implement_reactor_api!((), FallibleSystemBuilder<'a, T>);
+implement_reactor_par_api!((), FallibleSystemBuilder<'a, T>);

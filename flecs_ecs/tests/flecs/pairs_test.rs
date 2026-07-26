@@ -231,7 +231,8 @@ fn pairs_system_1_pair_instance() {
                     *tv.lock().unwrap() = tr[i].value as i32;
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     world.progress();
 
@@ -270,7 +271,8 @@ fn pairs_system_2_pair_instances() {
                     *tv.lock().unwrap() += tr[i].value as i32;
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     world.progress();
 

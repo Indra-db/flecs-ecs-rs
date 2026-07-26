@@ -119,7 +119,8 @@ fn world_factory_system_w_expr() {
                     p[i].y += v[i].y;
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     assert_ne!(*s.id(), 0u64);
     assert_eq!(s.name(), "MySystem");
@@ -166,7 +167,11 @@ fn world_factory_query_w_expr() {
     world.component::<Position>();
     world.component::<Velocity>();
 
-    let q = world.query::<()>().expr("Position, [in] Velocity").build();
+    let q = world
+        .query::<()>()
+        .expr("Position, [in] Velocity")
+        .build()
+        .expect("valid query expression");
 
     let e = world
         .entity()

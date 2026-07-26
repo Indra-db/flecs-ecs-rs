@@ -65,20 +65,20 @@ fn script_builder_reuse_code_then_file() {
 }
 
 #[test]
-fn alert_builder_try_build() {
+fn alert_builder_fallible_build() {
     let world = World::new();
     world.import::<AlertsModule>();
     world.component::<Position>();
 
-    let valid = world.alert::<&Position>().try_build();
-    assert!(valid.is_some());
+    let valid = world.alert::<&Position>().build();
+    assert_ne!(*valid.id(), 0);
 
-    let invalid = world.alert::<()>().expr("invalid syntax!!!").try_build();
-    assert!(invalid.is_none());
+    let invalid = world.alert::<()>().expr("invalid syntax!!!").build();
+    assert!(matches!(invalid, Err(AlertBuildError::InvalidExpr { .. })));
 }
 
 #[test]
-fn system_builder_try_build() {
+fn system_builder_fallible_build() {
     let world = World::new();
 
     extern "C-unwind" fn noop_iter(_it: *mut flecs_ecs::sys::ecs_iter_t) {}
@@ -87,10 +87,8 @@ fn system_builder_try_build() {
         callback: Some(noop_iter),
         ..Default::default()
     };
-    let valid = world
-        .system_builder_from_desc::<&Position>(desc)
-        .try_build();
-    assert!(valid.is_some());
+    let valid = world.system_builder_from_desc::<&Position>(desc).build();
+    assert_ne!(*valid.id(), 0);
 
     let desc = flecs_ecs::sys::ecs_system_desc_t {
         callback: Some(noop_iter),
@@ -99,12 +97,12 @@ fn system_builder_try_build() {
     let invalid = world
         .system_builder_from_desc::<()>(desc)
         .expr("invalid syntax!!!")
-        .try_build();
-    assert!(invalid.is_none());
+        .build();
+    assert!(matches!(invalid, Err(SystemBuildError::InvalidExpr { .. })));
 }
 
 #[test]
-fn observer_builder_try_build() {
+fn observer_builder_fallible_build() {
     use flecs_ecs::core::private::internal_SystemAPI;
 
     let world = World::new();
@@ -113,12 +111,16 @@ fn observer_builder_try_build() {
 
     let mut valid_builder = world.observer::<flecs::OnSet, &Position>();
     valid_builder.set_desc_callback(Some(noop_iter));
-    assert!(valid_builder.try_build().is_some());
+    assert_ne!(*valid_builder.build().id(), 0);
 
-    let mut invalid_builder = world.observer::<flecs::OnSet, ()>();
-    invalid_builder.expr("invalid syntax!!!");
+    let mut invalid_builder = world
+        .observer::<flecs::OnSet, ()>()
+        .expr("invalid syntax!!!");
     invalid_builder.set_desc_callback(Some(noop_iter));
-    assert!(invalid_builder.try_build().is_none());
+    assert!(matches!(
+        invalid_builder.build(),
+        Err(ObserverBuildError::InvalidExpr { .. })
+    ));
 }
 
 #[test]

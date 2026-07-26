@@ -632,7 +632,8 @@ fn on_add_expr() {
             e.world().get::<&mut Count>(|count| {
                 count.0 += 1;
             });
-        });
+        })
+        .expect("valid observer query expression");
     let e = world.entity().add(Tag);
     world.get::<&mut Count>(|count| {
         assert_eq!(count, 1);
@@ -2224,7 +2225,8 @@ fn query_eval_w_pair_first_var_that_triggered_observer() {
                         .enqueue(());
                 }
             }
-        });
+        })
+        .expect("valid observer query expression");
 
     unsafe {
         world
@@ -2276,7 +2278,8 @@ fn query_eval_w_pair_second_var_that_triggered_observer() {
                         .enqueue(());
                 }
             }
-        });
+        })
+        .expect("valid observer query expression");
 
     unsafe {
         world
@@ -2332,7 +2335,8 @@ fn query_eval_w_pair_both_vars_that_triggered_observer() {
                         .enqueue(());
                 }
             }
-        });
+        })
+        .expect("valid observer query expression");
 
     unsafe {
         world

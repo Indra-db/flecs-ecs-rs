@@ -149,7 +149,8 @@ fn iter_shared() {
                     }
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     world.progress();
 
@@ -398,7 +399,8 @@ fn signature() {
                     p[i].y += v[i].y;
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     world.progress();
 
@@ -435,7 +437,8 @@ fn signature_const() {
                     p[i].y += v[i].y;
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     world.progress();
 
@@ -493,7 +496,8 @@ fn signature_shared() {
                     }
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     world.progress();
 
@@ -550,7 +554,8 @@ fn signature_optional() {
                     }
                 }
             }
-        });
+        })
+        .expect("valid system query expression");
 
     world.progress();
 

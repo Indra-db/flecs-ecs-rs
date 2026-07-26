@@ -172,7 +172,7 @@ fn singleton_singleton_system() {
             p[0].x += 1;
             p[0].y += 1;
         }
-    });
+    }).expect("valid system query expression");
 
     world.progress();
 

@@ -523,6 +523,7 @@ fn module_lookup_module_after_reparent() {
         .query::<()>()
         .expr("(ChildOf, p.NestedModule)")
         .build()
+        .expect("valid query expression")
         .count();
     assert!(count_child_of_p > 0);
 
@@ -530,6 +531,7 @@ fn module_lookup_module_after_reparent() {
         .query::<()>()
         .expr("(ChildOf, ns.NestedModule)")
         .build()
+        .expect("valid query expression")
         .count();
     assert_eq!(count_child_of_ns, 0);
 }

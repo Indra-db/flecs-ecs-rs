@@ -44,10 +44,18 @@ fn relationships_introduction_03() {
     world.component_named::<Eats>("Eats");
     world.component_named::<Apples>("Apples");
     // Find all entities that eat apples
-    let q = world.query::<()>().expr("(Eats, Apples)").build();
+    let q = world
+        .query::<()>()
+        .expr("(Eats, Apples)")
+        .build()
+        .expect("valid query expression");
 
     // Find all entities that eat anything
-    let q = world.query::<()>().expr("(Eats, *)").build();
+    let q = world
+        .query::<()>()
+        .expr("(Eats, *)")
+        .build()
+        .expect("valid query expression");
 
     // With the query builder API:
     let q = world.query::<()>().with((eats, apples)).build();
@@ -240,7 +248,11 @@ fn relationships_relationship_wildcards_17() {
 fn relationships_relationship_wildcards_18() {
     let world = World::new();
     world.entity_named("likes");
-    let q = world.query::<()>().expr("(likes, *)").build();
+    let q = world
+        .query::<()>()
+        .expr("(likes, *)")
+        .build()
+        .expect("valid query expression");
 }
 
 #[test]

@@ -129,14 +129,17 @@ fn system_query_init_failure_reclaims_closure() {
     let counter = Arc::new(AtomicUsize::new(0));
     let counter_clone = Arc::clone(&counter);
 
-    let sys = world
+    let result = world
         .system::<&Position>()
         .expr("invalid syntax!!!")
         .each(move |_p| {
             counter_clone.fetch_add(1, Ordering::SeqCst);
         });
 
-    assert_eq!(*sys.id(), 0, "system creation must fail on invalid query");
+    assert!(
+        matches!(result, Err(SystemBuildError::InvalidExpr { .. })),
+        "system creation must fail on invalid query"
+    );
     assert_eq!(
         Arc::strong_count(&counter),
         1,
@@ -151,14 +154,17 @@ fn observer_query_init_failure_reclaims_closure() {
     let counter = Arc::new(AtomicUsize::new(0));
     let counter_clone = Arc::clone(&counter);
 
-    let obs = world
+    let result = world
         .observer::<flecs::OnSet, &Position>()
         .expr("invalid syntax!!!")
         .each(move |_p| {
             counter_clone.fetch_add(1, Ordering::SeqCst);
         });
 
-    assert_eq!(*obs.id(), 0, "observer creation must fail on invalid query");
+    assert!(
+        matches!(result, Err(ObserverBuildError::InvalidExpr { .. })),
+        "observer creation must fail on invalid query"
+    );
     assert_eq!(
         Arc::strong_count(&counter),
         1,

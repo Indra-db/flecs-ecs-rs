@@ -11,6 +11,7 @@ use core::mem::ManuallyDrop;
 extern crate std;
 
 extern crate alloc;
+use alloc::string::ToString;
 use alloc::{format, string::String, vec::Vec};
 
 /// [`AlertBuilder`] is a builder pattern for creating [`Alert`]s.
@@ -426,19 +427,116 @@ impl<'a, T> AlertBuilder<'a, T>
 where
     T: QueryTuple,
 {
-    /// Attempts to build the alert, returning `None` if alert creation fails.
+    /// Set a runtime query expression, transitioning to the fallible-build typestate.
     ///
-    /// This is the fallible counterpart of [`build()`](Builder::build): it returns
-    /// `None` instead of a handle to an invalid entity when the underlying
-    /// `ecs_alert_init` call fails, for example due to an invalid query
-    /// expression passed to `expr()` or a filter without a `$this` term.
-    ///
-    /// # See also
-    ///
-    /// * [`QueryBuilder::try_build()`]
-    pub fn try_build(&mut self) -> Option<Alert<'a>> {
-        let alert = self.build();
-        if *alert.id() == 0 { None } else { Some(alert) }
+    /// A purely-typed alert builder is infallible: [`build()`](Builder::build) returns
+    /// an [`Alert`] directly. A runtime expression string can fail to parse, so calling
+    /// `expr()` consumes the builder and returns a [`FallibleAlertBuilder`] whose
+    /// terminal [`build()`](FallibleAlertBuilder::build) returns a
+    /// `Result<Alert, AlertBuildError>`. All remaining configuration methods are still
+    /// available on the returned builder.
+    pub fn expr(mut self, expr: &str) -> FallibleAlertBuilder<'a, T> {
+        QueryBuilderImpl::expr(&mut self, expr);
+        FallibleAlertBuilder {
+            inner: self,
+            expr: expr.to_string(),
+        }
+    }
+}
+
+/// A malformed alert construction reported by the fallible-build typestate.
+///
+/// Only a builder that took a runtime [`expr()`](AlertBuilder::expr) can produce this
+/// error; a purely-typed alert builder is infallible.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AlertBuildError {
+    /// The runtime `expr()` string failed to parse or validate.
+    InvalidExpr {
+        /// The offending expression string.
+        expr: String,
+    },
+    /// `ecs_alert_init` rejected the descriptor for another reason.
+    Init,
+}
+
+impl core::fmt::Display for AlertBuildError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            AlertBuildError::InvalidExpr { expr } => {
+                write!(f, "invalid alert query expression: {expr:?}")
+            }
+            AlertBuildError::Init => write!(f, "alert initialization failed"),
+        }
+    }
+}
+
+impl core::error::Error for AlertBuildError {}
+
+/// The fallible-build typestate of [`AlertBuilder`], entered via
+/// [`AlertBuilder::expr()`].
+pub struct FallibleAlertBuilder<'a, T>
+where
+    T: QueryTuple,
+{
+    inner: AlertBuilder<'a, T>,
+    expr: String,
+}
+
+#[doc(hidden)]
+impl<'a, T: QueryTuple> internals::QueryConfig<'a> for FallibleAlertBuilder<'a, T> {
+    #[inline(always)]
+    fn term_builder(&self) -> &TermBuilder {
+        self.inner.term_builder()
+    }
+
+    #[inline(always)]
+    fn term_builder_mut(&mut self) -> &mut TermBuilder {
+        self.inner.term_builder_mut()
+    }
+
+    #[inline(always)]
+    fn query_desc(&self) -> &sys::ecs_query_desc_t {
+        self.inner.query_desc()
+    }
+
+    #[inline(always)]
+    fn query_desc_mut(&mut self) -> &mut sys::ecs_query_desc_t {
+        self.inner.query_desc_mut()
+    }
+
+    #[inline(always)]
+    fn count_generic_terms(&self) -> i32 {
+        self.inner.count_generic_terms()
+    }
+}
+
+impl<'a, T: QueryTuple> TermBuilderImpl<'a> for FallibleAlertBuilder<'a, T> {}
+
+impl<'a, T: QueryTuple> QueryBuilderImpl<'a> for FallibleAlertBuilder<'a, T> {}
+
+impl<'a, T: QueryTuple> WorldProvider<'a> for FallibleAlertBuilder<'a, T> {
+    fn world(&self) -> WorldRef<'a> {
+        self.inner.world()
+    }
+}
+
+impl<'a, T> Builder<'a> for FallibleAlertBuilder<'a, T>
+where
+    T: QueryTuple,
+{
+    type BuiltType = Result<Alert<'a>, AlertBuildError>;
+
+    /// Build the alert, returning [`AlertBuildError`] if the descriptor is malformed.
+    fn build(&mut self) -> Self::BuiltType {
+        let alert = self.inner.build();
+        if *alert.id() == 0 {
+            Err(AlertBuildError::InvalidExpr {
+                expr: core::mem::take(&mut self.expr),
+            })
+        } else {
+            Ok(alert)
+        }
     }
 }
 

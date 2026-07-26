@@ -633,7 +633,8 @@ fn expr_w_var() {
         .query::<()>()
         .expr("(Rel, $X)")
         .set_cache_kind(QueryCacheKind::Auto)
-        .build();
+        .build()
+        .expect("valid query expression");
 
     let x_var = r.find_var("X").unwrap();
     assert_ne!(x_var, -1);
@@ -919,7 +920,8 @@ fn string_term() {
         .query::<()>()
         .expr("Position")
         .set_cache_kind(QueryCacheKind::Auto)
-        .build();
+        .build()
+        .expect("valid query expression");
 
     let e1 = world.entity().set(Position { x: 0, y: 0 });
     world.entity().set(Velocity { x: 0, y: 0 });
@@ -3908,7 +3910,8 @@ fn n2_terms_w_expr() {
         .query::<()>()
         .expr("A, B")
         .set_cache_kind(QueryCacheKind::Auto)
-        .build();
+        .build()
+        .expect("valid query expression");
 
     assert_eq!(f.field_count(), 2);
 
@@ -3937,19 +3940,16 @@ fn assert_on_uninitialized_term() {
     world.entity_named("B");
 
     // In current Flecs, building a query with uninitialized terms may either
-    // ecs_abort (caught by guard → panic) or return None from ecs_query_init.
-    // We use try_build() so either path is valid: None means invalid query detected.
+    // ecs_abort (caught by guard → panic) or be accepted. This is a purely-typed
+    // builder (no runtime expression), so it stays on the infallible `build()` path.
+    // In newer Flecs versions this silently succeeds, so we just verify it doesn't crash.
     let result = world
         .query::<()>()
         .term()
         .term()
         .set_cache_kind(QueryCacheKind::Auto)
-        .try_build();
+        .build();
 
-    // The query should fail — either panic from ecs_abort (above guard catches it)
-    // or None from try_build. If it returns Some, it means Flecs accepted it — still valid.
-    // The original test intent: assert the invalid state is detected.
-    // In newer Flecs versions this silently succeeds, so we just verify it doesn't crash.
     let _ = result;
 }
 
@@ -5574,7 +5574,8 @@ fn is_valid() {
         .query::<()>()
         .expr("foo")
         .set_cache_kind(QueryCacheKind::Auto)
-        .build();
+        .build()
+        .unwrap();
 }
 
 #[test]
@@ -5582,13 +5583,14 @@ fn unresolved_by_name() {
     let world = World::new();
 
     // AllowUnresolvedByName lets a query reference an entity by name that doesn't exist yet.
-    // try_build() is used since the query may fail without the flag but should succeed with it.
+    // The flag makes the fallible expr build succeed instead of erroring on the unresolved name.
     let q = world
         .query::<()>()
-        .query_flags(QueryFlags::AllowUnresolvedByName)
         .expr("$this == Foo")
+        .query_flags(QueryFlags::AllowUnresolvedByName)
         .set_cache_kind(QueryCacheKind::Auto)
-        .build();
+        .build()
+        .expect("valid query expression with AllowUnresolvedByName");
 
     // "Foo" doesn't exist yet — query yields no results
     assert!(!q.iterable().is_true());
@@ -8483,4 +8485,101 @@ fn world_each_entity() {
     assert!(e2_found);
     assert!(e3_found);
     assert!(count > 3);
+}
+
+// --- Construction-fallibility split (spec §4.1) ---
+
+/// A purely-typed builder is infallible: `new_query`/`build` return `Query` directly
+/// (no `Result` to thread) and the documented `ecs_query_init` panic is unreachable
+/// for a well-formed typed descriptor. Building and iterating a representative typed
+/// query must simply succeed.
+#[test]
+fn typed_query_build_is_infallible() {
+    let world = World::new();
+
+    // Convenience constructor returns `Query<D>` directly.
+    let q1: Query<(&Position, &Velocity)> = world.new_query::<(&Position, &Velocity)>();
+    // Builder terminal returns `Query<D>` directly.
+    let q2 = world.query::<(&Position, &Velocity)>().build();
+
+    world
+        .entity()
+        .set(Position { x: 1, y: 2 })
+        .set(Velocity { x: 3, y: 4 });
+
+    let mut c1 = 0;
+    q1.each(|(_p, _v)| c1 += 1);
+    let mut c2 = 0;
+    q2.each(|(_p, _v)| c2 += 1);
+    assert_eq!(c1, 1);
+    assert_eq!(c2, 1);
+}
+
+/// `expr()` with a syntax error surfaces `QueryBuildError::InvalidExpr` carrying the
+/// offending string, and the world is left clean (a subsequent typed query builds and
+/// iterates, and no closure/leak is involved on the query path).
+#[test]
+fn expr_invalid_returns_invalid_expr_with_string() {
+    let world = World::new();
+
+    let err = world
+        .query::<()>()
+        .expr("invalid syntax!!!")
+        .build()
+        .unwrap_err();
+
+    match err {
+        QueryBuildError::InvalidExpr { expr } => assert_eq!(expr, "invalid syntax!!!"),
+        other => panic!("expected InvalidExpr, got {other:?}"),
+    }
+
+    // World left clean: a fresh typed query still builds and iterates.
+    world.entity().set(Position { x: 5, y: 6 });
+    let q = world.new_query::<&Position>();
+    let mut count = 0;
+    q.each(|_p| count += 1);
+    assert_eq!(count, 1);
+}
+
+/// A valid `expr()` builds through the fallible typestate and iterates normally.
+#[test]
+fn expr_valid_builds_and_iterates() {
+    let world = World::new();
+    world.component::<Position>();
+
+    let q = world
+        .query::<()>()
+        .expr("Position")
+        .build()
+        .expect("valid query expression");
+
+    world.entity().set(Position { x: 7, y: 8 });
+    world.entity().set(Position { x: 9, y: 10 });
+
+    let mut count = 0;
+    q.run(|mut it| {
+        while it.next() {
+            count += it.count();
+        }
+    });
+    assert_eq!(count, 2);
+}
+
+/// After `expr()` transitions to the fallible builder, the remaining configuration
+/// methods stay chainable (they delegate to the wrapped builder) and the terminal
+/// still returns a `Result`.
+#[test]
+fn fallible_builder_keeps_config_methods_chainable() {
+    let world = World::new();
+    world.component::<Position>();
+
+    let q = world
+        .query::<()>()
+        .expr("Position")
+        .set_cache_kind(QueryCacheKind::Auto)
+        .query_flags(QueryFlags::MatchEmptyTables)
+        .build()
+        .expect("valid query expression with chained config");
+
+    assert_eq!(q.field_count(), 1);
 }

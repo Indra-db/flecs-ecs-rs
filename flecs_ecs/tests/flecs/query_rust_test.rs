@@ -1167,7 +1167,11 @@ fn query_set_this_var() {
 fn query_inspect_terms_w_expr() {
     let world = World::new();
 
-    let q = world.query::<()>().expr("(ChildOf,#0)").build();
+    let q = world
+        .query::<()>()
+        .expr("(ChildOf,#0)")
+        .build()
+        .expect("valid query expression");
 
     let mut count = 0;
     q.each_term(|term| {
@@ -1358,7 +1362,8 @@ fn query_run_shared() {
     let q = world
         .query::<&mut Position>()
         .expr("Velocity(self|up IsA)")
-        .build();
+        .build()
+        .expect("valid query expression");
 
     q.run(|mut it| {
         while it.next() {
@@ -1866,7 +1871,11 @@ fn query_signature() {
         .set(Position { x: 10, y: 20 })
         .set(Velocity { x: 1, y: 2 });
 
-    let q = world.query::<()>().expr("Position, Velocity").build();
+    let q = world
+        .query::<()>()
+        .expr("Position, Velocity")
+        .build()
+        .expect("valid query expression");
 
     q.run(|mut it| {
         while it.next() {
@@ -1896,7 +1905,11 @@ fn query_signature_const() {
         .set(Position { x: 10, y: 20 })
         .set(Velocity { x: 1, y: 2 });
 
-    let q = world.query::<()>().expr("Position, [in] Velocity").build();
+    let q = world
+        .query::<()>()
+        .expr("Position, [in] Velocity")
+        .build()
+        .expect("valid query expression");
 
     q.run(|mut it| {
         while it.next() {
@@ -1939,7 +1952,8 @@ fn query_signature_shared() {
     let q = world
         .query::<()>()
         .expr("Position, [in] Velocity(self|up IsA)")
-        .build();
+        .build()
+        .expect("valid query expression");
 
     q.run(|mut it| {
         while it.next() {
@@ -1992,7 +2006,8 @@ fn query_signature_optional() {
     let q = world
         .query::<()>()
         .expr("Position, ?Velocity, ?Mass")
-        .build();
+        .build()
+        .expect("valid query expression");
 
     q.run(|mut it| {
         while it.next() {
@@ -2044,7 +2059,11 @@ fn query_query_single_pair() {
     world.entity().add((Pair2::id(), Position::id()));
     let e2 = world.entity().add((Pair2::id(), Velocity::id()));
 
-    let q = world.query::<()>().expr("(Pair2, Velocity)").build();
+    let q = world
+        .query::<()>()
+        .expr("(Pair2, Velocity)")
+        .build()
+        .expect("valid query expression");
 
     let mut table_count = 0;
     let mut entity_count = 0;
