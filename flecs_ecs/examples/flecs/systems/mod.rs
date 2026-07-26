@@ -6,6 +6,7 @@ mod system_custom_pipeline;
 mod system_custom_runner;
 mod system_delta_time;
 mod system_immediate;
+mod system_multithreaded;
 mod system_mutate_entity;
 mod system_mutate_entity_handle;
 mod system_pipeline;
