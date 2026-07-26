@@ -1,6 +1,7 @@
 //! This example shows one possible way to implement an inventory system
 //!  using ECS relationships.
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 //MARK: Components
@@ -172,7 +173,7 @@ fn find_item_w_kind(
 fn transfer_item(container: EntityView<'_>, item: EntityView<'_>) {
     let world = container.world();
 
-    let amt = item.try_cloned::<&Amount>().unwrap_or(Amount { amount: 1 });
+    let amt = item.cloned_owned::<&Amount>().unwrap_or(Amount { amount: 1 });
 
     #[allow(clippy::redundant_else)]
     if amt.amount > 0 {
@@ -183,11 +184,12 @@ fn transfer_item(container: EntityView<'_>, item: EntityView<'_>) {
 
         if let Some(dst_item) = dst_item {
             // If a matching item was found, increase its amount
-            world
+            let mut dst_amt = world
                 .entity_from_id(dst_item)
-                .get::<&mut Amount>(|dst_amt| {
-                    dst_amt.amount += amt.amount;
-                });
+                .get_ref::<&mut Amount>()
+                .unwrap();
+            dst_amt.amount += amt.amount;
+            drop(dst_amt); // release the write guard before the structural destruct
             item.destruct();
             return;
         } else {
@@ -227,7 +229,7 @@ fn attack(player: EntityView<'_>, weapon: EntityView<'_>) {
         item_name(weapon).unwrap_or("UnknownItem".to_string())
     );
 
-    let atk = weapon.try_cloned::<&Attack>();
+    let atk = weapon.cloned_owned::<&Attack>();
 
     if atk.is_none() {
         // A weapon without Attack power? Odd.
@@ -240,75 +242,76 @@ fn attack(player: EntityView<'_>, weapon: EntityView<'_>) {
     // Get armor item, if player has equipped any
     if let Some(armor_e) = find_item_w_kind(player, world.component_id::<Armor>(), true) {
         let armor_e = world.entity_from_id(armor_e);
-        armor_e.get::<Option<&mut Health>>(|health| {
-            if let Some(armor_health) = health {
-                println!(
-                    " - {} defends with {} ({} health)",
-                    player.name(),
-                    item_name(armor_e).unwrap(),
-                    armor_health.value
-                );
+        let (health,) = armor_e.get_ref::<(Option<&mut Health>,)>().unwrap();
+        if let Some(mut armor_health) = health {
+            println!(
+                " - {} defends with {} ({} health)",
+                player.name(),
+                item_name(armor_e).unwrap(),
+                armor_health.value
+            );
 
-                // Subtract attack from armor health. If armor health goes below
-                // zero, delete the armor and carry over remaining attack points.
-                armor_health.value -= att_value;
+            // Subtract attack from armor health. If armor health goes below
+            // zero, delete the armor and carry over remaining attack points.
+            armor_health.value -= att_value;
 
-                if armor_health.value <= 0 {
-                    att_value = -armor_health.value;
-                    armor_e.destruct();
-                    println!(" - {} is destroyed!", item_name(armor_e).unwrap());
-                } else {
-                    println!(
-                        " - {} has {} health left after taking {} damage",
-                        item_name(armor_e).unwrap(),
-                        armor_health.value,
-                        att_value
-                    );
-                    att_value = 0;
-                }
+            if armor_health.value <= 0 {
+                att_value = -armor_health.value;
+                let armor_name = item_name(armor_e).unwrap();
+                drop(armor_health); // release the guard before the structural destruct
+                armor_e.destruct();
+                println!(" - {armor_name} is destroyed!");
             } else {
-                // Armor without Defense power? Odd.
-                println!(" - the {} armor is a dud", item_name(armor_e).unwrap());
+                println!(
+                    " - {} has {} health left after taking {} damage",
+                    item_name(armor_e).unwrap(),
+                    armor_health.value,
+                    att_value
+                );
+                att_value = 0;
             }
-        });
+        } else {
+            // Armor without Defense power? Odd.
+            println!(" - the {} armor is a dud", item_name(armor_e).unwrap());
+        }
     } else {
         // Brave but stupid
         println!(" - {} fights without armor!", player.name());
     }
 
     // For each usage of the weapon, subtract one from its health
-    weapon.get::<&mut Health>(|weapon_health| {
-        if weapon_health.value > 0 {
-            weapon_health.value -= 1;
-            if weapon_health.value == 0 {
-                println!(" - {} is destroyed!", item_name(weapon).unwrap());
-                weapon.destruct();
-            } else {
-                println!(
-                    " - {} has {} uses left",
-                    item_name(weapon).unwrap(),
-                    weapon_health.value
-                );
-            }
+    let mut weapon_health = weapon.get_ref::<&mut Health>().unwrap();
+    if weapon_health.value > 0 {
+        weapon_health.value -= 1;
+        if weapon_health.value == 0 {
+            drop(weapon_health); // release the guard before the structural destruct
+            println!(" - {} is destroyed!", item_name(weapon).unwrap());
+            weapon.destruct();
+        } else {
+            println!(
+                " - {} has {} uses left",
+                item_name(weapon).unwrap(),
+                weapon_health.value
+            );
         }
-    });
+    }
 
     // If armor didn't counter the whole attack, subtract from the player health
     if att_value > 0 {
-        player.get::<&mut Health>(|player_health| {
-            player_health.value -= att_value;
-            if player_health.value <= 0 {
-                println!(" - {} died!", player.name());
-                player.destruct();
-            } else {
-                println!(
-                    " - {} has {} health left after taking {} damage",
-                    player.name(),
-                    player_health.value,
-                    att_value
-                );
-            }
-        });
+        let mut player_health = player.get_ref::<&mut Health>().unwrap();
+        player_health.value -= att_value;
+        if player_health.value <= 0 {
+            drop(player_health); // release the guard before the structural destruct
+            println!(" - {} died!", player.name());
+            player.destruct();
+        } else {
+            println!(
+                " - {} has {} health left after taking {} damage",
+                player.name(),
+                player_health.value,
+                att_value
+            );
+        }
     }
 
     println!();
@@ -329,7 +332,7 @@ fn print_items(container: EntityView<'_>) {
         // Items with an Amount component fill up a single inventory slot but
         // represent multiple instances, like coins.
         let amount = item
-            .try_cloned::<&Amount>()
+            .cloned_owned::<&Amount>()
             .unwrap_or(Amount { amount: 1 })
             .amount;
         println!(
