@@ -100,6 +100,17 @@ pub struct EntityView<'a> {
     pub(crate) id: Entity,
 }
 
+/// Read-only deref to the underlying [`Entity`] id. `EntityView` is deliberately
+/// **not** `DerefMut`: it is a `Copy` handle, so a mutable deref would let a
+/// local copy's id be reassigned in place, which is meaningless. Assigning
+/// through the deref does not compile:
+///
+/// ```compile_fail
+/// use flecs_ecs::prelude::*;
+/// let world = World::new();
+/// let mut e = world.entity();
+/// *e = Entity::new(0); // EntityView is not DerefMut
+/// ```
 impl Deref for EntityView<'_> {
     type Target = Entity;
 

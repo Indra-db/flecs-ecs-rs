@@ -7152,24 +7152,21 @@ fn add_remove_enum_component() {
     let e = world.entity();
     // In Flecs, enums are stored as pairs (Color, ConstantEntity).
     // Use add_enum/has_enum/remove_enum — equivalent to C++ set<Color>/has<Color>/remove<Color>.
-    // Enum read-back goes through the pair target: the constant entity converts
-    // back to the enum value. (`get` on an enum component trips the debug
-    // storage-revalidation net: the guard caches a pointer into the CONSTANT
-    // entity's storage but revalidates against the queried entity; see the
-    // SW-9 report.)
+    // Enum read-back goes through the natural guard `get`: the storage-revalidation
+    // net now resolves the constant entity's storage as the guard's owner.
     e.add_enum(Color::Blue);
     assert!(e.has_enum(Color::Blue));
-    assert_eq!(
-        e.target(Color::id(), 0).unwrap().to_constant::<Color>(),
-        Color::Blue
-    );
+    {
+        let color = e.get::<&Color>().unwrap();
+        assert_eq!(*color, Color::Blue);
+    }
     e.add_enum(Color::Green);
     assert!(e.has_enum(Color::Green));
     assert!(!e.has_enum(Color::Blue));
-    assert_eq!(
-        e.target(Color::id(), 0).unwrap().to_constant::<Color>(),
-        Color::Green
-    );
+    {
+        let color = e.get::<&Color>().unwrap();
+        assert_eq!(*color, Color::Green);
+    }
     let comp_id = world.component_id::<Color>();
     e.remove((comp_id, *flecs::Wildcard));
     assert!(!e.has_enum(Color::Green));
