@@ -49,9 +49,31 @@ Lock cost (on vs off, same tree): 1_term +4.9% (was +37.6%), 4_terms +11.6%, 1_w
 3. Prototype (in progress, worktree): guard-based `get`, exclusive register, chunk cursor + `each!`, build-time disjointness, benches vs current API and raw C.
 4. Spec finalisation from prototype findings, then full implementation fan-out.
 
+## Prototype findings (Phase 3, worktree branch `worktree-agent-a384a086b27116b5d`)
+
+Built in `flecs_ecs/src/experimental/`: guard-based `get_ref`/`try_get_ref`/`cloned_owned` with fused tuple acquire and rollback, exclusive-register `get_exclusive`/`each_exclusive`, lending `ChunkCursor` + `each!` macro, and the tier-0 disjointness proof. 44 tests green, clippy clean. Provisional benches (shared machine, controls within 3%): guard `get` ~11% faster than the closure `get`; `each_exclusive` ~10% faster than locked `each`, within ~5% of raw C; `each!` write path ~14% faster than locked `each`.
+
+Validated design facts:
+
+- Tier-0 on the shared register buys nothing beyond batch acquire: a held entity guard is invisible to a build-time proof, so shared-path terms must always register. Tier-0's full skip belongs to the exclusive register only, and even there requires the intra-query disjointness proof (`each_exclusive` falls back to the locked path when unproven; `chunks` refuses, since it hands out `&mut` slices).
+- Guards must hold a defer level for their lifetime (storage-pin): structural ops through the shared world are queued until the last guard drops, and observers run at release. This generalises the CPS-`get` semantics to arbitrary lexical scopes and is part of decision 2.
+- Fused tuple acquire with rollback and `PendingDefer` unwind cover is panic-safe without any per-batch RAII.
+
+Review findings (orchestrator review of the prototype):
+
+- Cross-world hole found and fixed (`4dc66a81`): `each_exclusive(&mut world)`/`chunks(&mut world)` accepted any world's `&mut`, so exclusivity over world B "proved" access to world A's storage. Both now assert world identity; regression tests added.
+- **Spec requirement (hard):** every iteration and access entry point in the final surface must thread a world borrow (`&World`/`&mut World` parameter). A `Query` handle that can iterate without borrowing the world defeats the exclusive register: legacy `q.each(...)` compiles while `get_exclusive`'s `&mut T` is live and takes locks the exclusive path never registered. The prototype coexists with this hazard because it is experimental; the final API removes world-argument-free iteration entirely.
+
+Frictions for the spec (from the prototype):
+
+- Chunk read path pays slice bounds-checks per row where `each` uses pointer adds; the cursor should expose pre-checked iterators (or users push through `iter_mut().zip`) so reads vectorise.
+- `Ref`/`Mut` need `Debug where T: Debug` (and likely `Display`) for test ergonomics.
+- Guard tuples do not model `Option<&T>`; owned/optional access stays on `cloned`. Decide whether that is final or whether an optional guard element ships.
+- Tuple impls are hand-capped at arity 5; move to the crate's `tuples!` macro for the final surface.
+- `is_proven_disjoint` should take a safe query handle, not a raw pointer.
+
 ## Open items for the spec
 
-- Tier-0 scope on the shared path: a build-time proof cannot see concurrently held entity guards, so it may only remove intra-query work there; the exclusive path gets the full skip. Prototype must report what is actually sound.
 - Worker-thread stage acquisition: how a worker legally obtains a stage handle; promote the scheduler invariant (non-MT systems only run on the `progress()` thread) into a CI-tested contract.
 - Defer/staging surface: persistent `Commands` buffer vs per-call token; `mem::forget` on a guard must not wedge defer depth.
 - Unsafe-twin catalogue and final naming pass.
