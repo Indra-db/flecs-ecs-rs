@@ -733,12 +733,16 @@ at build against a safe `&World`, not per call over a raw `*const ecs_query_t`
 world; that is their entire tier-selection cost. `is_proven_disjoint` stays public so
 callers can branch before choosing `chunks` vs `each_shared`.
 
-**Caveat pinned.** A component that gains a `Sparse` or `DontFragment` trait *after* a
-query is built against it would invalidate the cached proof. The implementation must
-**debug-assert storage traits are unchanged at iteration time**, and the spec
-documents the contract: **storage traits are fixed before the first query is built
-against them.** Both cached facts join the invariants list beside the 16-byte
-`get_ptr` rule (design record).
+**Stability of the cached verdict.** A late `Sparse` / `DontFragment` trait cannot
+invalidate the cached proof because **flecs itself forbids it**: once a query has been
+created against a component, adding any trait other than `With` fails with "cannot set
+trait ... because it is already queried for" (`flecs_trait_can_add_after_query`,
+vendored `flecs.c:4298`; enforcement at `flecs.c:4331`, active outside world-init).
+The cached verdict is therefore stable by construction; no per-iteration assert is
+needed or permitted on the hot path. One CI test pins the C behaviour (adding `Sparse`
+to a component after a query is built against it must error) and is re-verified on
+every vendored-C upgrade, alongside the §6.3 scheduler contract. Both cached facts
+join the invariants list beside the 16-byte `get_ptr` rule (design record).
 
 ### 4.8 Tuple arities via `tuples!` (friction fix)
 

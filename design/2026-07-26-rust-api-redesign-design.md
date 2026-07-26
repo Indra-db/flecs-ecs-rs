@@ -22,7 +22,7 @@ Faster than the current API, more ergonomic, sound from 100% safe code. Clean br
 ## Invariants the implementation must preserve
 
 - The 16-byte `ecs_rust_get_ptr_t` return. Never widen it: it is why `get` beats upstream by 19-30%.
-- Query build-time caches (spec §4.7): the disjointness verdict (a `bool`) and the owning-world identity (`*const ecs_world_t`) are computed once at `build()` and read per iteration as one branch plus one pointer compare. Storage traits (`Sparse`/`DontFragment`) must be fixed before the first query build against a component, debug-asserted unchanged at iteration time.
+- Query build-time caches (spec §4.7): the disjointness verdict (a `bool`) and the owning-world identity (`*const ecs_world_t`) are computed once at `build()` and read per iteration as one branch plus one pointer compare. Stable by construction: flecs rejects adding any trait except `With` to a component already queried for (`flecs_trait_can_add_after_query`, `flecs.c:4298`, enforced at `flecs.c:4331`), so no iteration-time assert exists; a CI test pins the C behaviour and is re-verified on vendored upgrades.
 - Guard pin counter (spec §7.1): guards touch only the stage lock map and a per-stage pin counter (single-owner per thread, no atomics); the flecs defer level is opened lazily once per write episode, never per guard, so the read path issues zero defer FFI.
 - Per-stage sparse tracking (global tracking false-positives on disjoint entities across stages).
 - No atomics in lock paths; stage maps are single-owner per thread.
