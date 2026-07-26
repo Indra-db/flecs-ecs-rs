@@ -254,4 +254,120 @@ impl World {
             id: Entity::new(id),
         }
     }
+
+    /// Constructs `count` entities from one bundle in a single `ecs_bulk_init`
+    /// call (spec §4.11).
+    ///
+    /// The bundle is cloned once per row except for the last row, which moves
+    /// the original in. Component values are laid out column-major into
+    /// temporary buffers and moved into storage in one bulk operation; `OnAdd`
+    /// and `OnSet` fire for every row exactly as they would for `count`
+    /// individual `spawn` calls.
+    ///
+    /// Returns the ids flecs allocated, in creation order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the bundle contains a duplicate component type, if the bundle
+    /// arity exceeds 31, or if the world is in its multithreaded execution
+    /// phase. Must be called on an immediate (non-deferred) world.
+    pub fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity> {
+        const {
+            assert!(
+                B::ARITY <= MAX_BUNDLE_ARITY,
+                "bundle arity exceeds the maximum of 31 components"
+            );
+        }
+
+        if count == 0 {
+            // Nothing is stored; drop the bundle normally.
+            drop(bundle);
+            return Vec::new();
+        }
+
+        let world = self.world();
+        let world_ptr = self.raw_world.as_ptr();
+        crate::core::assert_not_in_multithreaded_phase(world_ptr);
+
+        let arity = B::ARITY;
+        let mut ids = [0u64; ID_BUF];
+        B::resolve_ids(world, &mut ids[..arity]);
+        self.record_bundle_ids::<B>(&ids[..arity]);
+
+        let mut sizes = [0usize; ID_BUF];
+        B::sizes(&mut sizes[..arity]);
+
+        // Column-major staging: one contiguous byte buffer of `count` elements
+        // per non-tag component. Bytes are memcpy-moved into storage by flecs;
+        // dropping these `Vec<u8>` buffers only frees raw bytes and never runs a
+        // component destructor, so there is no double drop.
+        let mut columns: Vec<Vec<u8>> = (0..arity)
+            .map(|i| {
+                if sizes[i] == 0 {
+                    Vec::new()
+                } else {
+                    alloc::vec![0u8; sizes[i] * count]
+                }
+            })
+            .collect();
+
+        // Writes row `r`'s field bytes into the column buffers, then forgets the
+        // instance so its values are owned solely by the staging buffers.
+        //
+        // SAFETY: `inst` points to a live, initialized `B`; each field is
+        // memcpy-copied out and the instance is never dropped by the caller.
+        let write_row = |inst: *mut B, r: usize, columns: &mut [Vec<u8>]| {
+            let mut ptrs = [core::ptr::null_mut::<c_void>(); ID_BUF];
+            unsafe { B::data_ptrs(inst, &mut ptrs[..arity]) };
+            for i in 0..arity {
+                let sz = sizes[i];
+                if sz != 0 {
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(
+                            ptrs[i].cast::<u8>(),
+                            columns[i].as_mut_ptr().add(r * sz),
+                            sz,
+                        );
+                    }
+                }
+            }
+        };
+
+        let mut orig = ManuallyDrop::new(bundle);
+        for r in 0..count {
+            if r + 1 < count {
+                let mut c = ManuallyDrop::new((*orig).clone());
+                write_row(&mut *c as *mut B, r, &mut columns);
+            } else {
+                write_row(&mut *orig as *mut B, r, &mut columns);
+            }
+        }
+
+        let mut data = [core::ptr::null_mut::<c_void>(); ID_BUF];
+        for i in 0..arity {
+            data[i] = if sizes[i] == 0 {
+                core::ptr::null_mut()
+            } else {
+                columns[i].as_mut_ptr().cast::<c_void>()
+            };
+        }
+
+        // `desc.table` left null on purpose; see `spawn` for why (OnAdd gating).
+        let mut desc: sys::ecs_bulk_desc_t = unsafe { core::mem::zeroed() };
+        desc.count = count as i32;
+        desc.data = data.as_mut_ptr();
+        desc.ids[..arity].copy_from_slice(&ids[..arity]);
+
+        let id_ptr = unsafe { sys::ecs_bulk_init(world_ptr, &desc) };
+        assert!(
+            !id_ptr.is_null(),
+            "ecs_bulk_init failed while spawning a bundle batch"
+        );
+        // Copy the ids out immediately; the returned array aliases internal state.
+        let mut out = Vec::with_capacity(count);
+        for i in 0..count {
+            out.push(Entity::new(unsafe { *id_ptr.add(i) }));
+        }
+        out
+    }
 }

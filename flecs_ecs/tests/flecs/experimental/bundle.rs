@@ -194,3 +194,98 @@ fn spawn_observer_parity_with_set_sequence() {
     assert_eq!(spawn_add, seq_add, "OnAdd count parity spawn vs set-sequence");
     assert_eq!(spawn_set, seq_set, "OnSet count parity spawn vs set-sequence");
 }
+
+#[derive(Component, Clone, Debug, PartialEq)]
+struct CPos {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Component, Clone, Debug, PartialEq)]
+struct CHealth(i32);
+
+#[test]
+fn spawn_batch_count_and_distinct_ids() {
+    let world = World::new();
+
+    let ids = world.spawn_batch((CPos { x: 1, y: 2 }, CHealth(50)), 1000);
+    assert_eq!(ids.len(), 1000);
+
+    let mut unique: std::collections::HashSet<u64> = std::collections::HashSet::new();
+    for e in &ids {
+        assert!(unique.insert(**e), "duplicate id returned from spawn_batch");
+        assert!(world.entity_from_id(*e).is_alive());
+    }
+    assert_eq!(unique.len(), 1000);
+}
+
+#[test]
+fn spawn_batch_values_are_correct_across_rows() {
+    let world = World::new();
+    let ids = world.spawn_batch((CPos { x: 7, y: 8 }, CHealth(3)), 16);
+    for e in ids {
+        let ev = world.entity_from_id(e);
+        assert!(ev.has(CPos::id()));
+        assert!(ev.has(CHealth::id()));
+        ev.get::<(&CPos, &CHealth)>(|(p, h)| {
+            assert_eq!(*p, CPos { x: 7, y: 8 });
+            assert_eq!(*h, CHealth(3));
+        });
+    }
+}
+
+#[test]
+fn spawn_batch_count_one() {
+    let world = World::new();
+    let ids = world.spawn_batch((CHealth(42),), 1);
+    assert_eq!(ids.len(), 1);
+    world
+        .entity_from_id(ids[0])
+        .get::<&CHealth>(|h| assert_eq!(*h, CHealth(42)));
+}
+
+static BATCH_ZERO_DROP: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Component, Clone)]
+struct BatchZeroDrop(u32);
+
+impl Drop for BatchZeroDrop {
+    fn drop(&mut self) {
+        BATCH_ZERO_DROP.fetch_add(1, SeqCst);
+    }
+}
+
+#[test]
+fn spawn_batch_count_zero_drops_original_and_returns_empty() {
+    BATCH_ZERO_DROP.store(0, SeqCst);
+    let world = World::new();
+    let ids = world.spawn_batch((BatchZeroDrop(1),), 0);
+    assert!(ids.is_empty());
+    // The original bundle is not stored anywhere, so it is dropped exactly once.
+    assert_eq!(BATCH_ZERO_DROP.load(SeqCst), 1);
+    drop(world);
+}
+
+static BATCH_DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Component, Clone)]
+struct BatchDropCounter(u32);
+
+impl Drop for BatchDropCounter {
+    fn drop(&mut self) {
+        BATCH_DROP_COUNT.fetch_add(1, SeqCst);
+    }
+}
+
+#[test]
+fn spawn_batch_drop_runs_exactly_once_per_stored_value() {
+    BATCH_DROP_COUNT.store(0, SeqCst);
+    {
+        let world = World::new();
+        let ids = world.spawn_batch((BatchDropCounter(9),), 100);
+        assert_eq!(ids.len(), 100);
+        // Values live in storage; clones and the moved original were forgotten.
+        assert_eq!(BATCH_DROP_COUNT.load(SeqCst), 0);
+    }
+    assert_eq!(BATCH_DROP_COUNT.load(SeqCst), 100);
+}
