@@ -21,6 +21,7 @@ mod bypass_paths;
 #[cfg(feature = "flecs_safety_locks")]
 mod singleton;
 mod exclusive;
+mod system_with;
 
 #[derive(Component, Clone, Debug, Default)]
 struct Position {

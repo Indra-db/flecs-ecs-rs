@@ -354,6 +354,109 @@ pub mod private {
             }
         }
 
+        /// Trampoline for `each_with`: iterate every matched row, handing the
+        /// callback the row's component tuple and a per-callback
+        /// [`Stage`](crate::experimental::Stage) built from the iterator's stage
+        /// world. Always routes through the checked batch-lock path
+        /// ([`internal_each_iter_next`]); the stage handle can reach arbitrary
+        /// storage, so a `_with` system never takes the lock-free path (spec
+        /// §5.2).
+        #[cfg(feature = "flecs_experimental")]
+        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[extern_abi]
+        fn execute_run_each_with<Func>(iter: *mut sys::ecs_iter_t)
+        where
+            Func: FnMut(T::TupleType<'_>, crate::experimental::Stage<'_>),
+        {
+            unsafe {
+                let iter = &mut *iter;
+                iter.flags &= !sys::EcsIterIsValid;
+                let world = WorldRef::from_ptr(iter.world);
+                let each = &mut *iter.run_ctx.cast::<Func>();
+                let mut table_iter = TableIter::<true, ()>::new(iter, world);
+
+                #[cfg(feature = "flecs_safety_locks")]
+                if table_iter.iter.row_fields == 0 {
+                    while table_iter.internal_next() {
+                        let dt = table_iter.iter.delta_time;
+                        internal_each_iter_next::<T, true, false>(
+                            table_iter.iter,
+                            &world,
+                            &mut |t| each(t, crate::experimental::Stage::new(world, dt)),
+                        );
+                    }
+                } else {
+                    while table_iter.internal_next() {
+                        let dt = table_iter.iter.delta_time;
+                        internal_each_iter_next::<T, true, true>(
+                            table_iter.iter,
+                            &world,
+                            &mut |t| each(t, crate::experimental::Stage::new(world, dt)),
+                        );
+                    }
+                }
+
+                #[cfg(not(feature = "flecs_safety_locks"))]
+                while table_iter.internal_next() {
+                    let dt = table_iter.iter.delta_time;
+                    internal_each_iter_next::<T, true, false>(table_iter.iter, &world, &mut |t| {
+                        each(t, crate::experimental::Stage::new(world, dt))
+                    });
+                }
+            }
+        }
+
+        /// Trampoline for `each_entity_with`: as [`execute_run_each_with`] but the
+        /// callback also receives the row's [`EntityView`], for the "visit each
+        /// matched entity and issue a deferred command on it" shape (spec §5.2,
+        /// GAP-6).
+        #[cfg(feature = "flecs_experimental")]
+        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[extern_abi]
+        fn execute_run_each_entity_with<Func>(iter: *mut sys::ecs_iter_t)
+        where
+            Func: FnMut(EntityView, T::TupleType<'_>, crate::experimental::Stage<'_>),
+        {
+            unsafe {
+                let iter = &mut *iter;
+                iter.flags &= !sys::EcsIterIsValid;
+                let world = WorldRef::from_ptr(iter.world);
+                let each = &mut *iter.run_ctx.cast::<Func>();
+                let mut table_iter = TableIter::<true, ()>::new(iter, world);
+
+                #[cfg(feature = "flecs_safety_locks")]
+                if table_iter.iter.row_fields == 0 {
+                    while table_iter.internal_next() {
+                        let dt = table_iter.iter.delta_time;
+                        internal_each_entity_iter_next::<T, true, false>(
+                            table_iter.iter,
+                            &world,
+                            &mut |e, t| each(e, t, crate::experimental::Stage::new(world, dt)),
+                        );
+                    }
+                } else {
+                    while table_iter.internal_next() {
+                        let dt = table_iter.iter.delta_time;
+                        internal_each_entity_iter_next::<T, true, true>(
+                            table_iter.iter,
+                            &world,
+                            &mut |e, t| each(e, t, crate::experimental::Stage::new(world, dt)),
+                        );
+                    }
+                }
+
+                #[cfg(not(feature = "flecs_safety_locks"))]
+                while table_iter.internal_next() {
+                    let dt = table_iter.iter.delta_time;
+                    internal_each_entity_iter_next::<T, true, false>(
+                        table_iter.iter,
+                        &world,
+                        &mut |e, t| each(e, t, crate::experimental::Stage::new(world, dt)),
+                    );
+                }
+            }
+        }
+
         // /// Get the binding context
         // fn get_binding_context(&mut self, is_run: bool) -> &mut ReactorBindingType {
         //     let mut binding_ctx: *mut ReactorBindingType = self.desc_binding_context() as *mut _;

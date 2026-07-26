@@ -724,6 +724,66 @@ where
 
         self.build()
     }
+
+    /// Opt-in world access (spec §5.2): iterate every matched row, handing the
+    /// callback the component tuple and a per-callback
+    /// [`Stage`](crate::experimental::Stage) through which deferred commands are
+    /// issued.
+    ///
+    /// Enabling stage access makes the system **always register its term locks**
+    /// (never the lock-free tiered path): the stage handle can reach storage the
+    /// disjointness proof does not cover, so the term borrows must be visible to
+    /// any guard taken inside the callback.
+    #[cfg(feature = "flecs_experimental")]
+    fn each_with<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    where
+        Func: FnMut(T::TupleType<'_>, crate::experimental::Stage<'_>) + 'static,
+    {
+        const {
+            assert!(
+                !T::CONTAINS_ANY_TAG_TERM,
+                "a type provided in the query signature is a Tag and cannot be used with `.each_with`. use `.run` instead or provide the tag with `.with()`"
+            );
+        }
+
+        let each_func = Box::new(func);
+        let each_static_ref = Box::leak(each_func);
+
+        self.set_run_binding_context(each_static_ref as *mut _ as *mut c_void);
+        self.set_run_binding_context_free(Some(Self::free_callback::<Func>));
+        self.set_desc_run(Some(Self::execute_run_each_with::<Func> as ExternIterFn));
+
+        self.build()
+    }
+
+    /// Entity + item + stage (spec §5.2, GAP-6): as [`each_with`](SystemAPI::each_with)
+    /// but the callback also receives each matched [`EntityView`], the "visit each
+    /// entity and issue a deferred command on it" shape.
+    ///
+    /// Like `each_with`, always registers this system's term locks.
+    #[cfg(feature = "flecs_experimental")]
+    fn each_entity_with<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    where
+        Func: FnMut(EntityView, T::TupleType<'_>, crate::experimental::Stage<'_>) + 'static,
+    {
+        const {
+            assert!(
+                !T::CONTAINS_ANY_TAG_TERM,
+                "a type provided in the query signature is a Tag and cannot be used with `.each_entity_with`. use `.run` instead or provide the tag with `.with()`"
+            );
+        }
+
+        let each_func = Box::new(func);
+        let each_static_ref = Box::leak(each_func);
+
+        self.set_run_binding_context(each_static_ref as *mut _ as *mut c_void);
+        self.set_run_binding_context_free(Some(Self::free_callback::<Func>));
+        self.set_desc_run(Some(
+            Self::execute_run_each_entity_with::<Func> as ExternIterFn,
+        ));
+
+        self.build()
+    }
 }
 
 pub trait ParSystemAPI<'a, P, T>:
@@ -1012,6 +1072,40 @@ where
     {
         self.set_multi_threaded(true);
         self.run_each_iter(func, func_each_iter)
+    }
+
+    /// Multithreaded variant of [`SystemAPI::each_with`] (spec §6.2): flecs
+    /// partitions matched tables across workers so each row is visited by exactly
+    /// one worker, and each worker's callback gets a [`Stage`](crate::experimental::Stage)
+    /// over its own stage for deferred commands.
+    ///
+    /// The `Item: Send` bound is what makes handing a `&mut T` to another thread
+    /// sound (`&T` needs `T: Sync`, `&mut T` needs `T: Send`).
+    #[cfg(feature = "flecs_experimental")]
+    fn par_each_with<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    where
+        Func: Fn(T::TupleType<'_>, crate::experimental::Stage<'_>) + Send + Sync + 'static,
+        for<'w> T::TupleType<'w>: Send,
+    {
+        self.set_multi_threaded(true);
+        self.each_with(func)
+    }
+
+    /// Multithreaded variant of [`SystemAPI::each_entity_with`] (spec §6.2).
+    #[cfg(feature = "flecs_experimental")]
+    fn par_each_entity_with<Func>(
+        &mut self,
+        func: Func,
+    ) -> <Self as builder::Builder<'a>>::BuiltType
+    where
+        Func: Fn(EntityView, T::TupleType<'_>, crate::experimental::Stage<'_>)
+            + Send
+            + Sync
+            + 'static,
+        for<'w> T::TupleType<'w>: Send,
+    {
+        self.set_multi_threaded(true);
+        self.each_entity_with(func)
     }
 }
 
