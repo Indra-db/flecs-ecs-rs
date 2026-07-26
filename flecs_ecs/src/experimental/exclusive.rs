@@ -37,7 +37,7 @@
 
 use crate::core::{
     ComponentOrPairId, ComponentPointers, DataComponent, Entity, GetComponentPointers, GetTuple,
-    IterGuard, QueryAPI, QueryTuple, World, WorldRef,
+    IterGuard, QueryAPI, QueryTuple, World, WorldProvider, WorldRef,
 };
 use crate::sys;
 
@@ -146,8 +146,15 @@ where
     T: QueryTuple,
 {
     fn each_exclusive(&self, world: &mut World, func: impl FnMut(T::TupleType<'_>)) {
-        let _ = world;
         let world_ref = self.world();
+        assert!(
+            core::ptr::eq(
+                world_ref.real_world().world_ptr(),
+                (&*world).world().real_world().world_ptr()
+            ),
+            "each_exclusive requires the query's own world: the &mut World passed in belongs to a \
+             different world and cannot prove exclusive access to this query's storage"
+        );
 
         // The &mut World proves no outstanding entity guard, but the query must
         // still be intra-query disjoint for a lock-free run to be sound (nothing

@@ -86,3 +86,16 @@ fn each_exclusive_matches_locked_each() {
     collected.sort_unstable();
     assert_eq!(collected, vec![0, 2, 4, 6, 8, 10, 12, 14]);
 }
+
+#[test]
+#[should_panic(expected = "each_exclusive requires the query's own world")]
+fn each_exclusive_foreign_world_panics() {
+    let world_a = World::new();
+    world_a
+        .entity()
+        .set(Position::default())
+        .set(Velocity::default());
+    let q = query!(world_a, &mut Position, &Velocity).build();
+    let mut world_b = World::new();
+    q.each_exclusive(&mut world_b, |(_, _)| {});
+}

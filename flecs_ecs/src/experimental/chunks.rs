@@ -16,6 +16,7 @@ use core::marker::PhantomData;
 
 use crate::core::{
     ComponentOrPairId, ComponentPointers, ExternIterNextFn, IterGuard, QueryAPI, QueryTuple, World,
+    WorldProvider,
 };
 use crate::sys;
 
@@ -227,8 +228,15 @@ where
     T: QueryTuple + ChunkColumns,
 {
     fn chunks<'w>(&self, world: &'w mut World) -> ChunkCursor<'w, P, T> {
-        let _ = world;
         let world_ref = self.world();
+        assert!(
+            core::ptr::eq(
+                world_ref.real_world().world_ptr(),
+                (&*world).world().real_world().world_ptr()
+            ),
+            "chunks() requires the query's own world: the &mut World passed in belongs to a \
+             different world and cannot prove exclusive access to this query's storage"
+        );
         assert!(
             super::disjoint::is_proven_disjoint(world_ref, self.query_ptr()),
             "chunks() requires a provably-disjoint query: distinct dense self component ids, no \

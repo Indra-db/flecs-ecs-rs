@@ -178,3 +178,16 @@ fn chunks_rejects_non_disjoint_query() {
     let q = query!(world, &mut Position, &Position).build();
     let _cursor = q.chunks(&mut world);
 }
+
+#[test]
+#[should_panic(expected = "chunks() requires the query's own world")]
+fn chunks_foreign_world_panics() {
+    let world_a = World::new();
+    world_a
+        .entity()
+        .set(Position::default())
+        .set(Velocity::default());
+    let q = query!(world_a, &mut Position, &Velocity).build();
+    let mut world_b = World::new();
+    let _ = q.chunks(&mut world_b);
+}
