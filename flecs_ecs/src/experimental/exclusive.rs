@@ -190,5 +190,7 @@ where
         while iter.next(|i| self.iter_next(i)) {
             each_exclusive_batch::<T>(&mut iter, &mut func);
         }
+        // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+        world_ref.rethrow_stashed_panic();
     }
 }

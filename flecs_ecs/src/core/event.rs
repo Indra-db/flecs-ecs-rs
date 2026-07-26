@@ -166,6 +166,9 @@ impl<'a, T: ComponentId> EventBuilder<'a, T> {
         desc.ids = ids;
         desc.observable = world.real_world().world_ptr_mut() as *mut c_void;
         unsafe { sys::ecs_emit(world.world_ptr_mut(), desc) };
+        // Rethrow a panic an observer callback stashed while handling this event
+        // (spec §5.5): synchronous emit runs observers before returning here.
+        world.rethrow_stashed_panic();
     }
 
     pub fn enqueue(&mut self, data: T) {
@@ -210,5 +213,8 @@ impl<'a, T: ComponentId> EventBuilder<'a, T> {
                 }
             }
         };
+        // Rethrow a panic an observer stashed while handling a synchronous emit
+        // (spec §5.5); a no-op when the event was only enqueued (deferred).
+        self.world.rethrow_stashed_panic();
     }
 }

@@ -43,6 +43,101 @@ pub mod private {
     use alloc::boxed::Box;
     use flecs_ecs_derive::extern_abi;
 
+    /// Run one callback-trampoline body under the catch-stash-rethrow policy
+    /// (spec §5.5, Decision 8).
+    ///
+    /// A panic in the user callback is caught here rather than allowed to unwind
+    /// through the flecs C frame that called this trampoline. On catch the stage
+    /// borrow map is rolled back to its pre-invocation snapshot (query batches
+    /// take and release their term borrows with plain calls, so a panicking
+    /// callback would otherwise leak them, spec §5.2), the payload is stashed in
+    /// the world context, and control returns to C normally; the enclosing safe
+    /// entry point rethrows it once flecs has returned.
+    ///
+    /// Once a panic is stashed the frame is poisoned: later trampoline
+    /// invocations in the same frame (remaining tables of a per-table callback,
+    /// or later systems/observers in the pipeline) short-circuit here without
+    /// running any user code, leaving flecs to drive its iterator/pipeline to
+    /// the end so its own frames unwind cleanly.
+    ///
+    /// `AssertUnwindSafe` is justified once for the whole trampoline family:
+    /// every shared invariant the body can touch is restored before returning
+    /// to C. The stage locks are restored by the snapshot below; the debug
+    /// `ecs_table_lock` a run-loop trampoline holds on the in-flight table and
+    /// the iterator itself are balanced by the finalization below; any lazily
+    /// opened defer level is balanced by its guard's `Drop`, which runs during
+    /// the unwind before this catch. No caller observes a torn state, so
+    /// treating the borrowed iterator/world state the body captures as
+    /// unwind-safe is sound.
+    ///
+    /// The finalization obligations differ across the trampoline family because
+    /// flecs does not finalize the iterator of a `run` callback after it returns
+    /// (it expects the callback to iterate to completion, which auto-finalizes
+    /// via `ecs_query_next`). Any early exit from a `run` trampoline must call
+    /// `ecs_iter_fini` itself or the stage's stack-allocator cursor leaks and
+    /// aborts at teardown. Two flags capture the two early exits, because the
+    /// iterator state that makes finalization safe differs between them:
+    ///
+    /// * `fini_on_shortcircuit` — a poisoned-frame short-circuit runs no body,
+    ///   so the iterator is exactly as flecs created it (fresh, live) and is
+    ///   finalized unconditionally. True for every `run` trampoline
+    ///   (`execute_run`, `execute_run_each*`); this is what releases the sibling
+    ///   `par_*` workers whose `run` starts after one worker has stashed a panic.
+    ///
+    /// * `fini_on_panic` — a caught panic finalizes the in-flight iterator
+    ///   (releasing the flecs per-table debug lock first, mirroring
+    ///   `TableIter::fini`). Only the trampolines that drive their own
+    ///   `while table_iter.internal_next()` loop (`execute_run_each*`) set this:
+    ///   there a caught panic is always mid-batch, so the iterator is live and
+    ///   `ecs_iter_fini` runs exactly once. The raw `execute_run` leaves it
+    ///   `false`: its user closure owns iteration and may already have run the
+    ///   loop to completion (which finalized the iterator while
+    ///   `TableIter::internal_next` left `EcsIterIsValid` set) or called `fini`
+    ///   itself, so finalizing again would double-free.
+    ///
+    /// The per-table callback trampolines (`execute_each*`) set both `false`:
+    /// they are driven by `it.each()` or flecs' default-run loop, both of which
+    /// own and finalize the iterator.
+    #[inline]
+    pub(crate) fn run_callback_trampoline(
+        world: &WorldRef<'_>,
+        iter_ptr: *mut sys::ecs_iter_t,
+        fini_on_shortcircuit: bool,
+        fini_on_panic: bool,
+        body: impl FnOnce(),
+    ) {
+        let ctx = world.world_ctx();
+        if ctx.frame_panicked() {
+            if fini_on_shortcircuit {
+                unsafe { sys::ecs_iter_fini(iter_ptr) };
+            }
+            return;
+        }
+        #[cfg(feature = "flecs_safety_locks")]
+        let scope = crate::core::StageLocksScope::new(world);
+        match std::panic::catch_unwind(core::panic::AssertUnwindSafe(body)) {
+            Ok(()) => {}
+            Err(payload) => {
+                #[cfg(feature = "flecs_safety_locks")]
+                scope.restore();
+                if fini_on_panic {
+                    let iter = unsafe { &*iter_ptr };
+                    if iter.flags & sys::EcsIterIsValid != 0 {
+                        #[cfg(any(
+                            debug_assertions,
+                            feature = "flecs_force_enable_ecs_asserts"
+                        ))]
+                        if !iter.table.is_null() {
+                            unsafe { sys::ecs_table_unlock(iter.world, iter.table) };
+                        }
+                        unsafe { sys::ecs_iter_fini(iter_ptr) };
+                    }
+                }
+                ctx.stash_panic(payload);
+            }
+        }
+    }
+
     #[allow(non_camel_case_types)]
     #[doc(hidden)]
     pub trait internal_SystemAPI<'a, P, T>
@@ -75,16 +170,17 @@ pub mod private {
         /// # Arguments
         ///
         /// * `iter` - The iterator which gets passed in from `C`
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_each<const CALLED_FROM_RUN: bool, Func>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(T::TupleType<'_>),
         {
-            unsafe {
-                let iter = &mut *iter;
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, false, false, || unsafe {
                 let each = &mut *(iter.callback_ctx as *mut Func);
-                let world = WorldRef::from_ptr(iter.world);
                 #[cfg(feature = "flecs_safety_locks")]
                 if iter.row_fields == 0 {
                     internal_each_iter_next::<T, CALLED_FROM_RUN, false>(iter, &world, each);
@@ -96,7 +192,7 @@ pub mod private {
                 {
                     internal_each_iter_next::<T, CALLED_FROM_RUN, false>(iter, &world, each);
                 }
-            }
+            });
         }
 
         /// Callback of the `each_entity` functionality
@@ -104,15 +200,16 @@ pub mod private {
         /// # Arguments
         ///
         /// * `iter` - The iterator which gets passed in from `C`
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_each_entity<const CALLED_FROM_RUN: bool, Func>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(EntityView, T::TupleType<'_>),
         {
-            unsafe {
-                let iter = &mut *iter;
-                let world = WorldRef::from_ptr(iter.world);
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, false, false, || unsafe {
                 let each_entity = &mut *(iter.callback_ctx as *mut Func);
                 #[cfg(feature = "flecs_safety_locks")]
                 if iter.row_fields == 0 {
@@ -137,18 +234,19 @@ pub mod private {
                         each_entity,
                     );
                 }
-            }
+            });
         }
 
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_each_iter<const CALLED_FROM_RUN: bool, Func>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(TableIter<CALLED_FROM_RUN, P>, FieldIndex, T::TupleType<'_>),
         {
-            unsafe {
-                let iter = &mut *iter;
-                let world = WorldRef::from_ptr(iter.world);
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, false, false, || unsafe {
                 let each_iter = &mut *(iter.callback_ctx as *mut Func);
                 #[cfg(feature = "flecs_safety_locks")]
                 if iter.row_fields == 0 {
@@ -161,7 +259,7 @@ pub mod private {
                 {
                     internal_each_iter::<T, P, CALLED_FROM_RUN, false>(iter, &world, each_iter);
                 }
-            }
+            });
         }
 
         /// Callback of the `iter_only` functionality
@@ -169,19 +267,19 @@ pub mod private {
         /// # Arguments
         ///
         /// * `iter` - The iterator which gets passed in from `C`
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_run<Func>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(TableIter<true, P>),
         {
-            unsafe {
-                let iter = &mut *iter;
-                let run_ptr = iter.run_ctx.cast::<Func>();
-                let run = &mut *run_ptr;
-                let world = WorldRef::from_ptr(iter.world);
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, true, false, || unsafe {
+                let run = &mut *iter.run_ctx.cast::<Func>();
                 internal_run::<P>(iter, run, world);
-            }
+            });
         }
 
         #[extern_abi]
@@ -192,18 +290,18 @@ pub mod private {
             };
         }
 
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_run_each<Func, const CHECKED: bool>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(T::TupleType<'_>),
         {
-            unsafe {
-                let iter = &mut *iter;
-                iter.flags &= !sys::EcsIterIsValid;
-                let world = WorldRef::from_ptr(iter.world);
-                let each_ptr = iter.run_ctx.cast::<Func>();
-                let each = &mut *each_ptr;
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            iter.flags &= !sys::EcsIterIsValid;
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, true, true, || unsafe {
+                let each = &mut *iter.run_ctx.cast::<Func>();
                 let mut table_iter = TableIter::<true, ()>::new(iter, world);
 
                 #[cfg(feature = "flecs_safety_locks")]
@@ -234,21 +332,21 @@ pub mod private {
                         internal_each_iter_next::<T, true, false>(table_iter.iter, &world, each);
                     }
                 }
-            }
+            });
         }
 
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_run_each_entity<Func, const CHECKED: bool>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(EntityView, T::TupleType<'_>),
         {
-            unsafe {
-                let iter = &mut *iter;
-                iter.flags &= !sys::EcsIterIsValid;
-                let world = WorldRef::from_ptr(iter.world);
-                let each_entity_ptr = iter.run_ctx.cast::<Func>();
-                let each_entity = &mut *each_entity_ptr;
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            iter.flags &= !sys::EcsIterIsValid;
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, true, true, || unsafe {
+                let each_entity = &mut *iter.run_ctx.cast::<Func>();
                 let mut table_iter = TableIter::<true, ()>::new(iter, world);
 
                 #[cfg(feature = "flecs_safety_locks")]
@@ -291,10 +389,10 @@ pub mod private {
                         );
                     }
                 }
-            }
+            });
         }
 
-        #[expect(
+        #[allow(
             clippy::not_unsafe_ptr_arg_deref,
             reason = "this doesn't actually deref the pointer"
         )]
@@ -303,12 +401,12 @@ pub mod private {
         where
             Func: FnMut(TableIter<false, P>, FieldIndex, T::TupleType<'_>) + 'static,
         {
-            unsafe {
-                let iter = &mut *iter;
-                iter.flags &= !sys::EcsIterIsValid;
-                let world = WorldRef::from_ptr(iter.world);
-                let each_iter_ptr = iter.run_ctx.cast::<Func>();
-                let each_iter = &mut *each_iter_ptr;
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            iter.flags &= !sys::EcsIterIsValid;
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, true, true, || unsafe {
+                let each_iter = &mut *iter.run_ctx.cast::<Func>();
                 let mut table_iter = TableIter::<true, ()>::new(iter, world);
 
                 #[cfg(feature = "flecs_safety_locks")]
@@ -351,7 +449,7 @@ pub mod private {
                         );
                     }
                 }
-            }
+            });
         }
 
         /// Trampoline for `each_with`: iterate every matched row, handing the
@@ -362,16 +460,17 @@ pub mod private {
         /// storage, so a `_with` system never takes the lock-free path (spec
         /// §5.2).
         #[cfg(feature = "flecs_experimental")]
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_run_each_with<Func>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(T::TupleType<'_>, crate::experimental::Stage<'_>),
         {
-            unsafe {
-                let iter = &mut *iter;
-                iter.flags &= !sys::EcsIterIsValid;
-                let world = WorldRef::from_ptr(iter.world);
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            iter.flags &= !sys::EcsIterIsValid;
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, true, true, || unsafe {
                 let each = &mut *iter.run_ctx.cast::<Func>();
                 let mut table_iter = TableIter::<true, ()>::new(iter, world);
 
@@ -403,7 +502,7 @@ pub mod private {
                         each(t, crate::experimental::Stage::new(world, dt))
                     });
                 }
-            }
+            });
         }
 
         /// Trampoline for `each_entity_with`: as [`execute_run_each_with`] but the
@@ -411,16 +510,17 @@ pub mod private {
         /// matched entity and issue a deferred command on it" shape (spec §5.2,
         /// GAP-6).
         #[cfg(feature = "flecs_experimental")]
-        #[expect(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
+        #[allow(clippy::not_unsafe_ptr_arg_deref, reason = "iter will always be valid")]
         #[extern_abi]
         fn execute_run_each_entity_with<Func>(iter: *mut sys::ecs_iter_t)
         where
             Func: FnMut(EntityView, T::TupleType<'_>, crate::experimental::Stage<'_>),
         {
-            unsafe {
-                let iter = &mut *iter;
-                iter.flags &= !sys::EcsIterIsValid;
-                let world = WorldRef::from_ptr(iter.world);
+            let iter_ptr = iter;
+            let iter = unsafe { &mut *iter_ptr };
+            iter.flags &= !sys::EcsIterIsValid;
+            let world = unsafe { WorldRef::from_ptr(iter.world) };
+            run_callback_trampoline(&world, iter_ptr, true, true, || unsafe {
                 let each = &mut *iter.run_ctx.cast::<Func>();
                 let mut table_iter = TableIter::<true, ()>::new(iter, world);
 
@@ -454,7 +554,7 @@ pub mod private {
                         &mut |e, t| each(e, t, crate::experimental::Stage::new(world, dt)),
                     );
                 }
-            }
+            });
         }
 
         // /// Get the binding context

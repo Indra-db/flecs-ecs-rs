@@ -161,7 +161,12 @@ impl World {
         // without an outstanding borrow; it costs the release hot path nothing.
         #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
         crate::core::assert_no_live_pin(&(&*self).world(), "World::progress()");
-        unsafe { sys::ecs_progress(self.raw_world.as_ptr(), delta_time) }
+        let progressed = unsafe { sys::ecs_progress(self.raw_world.as_ptr(), delta_time) };
+        // Resume a panic a system/observer callback stashed this frame (spec
+        // §5.5): flecs has returned and unwound its own frames, so it surfaces
+        // here as an ordinary panic. One relaxed load when nothing panicked.
+        self.rethrow_stashed_panic();
+        progressed
     }
 
     /// Run pipeline.
@@ -227,6 +232,8 @@ impl World {
                 delta_time,
             );
         }
+        // Rethrow a callback panic stashed during the pipeline run (spec §5.5).
+        self.rethrow_stashed_panic();
     }
 
     /// Set time scale. Increase or decrease simulation speed by the provided multiplier.

@@ -189,6 +189,11 @@ where
                 }
             }
         }
+
+        // A callback that triggered a synchronous observer whose Rust hook
+        // panicked has that panic stashed rather than unwound through C
+        // (spec §5.5); resume it now, once iteration has finished.
+        world.rethrow_stashed_panic();
     }
 
     /// Each iterator.
@@ -295,6 +300,9 @@ where
                 }
             }
         }
+
+        // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+        world.rethrow_stashed_panic();
     }
 
     /// Each iterator. This variant of `each` provides access to the [`TableIter`] object,
@@ -440,6 +448,9 @@ where
                 }
             }
         }
+
+        // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+        world.rethrow_stashed_panic();
     }
 
     /// find iterator to find an entity
@@ -493,6 +504,8 @@ where
                     );
                 }
             }
+            // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+            world.rethrow_stashed_panic();
             entity
         }
     }
@@ -551,6 +564,8 @@ where
                     );
                 }
             }
+            // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+            world.rethrow_stashed_panic();
             entity_result
         }
     }
@@ -628,8 +643,11 @@ where
     where
         P: ComponentId,
     {
+        let world = self.world();
         let mut iter = self.retrieve_iter();
-        internal_run::<P>(&mut iter, &mut func, self.world());
+        internal_run::<P>(&mut iter, &mut func, world);
+        // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+        world.rethrow_stashed_panic();
     }
 
     /// Run iterator with each forwarding.
@@ -706,15 +724,18 @@ where
         P: ComponentId,
         FuncEach: FnMut(T::TupleType<'_>),
     {
+        let world = self.world();
         let mut iter = self.retrieve_iter();
         iter.callback_ctx = &mut func_each as *mut _ as *mut core::ffi::c_void;
         iter.callback = Some(__internal_query_execute_each_from_run::<T, FuncEach> as ExternIterFn);
-        internal_run::<P>(&mut iter, &mut func, self.world());
+        internal_run::<P>(&mut iter, &mut func, world);
         #[allow(unused_assignments)]
         {
             iter.callback = None;
             iter.callback_ctx = core::ptr::null_mut();
         }
+        // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+        world.rethrow_stashed_panic();
     }
 
     /// Run iterator with each entity forwarding.
@@ -809,6 +830,8 @@ where
             iter.callback = None;
             iter.callback_ctx = core::ptr::null_mut();
         }
+        // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+        world.rethrow_stashed_panic();
     }
 
     /// Each iterator. This variant of `each` provides access to the [`TableIter`] object,
@@ -871,6 +894,8 @@ where
             iter.callback = None;
             iter.callback_ctx = core::ptr::null_mut();
         }
+        // Resume a panic stashed by a nested synchronous observer (spec §5.5).
+        world.rethrow_stashed_panic();
     }
 
     /// Get the entity of the current query

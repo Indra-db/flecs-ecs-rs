@@ -7,9 +7,12 @@ use core::cell::Cell;
 extern crate std;
 
 extern crate alloc;
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
+use core::any::Any;
 use std::sync::Mutex;
+use std::sync::PoisonError;
 
 /// Per-world cache mapping a [`Bundle`](crate::experimental::Bundle) type to the
 /// sorted, de-duplicated component id array used to resolve its target table.
@@ -22,6 +25,15 @@ pub(crate) type BundleIdCache = core::cell::RefCell<
     hashbrown::HashMap<core::any::TypeId, alloc::boxed::Box<[u64]>, super::NoOpHash>,
 >;
 
+/// Payload of a panic caught at a callback trampoline (spec §5.5, Decision 8),
+/// held until the enclosing safe entry point rethrows it. `first` keeps the
+/// payload of the first panic in the frame (that one is rethrown); `suppressed`
+/// counts later panics in the same frame whose payloads are dropped.
+struct PanicStash {
+    first: Option<Box<dyn Any + Send>>,
+    suppressed: u32,
+}
+
 pub(crate) struct WorldCtx {
     query_ref_count: Cell<i32>,
     pub(crate) components: FlecsIdMap,
@@ -31,6 +43,17 @@ pub(crate) struct WorldCtx {
     pub(crate) bundle_ids: BundleIdCache,
     // Atomic because `QueryHandle::drop` reads it from other threads.
     is_panicking: core::sync::atomic::AtomicBool,
+    // Set once a callback trampoline has caught and stashed a panic for the
+    // current frame (spec §5.5). Read at every trampoline entry (short-circuit
+    // the rest of the poisoned frame) and at every safe entry point (rethrow).
+    // A worker thread in a `par_*` system writes it under `panic_stash`; the
+    // trampoline read is one relaxed load on the non-panic hot path.
+    frame_panicked: core::sync::atomic::AtomicBool,
+    // The caught payload. Locked only on the panic path (a trampoline catching,
+    // or a safe entry point rethrowing), never during normal iteration, so the
+    // one lock this wave introduces stays off every hot path. The `Mutex`
+    // serialises concurrent stashes from `par_*` worker threads.
+    panic_stash: Mutex<PanicStash>,
     owning_thread: std::thread::ThreadId,
     // Shared with every `QueryHandle`. `true` once world teardown has begun;
     // a handle dropping on another thread takes the lock so its refcount
@@ -54,6 +77,11 @@ impl WorldCtx {
             #[cfg(feature = "flecs_experimental")]
             bundle_ids: core::cell::RefCell::new(hashbrown::HashMap::default()),
             is_panicking: core::sync::atomic::AtomicBool::new(false),
+            frame_panicked: core::sync::atomic::AtomicBool::new(false),
+            panic_stash: Mutex::new(PanicStash {
+                first: None,
+                suppressed: 0,
+            }),
             owning_thread: std::thread::current().id(),
             world_dead: Arc::new(Mutex::new(false)),
             #[cfg(feature = "flecs_safety_locks")]
@@ -121,6 +149,80 @@ impl WorldCtx {
             .load(core::sync::atomic::Ordering::Relaxed)
             || std::thread::panicking()
     }
+
+    /// Whether a callback panic has been caught for the current frame and is
+    /// waiting to be rethrown. One relaxed load; the trampolines call it at
+    /// entry to skip the rest of a poisoned frame and the safe entry points
+    /// call it before deciding to rethrow.
+    #[inline(always)]
+    pub(crate) fn frame_panicked(&self) -> bool {
+        self.frame_panicked
+            .load(core::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Stash a panic payload caught at a callback trampoline. The first payload
+    /// of the frame is kept for rethrow; any later panic in the same frame only
+    /// bumps the suppressed count (its payload is dropped here). Safe to call
+    /// from a `par_*` worker thread: the `Mutex` serialises concurrent stashes.
+    pub(crate) fn stash_panic(&self, payload: Box<dyn Any + Send>) {
+        {
+            let mut stash = self
+                .panic_stash
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            if stash.first.is_none() {
+                stash.first = Some(payload);
+            } else {
+                stash.suppressed += 1;
+            }
+        }
+        self.frame_panicked
+            .store(true, core::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Take the stashed panic, clearing the frame-panicked flag. Returns the
+    /// first payload and the number of additional same-frame panics that were
+    /// suppressed. Called from a safe entry point after flecs has returned.
+    pub(crate) fn take_stashed_panic(&self) -> Option<(Box<dyn Any + Send>, u32)> {
+        if !self.frame_panicked() {
+            return None;
+        }
+        self.frame_panicked
+            .store(false, core::sync::atomic::Ordering::Relaxed);
+        let mut stash = self
+            .panic_stash
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let suppressed = core::mem::take(&mut stash.suppressed);
+        stash.first.take().map(|payload| (payload, suppressed))
+    }
+}
+
+/// Rethrow a panic stashed by a callback trampoline, if any (spec §5.5).
+///
+/// Called from every safe entry point that drives flecs (`progress`,
+/// `run_pipeline`, `System::run_with`, event emit, query iteration terminals):
+/// after flecs has returned and unwound its own frames normally, the original
+/// panic resumes here so it surfaces to the caller as an ordinary Rust panic,
+/// preserving its payload (and message) for `should_panic` / `catch_unwind`.
+/// On the non-panic path this is a single relaxed load and return.
+#[inline(always)]
+pub(crate) fn rethrow_stashed_panic(ctx: &WorldCtx) {
+    if let Some((payload, suppressed)) = ctx.take_stashed_panic() {
+        resume_stashed_panic(payload, suppressed);
+    }
+}
+
+/// Resume a taken panic payload, reporting any suppressed same-frame panics.
+#[allow(clippy::print_stderr, reason = "reporting dropped same-frame panics")]
+pub(crate) fn resume_stashed_panic(payload: Box<dyn Any + Send>, suppressed: u32) -> ! {
+    if suppressed > 0 {
+        std::eprintln!(
+            "flecs_ecs: {suppressed} further panic(s) in the same frame were suppressed; \
+             rethrowing the first"
+        );
+    }
+    std::panic::resume_unwind(payload);
 }
 
 /// Calls `defer_begin` on construction and `defer_end` on drop, so the defer
@@ -159,6 +261,13 @@ impl Drop for ScopeEndGuard<'_> {
 impl World {
     pub(crate) fn world_ctx(&self) -> &WorldCtx {
         unsafe { &*(sys::ecs_get_binding_ctx(self.raw_world.as_ptr()) as *const WorldCtx) }
+    }
+
+    /// Resume a panic stashed by a callback trampoline during the flecs call
+    /// that just returned (spec §5.5). No-op when no panic was caught.
+    #[inline(always)]
+    pub(crate) fn rethrow_stashed_panic(&self) {
+        rethrow_stashed_panic(self.world_ctx());
     }
 
     // XAI: thread-affinity model. `World`/`WorldRef` are !Send, so all safe

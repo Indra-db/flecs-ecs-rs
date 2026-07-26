@@ -137,8 +137,25 @@ impl Drop for World {
                         Please ensure that all `Query` objects are out of scope before the world is destroyed.");
                 }
 
+                // Safety net for the catch-stash-rethrow policy (spec §5.5): a
+                // callback panic that was stashed but never rethrown by a safe
+                // entry point (e.g. an observer fired by a top-level structural
+                // op that is not itself a rethrow point) must not be lost.
+                // Take it now, finish teardown, then resume it. Skipped while
+                // already unwinding (resuming then would abort); the flag stays
+                // set and is a no-op once the ctx is gone.
+                let stashed = if std::thread::panicking() {
+                    None
+                } else {
+                    ctx.take_stashed_panic()
+                };
+
                 let ctx = unsafe { Box::from_raw(ctx as *const WorldCtx as *mut WorldCtx) };
                 drop(ctx);
+
+                if let Some((payload, suppressed)) = stashed {
+                    crate::core::world_ctx::resume_stashed_panic(payload, suppressed);
+                }
             }
         }
     }

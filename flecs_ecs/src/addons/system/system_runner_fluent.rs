@@ -79,5 +79,13 @@ impl Drop for SystemRunnerFluent<'_> {
                 );
             }
         }
+        // Rethrow a panic the system callback stashed during this run (spec
+        // §5.5). This runs on drop, so it must not resume a payload while a
+        // different panic is already unwinding through it (that would abort);
+        // when already unwinding, the stashed panic is left for the enclosing
+        // entry point to surface.
+        if !std::thread::panicking() {
+            self.stage.rethrow_stashed_panic();
+        }
     }
 }

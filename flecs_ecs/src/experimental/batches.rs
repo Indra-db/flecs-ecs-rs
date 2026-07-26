@@ -202,6 +202,14 @@ where
                 pointers.safety_table_records(),
             );
         }
+        // A batch body that fired a synchronous observer whose Rust hook panicked
+        // has that panic stashed (spec §5.5). Resume it when the cursor is
+        // dropped, unless a different panic is already unwinding through this
+        // drop (resuming then would abort); that panic reaches its own entry
+        // point instead.
+        if !std::thread::panicking() {
+            self.world.rethrow_stashed_panic();
+        }
     }
 }
 

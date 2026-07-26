@@ -317,6 +317,8 @@ impl<'a> System<'a> {
             },
             None => unsafe { sys::ecs_run(world_ptr, id, args.delta_time, args.param) },
         };
+        // Rethrow a panic the system callback stashed this run (spec §5.5).
+        world.rethrow_stashed_panic();
         Entity(interrupted)
     }
 
