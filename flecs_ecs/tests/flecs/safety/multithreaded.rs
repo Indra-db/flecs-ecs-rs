@@ -25,6 +25,12 @@ struct TagB;
 #[derive(Component)]
 struct TagC;
 
+#[derive(Component)]
+struct Marked;
+
+#[derive(Component)]
+struct Bumped(u64);
+
 const ENTITY_COUNT: u64 = 1000;
 const FRAMES: u64 = 8;
 
@@ -171,4 +177,74 @@ fn par_each_iter_entity_preserves_worker_stage() {
         });
 
     world.progress();
+}
+
+/// Stage isolation across workers (spec §6.1, §7.3): a `par_each_entity_with`
+/// system running on multiple stages, each worker issuing Stage-deferred
+/// structural commands on its own partition's entities. Every command must apply
+/// after the pipeline sync point, with no false mut-alias conflict and no abort:
+/// each worker enqueues onto its own single-owner stage command buffer, and flecs
+/// merges them into the real world at the sync point.
+#[test]
+fn par_each_with_stage_deferred_structural_ops_apply_after_sync() {
+    let mut world = World::new();
+    // Register the deferred-added component up front: registration cannot happen
+    // on a worker during the multithreaded phase.
+    world.component::<Marked>();
+
+    spawn_across_tables(&world, |e| {
+        e.set(DenseCounter(0));
+    });
+    world.set_threads(4);
+
+    world
+        .system::<&DenseCounter>()
+        .multi_threaded()
+        .par_each_entity_with(|entity, _c, stage| {
+            // deferred structural add on the visited entity, through this
+            // worker's stage
+            stage.entity_view(entity.id()).add(Marked::id());
+        });
+
+    world.progress();
+
+    // Every entity received its deferred tag exactly once at the sync point.
+    let mut marked = 0u64;
+    world
+        .query::<()>()
+        .with(Marked::id())
+        .build()
+        .each(|_| marked += 1);
+    assert_eq!(marked, ENTITY_COUNT);
+}
+
+/// Stage isolation for deferred data writes: each worker issues a deferred `set`
+/// on its own partition's entities; all land after the sync point with no abort.
+#[test]
+fn par_each_with_stage_deferred_set_applies_after_sync() {
+    let mut world = World::new();
+    world.component::<Bumped>();
+
+    spawn_across_tables(&world, |e| {
+        e.set(DenseCounter(7));
+    });
+    world.set_threads(4);
+
+    world
+        .system::<&DenseCounter>()
+        .multi_threaded()
+        .par_each_entity_with(|entity, c, stage| {
+            stage.entity_view(entity.id()).set(Bumped(c.0 + 1));
+        });
+
+    world.progress();
+
+    let mut sum = 0u64;
+    let mut count = 0u64;
+    world.new_query::<&Bumped>().each(|b| {
+        sum += b.0;
+        count += 1;
+    });
+    assert_eq!(count, ENTITY_COUNT);
+    assert_eq!(sum, ENTITY_COUNT * 8);
 }
