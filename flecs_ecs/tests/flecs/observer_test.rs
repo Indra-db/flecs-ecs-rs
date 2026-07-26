@@ -317,19 +317,21 @@ fn n2_entities_iter() {
     e1.set(Position { x: 10, y: 20 });
     {
         let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
-        world.get::<&mut LastEntity>(|last| {
+        {
+            let last = WorldSingletonExt::singleton::<LastEntity>(&world).unwrap();
             assert_eq!(count.0, 1);
             assert!(last.0 == e1.id());
-        });
+        };
     };
 
     e2.set(Position { x: 30, y: 40 });
     {
         let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
-        world.get::<&mut LastEntity>(|last| {
+        {
+            let last = WorldSingletonExt::singleton::<LastEntity>(&world).unwrap();
             assert_eq!(count.0, 2);
             assert!(last.0 == e2.id());
-        });
+        };
     };
 }
 
@@ -387,19 +389,21 @@ fn n2_entities_table_column() {
     e1.set(Position { x: 10, y: 20 });
     {
         let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
-        world.get::<&mut LastEntity>(|last| {
+        {
+            let last = WorldSingletonExt::singleton::<LastEntity>(&world).unwrap();
             assert_eq!(count.0, 1);
             assert!(last.0 == e1.id());
-        });
+        };
     };
 
     e2.set(Position { x: 30, y: 40 });
     {
         let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
-        world.get::<&mut LastEntity>(|last| {
+        {
+            let last = WorldSingletonExt::singleton::<LastEntity>(&world).unwrap();
             assert_eq!(count.0, 2);
             assert!(last.0 == e2.id());
-        });
+        };
     };
 }
 
@@ -449,18 +453,20 @@ fn n2_entities_each() {
     e1.set(Position { x: 10, y: 20 });
     {
         let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
-        world.get::<&mut LastEntity>(|last| {
+        {
+            let last = WorldSingletonExt::singleton::<LastEntity>(&world).unwrap();
             assert_eq!(count.0, 1);
             assert!(last.0 == e1);
-        });
+        };
     };
     e2.set(Position { x: 30, y: 40 });
     {
         let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
-        world.get::<&mut LastEntity>(|last| {
+        {
+            let last = WorldSingletonExt::singleton::<LastEntity>(&world).unwrap();
             assert_eq!(count.0, 2);
             assert!(last.0 == e2);
-        });
+        };
     };
 }
 
@@ -1702,9 +1708,10 @@ fn on_set_singleton_set_component_named_entity() {
 
     world.set(MySingletonComponent { v: 1 });
 
-    world
-        .entity_named("A")
-        .get::<&MyComponent>(|c| assert_eq!(c.v, 1));
+    {
+        let c = world.entity_named("A").get_ref::<&MyComponent>().unwrap();
+        assert_eq!(c.v, 1);
+    };
 }
 
 #[test]
@@ -2575,7 +2582,10 @@ fn query_eval_w_component_that_triggered_observer() {
     }
     world.progress();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
 }
 
 #[test]
@@ -2633,7 +2643,10 @@ fn query_eval_w_pair_first_var_that_triggered_observer() {
     }
     world.progress();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
 }
 
 #[test]
@@ -2691,7 +2704,10 @@ fn query_eval_w_pair_second_var_that_triggered_observer() {
     }
     world.progress();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
 }
 
 #[test]
@@ -2753,7 +2769,10 @@ fn query_eval_w_pair_both_vars_that_triggered_observer() {
     }
     world.progress();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
 }
 
 // ─── 2_terms_un_set ───────────────────────────────────────────────────────────
