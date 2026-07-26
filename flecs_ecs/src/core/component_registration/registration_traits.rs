@@ -163,11 +163,10 @@ pub trait ComponentId: Sized + ComponentInfo + 'static + OnComponentRegistration
         if !Self::IS_GENERIC {
             let index = Self::index() as usize;
             let world = world.world();
-            let components_array = world.components_array();
-            let len = components_array.len();
+            let len = world.components_array().len();
 
             if len > index {
-                let component_id = components_array[index];
+                let component_id = world.components_array()[index];
                 if component_id == 0 || !world.is_alive(component_id) {
                     if MANUAL_REGISTRATION_CHECK {
                         #[cfg(feature = "flecs_manual_registration")]
@@ -181,13 +180,17 @@ pub trait ComponentId: Sized + ComponentInfo + 'static + OnComponentRegistration
                         }
                     }
 
+                    // Register first: for enums this recurses to register the
+                    // underlying type, which can grow (and reallocate) the
+                    // components array. Re-borrow the array afterwards so no
+                    // `&mut` to it is ever held across the recursive call.
                     let id = if let Some(name) = Self::internal_pre_registration_name() {
                         try_register_component_named::<MANUAL_REGISTRATION_CHECK, Self>(world, name)
                     } else {
                         try_register_component::<MANUAL_REGISTRATION_CHECK, Self>(world)
                     };
 
-                    components_array[index] = id;
+                    world.components_array()[index] = id;
                     #[cfg(feature = "flecs_meta")]
                     {
                         world
@@ -199,17 +202,20 @@ pub trait ComponentId: Sized + ComponentInfo + 'static + OnComponentRegistration
 
                     return id;
                 }
-                components_array[index]
+                world.components_array()[index]
             } else {
-                components_array.reserve(index + 1 - len);
-                let capacity = components_array.capacity();
-                unsafe {
-                    core::ptr::write_bytes(
-                        components_array.as_mut_ptr().add(len),
-                        0,
-                        capacity - len,
-                    );
-                    components_array.set_len(capacity);
+                {
+                    let components_array = world.components_array();
+                    components_array.reserve(index + 1 - len);
+                    let capacity = components_array.capacity();
+                    unsafe {
+                        core::ptr::write_bytes(
+                            components_array.as_mut_ptr().add(len),
+                            0,
+                            capacity - len,
+                        );
+                        components_array.set_len(capacity);
+                    }
                 }
 
                 let id = if let Some(name) = Self::internal_pre_registration_name() {
@@ -218,7 +224,7 @@ pub trait ComponentId: Sized + ComponentInfo + 'static + OnComponentRegistration
                     try_register_component::<MANUAL_REGISTRATION_CHECK, Self>(world)
                 };
 
-                components_array[index] = id;
+                world.components_array()[index] = id;
                 #[cfg(feature = "flecs_meta")]
                 {
                     world
@@ -303,12 +309,11 @@ pub trait ComponentId: Sized + ComponentInfo + 'static + OnComponentRegistration
         if !Self::IS_GENERIC {
             let index = Self::index() as usize;
             let world = world.world();
-            let components_array = world.components_array();
-            let len = components_array.len();
+            let len = world.components_array().len();
 
             if len > index {
-                let component_id = components_array[index];
-                if components_array[index] == 0 || !world.is_alive(component_id) {
+                let component_id = world.components_array()[index];
+                if component_id == 0 || !world.is_alive(component_id) {
                     if MANUAL_REGISTRATION_CHECK {
                         #[cfg(feature = "flecs_manual_registration")]
                         {
@@ -321,11 +326,14 @@ pub trait ComponentId: Sized + ComponentInfo + 'static + OnComponentRegistration
                         }
                     }
 
+                    // Register first, then re-borrow: registration can recurse
+                    // (enum underlying types) and reallocate the array, so no
+                    // `&mut` to it may be held across the recursive call.
                     let id = try_register_component_named::<MANUAL_REGISTRATION_CHECK, Self>(
                         world, name,
                     );
 
-                    components_array[index] = id;
+                    world.components_array()[index] = id;
 
                     #[cfg(feature = "flecs_meta")]
                     {
@@ -338,22 +346,25 @@ pub trait ComponentId: Sized + ComponentInfo + 'static + OnComponentRegistration
 
                     return id;
                 }
-                components_array[index]
+                world.components_array()[index]
             } else {
-                components_array.reserve(index + 1 - len);
-                let capacity = components_array.capacity();
-                unsafe {
-                    core::ptr::write_bytes(
-                        components_array.as_mut_ptr().add(len),
-                        0,
-                        capacity - len,
-                    );
-                    components_array.set_len(capacity);
+                {
+                    let components_array = world.components_array();
+                    components_array.reserve(index + 1 - len);
+                    let capacity = components_array.capacity();
+                    unsafe {
+                        core::ptr::write_bytes(
+                            components_array.as_mut_ptr().add(len),
+                            0,
+                            capacity - len,
+                        );
+                        components_array.set_len(capacity);
+                    }
                 }
                 let id =
                     try_register_component_named::<MANUAL_REGISTRATION_CHECK, Self>(world, name);
 
-                components_array[index] = id;
+                world.components_array()[index] = id;
                 #[cfg(feature = "flecs_meta")]
                 {
                     world

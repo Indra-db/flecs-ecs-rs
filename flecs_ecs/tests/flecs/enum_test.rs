@@ -1212,3 +1212,33 @@ fn query_singleton_enum_constant_or() {
     });
     assert_eq!(count, 2);
 }
+
+// Registering a derived enum recurses to register its underlying enum type
+// during the enum's own registration. Both registrations write (and may
+// reallocate) the world's `components_array`. The outer registration must
+// re-borrow the array after the recursive call instead of holding a `&mut`
+// across it, which was a use-after-realloc plus aliasing bug. Registering the
+// enum as an early component in a fresh world exercises that recursion.
+#[test]
+fn enum_recursive_registration_no_aliasing() {
+    #[repr(C)]
+    #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+    enum RecursiveEnum {
+        A,
+        B,
+        C,
+    }
+
+    let world = World::new();
+
+    let comp = world.component::<RecursiveEnum>();
+    assert_ne!(comp.id(), 0);
+
+    let a = RecursiveEnum::A.id_variant(&world);
+    let b = RecursiveEnum::B.id_variant(&world);
+    let c = RecursiveEnum::C.id_variant(&world);
+    assert!(a.id() != 0 && b.id() != 0 && c.id() != 0);
+    assert_ne!(a, b);
+    assert_ne!(b, c);
+    assert_ne!(a, c);
+}
