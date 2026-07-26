@@ -4,6 +4,7 @@ use core::ffi::CStr;
 use core::mem::offset_of;
 use flecs_ecs::prelude::meta::*;
 use flecs_ecs::sys;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::{component, prelude::*};
 use flecs_ecs_sys::ecs_world_t;
 
@@ -196,10 +197,11 @@ fn meta_partial_struct() {
 
     assert_ne!(c.id(), 0);
 
-    c.get::<&flecs::Component>(|ptr| {
+    {
+        let ptr = c.get_ref::<&flecs::Component>().unwrap();
         assert_eq!(ptr.size, 4);
         assert_eq!(ptr.alignment, 4);
-    });
+    };
 
     unsafe {
         let m = sys::ecs_struct_get_member(world.ptr_mut(), *c.id(), c"x".as_ptr());
@@ -223,10 +225,11 @@ fn meta_partial_struct_custom_offset() {
 
     assert_ne!(c.id(), 0);
 
-    c.get::<&flecs::Component>(|ptr| {
+    {
+        let ptr = c.get_ref::<&flecs::Component>().unwrap();
         assert_eq!(ptr.size, 8);
         assert_eq!(ptr.alignment, 4);
-    });
+    };
 
     unsafe {
         let m = sys::ecs_struct_get_member(world.ptr_mut(), *c.id(), c"y".as_ptr());
@@ -308,9 +311,10 @@ fn meta_bitmask() {
     });
 
     // Convert Sandwidth component to flecs expression string
-    e.get::<&Sandwich>(|val| {
-        assert_eq!(world.to_expr(val), "{toppings: lettuce|bacon}");
-    });
+    {
+        let val = e.get_ref::<&Sandwich>().unwrap();
+        assert_eq!(world.to_expr(&*val), "{toppings: lettuce|bacon}");
+    };
 }
 
 #[test]
@@ -329,11 +333,12 @@ fn meta_world_ser_deser_flecs_entity() {
         .entity_named("ent2")
         .set(RustEntity { entity: e1.id() });
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 
     let json = world.to_json_world(None);
 
@@ -346,11 +351,12 @@ fn meta_world_ser_deser_flecs_entity() {
     assert!(e1.is_alive());
     assert!(e2.is_alive());
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 }
 
 #[test]
@@ -369,11 +375,12 @@ fn meta_new_world_ser_deser_flecs_entity() {
         .entity_named("ent2")
         .set(RustEntity { entity: e1.id() });
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 
     let json = world.to_json_world(None);
 
@@ -392,11 +399,12 @@ fn meta_new_world_ser_deser_flecs_entity() {
     assert!(e1.is_alive());
     assert!(e2.is_alive());
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 }
 
 #[test]
@@ -413,11 +421,12 @@ fn meta_new_world_ser_deser_empty_flecs_entity() {
     let e1 = Entity::null();
     let e2 = world.entity_named("ent2").set(RustEntity { entity: e1 });
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"#0\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"#0\"}");
+    };
 
     let json = world.to_json_world(None);
 
@@ -433,11 +442,12 @@ fn meta_new_world_ser_deser_empty_flecs_entity() {
 
     assert!(e2.is_alive());
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"#0\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"#0\"}");
+    };
 }
 
 #[repr(C)]
@@ -559,12 +569,13 @@ fn meta_struct_field_order() {
 
     let e = world.entity().set(Test { a: 10, b: 20 });
 
-    e.get::<&Test>(|ptr| {
+    {
+        let ptr = e.get_ref::<&Test>().unwrap();
         assert_eq!(ptr.a, 10);
         assert_eq!(ptr.b, 20);
-        let json = world.to_expr(ptr);
+        let json = world.to_expr(&*ptr);
         assert_eq!(json, "{a: 10, b: 20}"); //if this fails, field re-ordering is not working
-    });
+    };
 }
 
 #[test]

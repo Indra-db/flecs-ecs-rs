@@ -1,3 +1,4 @@
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::prelude::meta::*;
 use flecs_ecs::prelude::*;
 
@@ -32,10 +33,11 @@ fn test_pos() {
     let e = world.entity().set(Position { x: 2.0, y: 4.0 });
 
     // Convert position component to flecs expression string
-    e.get::<&Position>(|p| {
-        let expr: String = world.to_expr(p);
+    {
+        let p = e.get_ref::<&Position>().unwrap();
+        let expr: String = world.to_expr(&*p);
         assert_eq!(expr, "{x: 2, y: 4}");
-    });
+    };
 }
 
 #[test]
@@ -46,10 +48,11 @@ fn test_pos_skip_y() {
     let e = world.entity().set(PositionSkipY { x: 2.0, y: 4.0 });
 
     // Convert position component to flecs expression string
-    e.get::<&PositionSkipY>(|p| {
-        let expr: String = world.to_expr(p);
+    {
+        let p = e.get_ref::<&PositionSkipY>().unwrap();
+        let expr: String = world.to_expr(&*p);
         assert_eq!(expr, "{x: 2}");
-    });
+    };
 }
 
 #[test]
@@ -60,10 +63,11 @@ fn test_pos_skip_x() {
     let e = world.entity().set(PositionSkipX { x: 2.0, y: 4.0 });
 
     // Convert position component to flecs expression string
-    e.get::<&PositionSkipX>(|p| {
-        let expr: String = world.to_expr(p);
+    {
+        let p = e.get_ref::<&PositionSkipX>().unwrap();
+        let expr: String = world.to_expr(&*p);
         assert_eq!(expr, "{y: 4}");
-    });
+    };
 }
 
 #[derive(Debug, Component)]
@@ -97,6 +101,10 @@ fn test_enum() {
         .add_enum(Color::Green)
         .set(TypeWithEnum { color: Color::Blue });
 
+    // SW-15/SW-17: kept on the CPS `get`. `add_enum` stores the enum as a
+    // relationship target, which the experimental read surface cannot yet serve
+    // (`get_ref`'s pin revalidation rejects the target pointer, `get_exclusive`
+    // forbids a mutable enum get, and `cloned_owned` cannot resolve the pair).
     // Convert TypeWithEnum component to flecs expression string
     e.get::<(&Color, &TypeWithEnum)>(|(color, type_enum)| {
         let expr: String = world.to_expr(color);
@@ -128,10 +136,11 @@ fn test_type_w_string() {
     });
 
     // Convert TypeWithEnum component to flecs expression string
-    e.get::<&TypeWithString>(|str| {
-        let json: String = world.to_json::<TypeWithString>(str);
+    {
+        let str = e.get_ref::<&TypeWithString>().unwrap();
+        let json: String = world.to_json::<TypeWithString>(&str);
         assert_eq!(json, "{\"name\":\"hello\"}");
-    });
+    };
 }
 
 #[derive(Debug, Component)]
@@ -156,8 +165,9 @@ fn test_type_w_vec_string() {
     });
 
     // Convert TypeWithVecString component to flecs json string
-    e.get::<&TypeWithVecString>(|str| {
-        let json: String = world.to_json::<TypeWithVecString>(str);
+    {
+        let str = e.get_ref::<&TypeWithVecString>().unwrap();
+        let json: String = world.to_json::<TypeWithVecString>(&str);
         assert_eq!(json, "{\"names\":[\"hello\", \"world\"]}");
-    });
+    };
 }

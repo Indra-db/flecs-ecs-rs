@@ -6,10 +6,27 @@
 use core::ffi::c_void;
 
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldSingletonExt};
 use flecs_ecs::macros::*;
 use timer::TimerAPI;
 
 use crate::common_test::*;
+use flecs_ecs::addons::system::{RunArgs, System};
+
+/// Run a built system on the exclusive register (spec §5.7). Today a `System`
+/// handle still carries the `&World` borrow it was built from, so a detached
+/// handle is reconstructed here to satisfy `run_with`'s `&mut World` argument;
+/// the ergonomic same-world call lands when the handle is decoupled in a later
+/// sub-wave.
+fn run_system(world: &mut World, system: Entity) {
+    let ptr = (&*world).world_ptr_mut();
+    // SAFETY: `ptr` is this world's live pointer; the detached handle only names
+    // the system id to `run_with`, whose own `&mut World` argument is the world
+    // it runs on.
+    let wref = unsafe { WorldRef::from_ptr(ptr) };
+    System::new_from_existing(EntityView::new_from(wref, system))
+        .run_with(world, RunArgs::default());
+}
 
 #[derive(Component)]
 struct LastVal(i32);
@@ -39,12 +56,16 @@ fn iter() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<(&Position, &Velocity)>(|(p, v)| {
+    {
+        let (p, v) = world
+            .entity_from_id(entity)
+            .get_ref::<(&Position, &Velocity)>()
+            .unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -70,12 +91,16 @@ fn iter_macro() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<(&Position, &Velocity)>(|(p, v)| {
+    {
+        let (p, v) = world
+            .entity_from_id(entity)
+            .get_ref::<(&Position, &Velocity)>()
+            .unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -101,12 +126,16 @@ fn iter_const() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<(&Position, &Velocity)>(|(p, v)| {
+    {
+        let (p, v) = world
+            .entity_from_id(entity)
+            .get_ref::<(&Position, &Velocity)>()
+            .unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -159,15 +188,17 @@ fn iter_shared() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(e2).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
-    });
+    };
 }
 
 #[test]
@@ -217,25 +248,29 @@ fn iter_optional() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(e2).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
-    });
+    };
 
-    world.entity_from_id(e3).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
-    });
+    };
 
-    world.entity_from_id(e4).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
-    });
+    };
 }
 
 #[test]
@@ -257,10 +292,11 @@ fn each() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -282,10 +318,11 @@ fn each_const() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -315,15 +352,17 @@ fn each_shared() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(e2).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
-    });
+    };
 }
 
 #[test]
@@ -365,29 +404,34 @@ fn each_optional() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(e2).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
-    });
+    };
 
-    world.entity_from_id(e3).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
-    });
+    };
 
-    world.entity_from_id(e4).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
-    });
+    };
 }
 
 #[test]
@@ -418,15 +462,17 @@ fn signature() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(entity).get::<&Velocity>(|v| {
+    {
+        let v = world.entity_from_id(entity).get_ref::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -457,15 +503,17 @@ fn signature_const() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(entity).get::<&Velocity>(|v| {
+    {
+        let v = world.entity_from_id(entity).get_ref::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -518,15 +566,17 @@ fn signature_shared() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(e2).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
-    });
+    };
 }
 
 #[test]
@@ -578,25 +628,29 @@ fn signature_optional() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(e2).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
-    });
+    };
 
-    world.entity_from_id(e3).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
-    });
+    };
 
-    world.entity_from_id(e4).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
-    });
+    };
 }
 
 #[test]
@@ -645,17 +699,22 @@ fn empty_signature() {
     world.system::<()>().run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         }
     });
 
     world.progress();
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 1);
-    });
+    };
 }
 
 #[test]
@@ -667,9 +726,13 @@ fn iter_tag() {
     world.system::<()>().with(&TagA::id()).run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         }
     });
 
@@ -677,9 +740,10 @@ fn iter_tag() {
 
     world.progress();
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 1);
-    });
+    };
 }
 
 #[test]
@@ -692,9 +756,13 @@ fn each_tag() {
         while it.next() {
             for _ in it.iter() {
                 let world = it.world();
-                world.get::<&mut Count>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Count::entity_id(world))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
                     c.0 += 1;
-                });
+                };
             }
         }
     });
@@ -703,9 +771,10 @@ fn each_tag() {
 
     world.progress();
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 1);
-    });
+    };
 }
 
 #[test]
@@ -725,7 +794,7 @@ fn set_interval() {
 
 #[test]
 fn order_by_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.entity().set(Position { x: 3, y: 0 });
     world.entity().set(Position { x: 1, y: 0 });
@@ -743,25 +812,36 @@ fn order_by_type() {
         })
         .each_entity(|e, p| {
             let world = e.world();
-            world.get::<&mut LastVal>(|last_val| {
+            {
+                let mut last_val = world
+                    .entity_from_id(LastVal::entity_id(world))
+                    .get_ref::<&mut LastVal>()
+                    .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
-            });
-            world.get::<&mut Count>(|c| {
+            };
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| {
+    run_system(&mut world, system);
+
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 5);
-    });
+    };
 }
 
 #[test]
 fn order_by_id() {
-    let world = World::new();
+    let mut world = World::new();
 
     let pos = world.component::<Position>();
 
@@ -786,25 +866,36 @@ fn order_by_id() {
         )
         .each_entity(|e, p| {
             let world = e.world();
-            world.get::<&mut LastVal>(|last_val| {
+            {
+                let mut last_val = world
+                    .entity_from_id(LastVal::entity_id(world))
+                    .get_ref::<&mut LastVal>()
+                    .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
-            });
-            world.get::<&mut Count>(|c| {
+            };
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| {
+    run_system(&mut world, system);
+
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 5);
-    });
+    };
 }
 
 #[test]
 fn order_by_type_after_create() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.entity().set(Position { x: 3, y: 0 });
     world.entity().set(Position { x: 1, y: 0 });
@@ -822,26 +913,37 @@ fn order_by_type_after_create() {
         })
         .each_entity(|e, p| {
             let world = e.world();
-            world.get::<&mut LastVal>(|last_val| {
+            {
+                let mut last_val = world
+                    .entity_from_id(LastVal::entity_id(world))
+                    .get_ref::<&mut LastVal>()
+                    .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
-            });
-            world.get::<&mut Count>(|c| {
+            };
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| {
+    run_system(&mut world, system);
+
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 5);
-    });
+    };
 }
 
 // SAFETY_MARKER_ORDER_BY_ID_AFTER_CREATE
 #[test]
 fn order_by_id_after_create() {
-    let world = World::new();
+    let mut world = World::new();
 
     let pos = world.component::<Position>();
 
@@ -866,20 +968,31 @@ fn order_by_id_after_create() {
         )
         .each_entity(|e, p| {
             let world = e.world();
-            world.get::<&mut LastVal>(|last_val| {
+            {
+                let mut last_val = world
+                    .entity_from_id(LastVal::entity_id(world))
+                    .get_ref::<&mut LastVal>()
+                    .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
-            });
-            world.get::<&mut Count>(|c| {
+            };
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| {
+    run_system(&mut world, system);
+
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 5);
-    });
+    };
 }
 
 #[test]
@@ -904,16 +1017,21 @@ fn get_query() {
             let pos = it.field::<Position>(0);
             for i in it.iter() {
                 assert_eq!(<FieldIndex as Into<usize>>::into(i) as i32, pos[i].x);
-                world.get::<&mut Count>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Count::entity_id(world))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
                     c.0 += 1;
-                });
+                };
             }
         }
     });
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 3);
-    });
+    };
 }
 
 #[test]
@@ -924,11 +1042,13 @@ fn add_from_each() {
     let e2 = world.entity().set(Position { x: 1, y: 0 }).id();
     let e3 = world.entity().set(Position { x: 2, y: 0 }).id();
 
-    world.system::<&Position>().each_entity(|e, _p| {
-        e.add(Velocity::id());
-        // Add is deferred
-        assert!(!e.has(Velocity::id()));
-    });
+    world
+        .system::<&Position>()
+        .each_entity_with(|e, _p, stage| {
+            stage.entity_view(e.id()).add(Velocity::id());
+            // Add is deferred
+            assert!(!e.has(Velocity::id()));
+        });
 
     world.progress();
 
@@ -945,11 +1065,13 @@ fn delete_from_each() {
     let e2 = world.entity().set(Position { x: 1, y: 0 }).id();
     let e3 = world.entity().set(Position { x: 2, y: 0 }).id();
 
-    world.system::<&Position>().each_entity(|e, _p| {
-        e.destruct();
-        // Delete is deferred
-        assert!(e.is_alive());
-    });
+    world
+        .system::<&Position>()
+        .each_entity_with(|e, _p, stage| {
+            stage.entity_view(e.id()).destruct();
+            // Delete is deferred
+            assert!(e.is_alive());
+        });
 
     world.progress();
 
@@ -981,28 +1103,31 @@ fn add_from_each_world_handle() {
         })
         .id();
 
-    world.system::<&EntityRef>().each_entity(|e, c| {
-        let world = e.world();
-        let e = world.entity_from_id(c.value);
-        e.mut_stage_of(e).add(Position::id());
-    });
+    world
+        .system::<&EntityRef>()
+        .each_entity_with(|_e, c, stage| {
+            stage.entity_view(c.value).add(Position::id());
+        });
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
-    });
+    };
 
-    world.entity_from_id(e2).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
-    });
+    };
 
-    world.entity_from_id(e3).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
-    });
+    };
 }
 
 #[test]
@@ -1013,11 +1138,13 @@ fn new_from_each() {
     let e2 = world.entity().set(Position { x: 0, y: 0 }).id();
     let e3 = world.entity().set(Position { x: 0, y: 0 }).id();
 
-    world.system::<&Position>().each_entity(|e, _p| {
-        e.set(EntityRef {
-            value: e.world().entity().add(Velocity::id()).id(),
+    world
+        .system::<&Position>()
+        .each_entity_with(|e, _p, stage| {
+            stage.entity_view(e.id()).set(EntityRef {
+                value: stage.entity().add(Velocity::id()).id(),
+            });
         });
-    });
 
     world.progress();
 
@@ -1025,17 +1152,20 @@ fn new_from_each() {
     assert!(world.entity_from_id(e2).has(EntityRef::id()));
     assert!(world.entity_from_id(e3).has(EntityRef::id()));
 
-    world.entity_from_id(e1).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
-    });
+    };
 
-    world.entity_from_id(e2).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
-    });
+    };
 
-    world.entity_from_id(e3).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
-    });
+    };
 }
 
 #[test]
@@ -1125,20 +1255,23 @@ fn add_from_iter_world_handle() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
-    });
+    };
 
-    world.entity_from_id(e2).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
-    });
+    };
 
-    world.entity_from_id(e3).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
-    });
+    };
 }
 
 #[test]
@@ -1165,17 +1298,20 @@ fn new_from_iter() {
     assert!(world.entity_from_id(e2).has(EntityRef::id()));
     assert!(world.entity_from_id(e3).has(EntityRef::id()));
 
-    world.entity_from_id(e1).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
-    });
+    };
 
-    world.entity_from_id(e2).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
-    });
+    };
 
-    world.entity_from_id(e3).get::<&EntityRef>(|c| {
+    {
+        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
-    });
+    };
 }
 
 #[test]
@@ -1207,9 +1343,13 @@ fn each_w_mut_children_it() {
             for i in it.iter() {
                 it.get_entity(i).unwrap().each_child(|child| {
                     child.add(Velocity::id());
-                    world.get::<&mut Count>(|c| {
+                    {
+                        let mut c = world
+                            .entity_from_id(Count::entity_id(world))
+                            .get_ref::<&mut Count>()
+                            .unwrap();
                         c.0 += 1;
-                    });
+                    };
                 });
             }
         }
@@ -1217,9 +1357,10 @@ fn each_w_mut_children_it() {
 
     world.progress();
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 3);
-    });
+    };
 
     assert!(world.entity_from_id(e1).has(Velocity::id()));
     assert!(world.entity_from_id(e2).has(Velocity::id()));
@@ -1245,14 +1386,19 @@ fn readonly_children_iter() {
             for i in it.iter() {
                 world.entity_from_id(c[i].value).each_child(|child| {
                     // Dummy code to ensure we can access the entity
-                    child.get::<&Position>(|p| {
+                    {
+                        let p = child.get_ref::<&Position>().unwrap();
                         assert_eq!(p.x, 1);
                         assert_eq!(p.y, 0);
-                    });
+                    };
 
-                    world.get::<&mut Count>(|c| {
+                    {
+                        let mut c = world
+                            .entity_from_id(Count::entity_id(world))
+                            .get_ref::<&mut Count>()
+                            .unwrap();
                         c.0 += 1;
-                    });
+                    };
                 });
             }
         }
@@ -1260,9 +1406,10 @@ fn readonly_children_iter() {
 
     world.progress();
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 3);
-    });
+    };
 }
 
 #[test]
@@ -1292,9 +1439,13 @@ fn rate_filter() {
     let root = world.system_named::<()>("root").run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Counter>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Counter::entity_id(world))
+                    .get_ref::<&mut Counter>()
+                    .unwrap();
                 c.root += 1;
-            });
+            };
         }
     });
 
@@ -1304,9 +1455,13 @@ fn rate_filter() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Counter>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Counter::entity_id(world))
+                        .get_ref::<&mut Counter>()
+                        .unwrap();
                     c.l1_a += 1;
-                });
+                };
             }
         });
 
@@ -1316,9 +1471,13 @@ fn rate_filter() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Counter>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Counter::entity_id(world))
+                        .get_ref::<&mut Counter>()
+                        .unwrap();
                     c.l1_b += 1;
-                });
+                };
             }
         });
 
@@ -1328,9 +1487,13 @@ fn rate_filter() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Counter>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Counter::entity_id(world))
+                        .get_ref::<&mut Counter>()
+                        .unwrap();
                     c.l1_c += 1;
-                });
+                };
             }
         });
 
@@ -1340,9 +1503,13 @@ fn rate_filter() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Counter>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Counter::entity_id(world))
+                        .get_ref::<&mut Counter>()
+                        .unwrap();
                     c.l2_a += 1;
-                });
+                };
             }
         });
 
@@ -1352,23 +1519,28 @@ fn rate_filter() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Counter>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Counter::entity_id(world))
+                        .get_ref::<&mut Counter>()
+                        .unwrap();
                     c.l2_b += 1;
-                });
+                };
             }
         });
 
     for _i in 0..30 {
         world.progress();
         frame_count += 1;
-        world.get::<&Counter>(|c| {
+        {
+            let c = WorldSingletonExt::singleton::<Counter>(&world).unwrap();
             assert_eq!(c.root, frame_count / root_mult);
             assert_eq!(c.l1_a, frame_count / l1_a_mult);
             assert_eq!(c.l1_b, frame_count / l1_b_mult);
             assert_eq!(c.l1_c, frame_count / l1_c_mult);
             assert_eq!(c.l2_a, frame_count / l2_a_mult);
             assert_eq!(c.l2_b, frame_count / l2_b_mult);
-        });
+        };
     }
 }
 
@@ -1383,9 +1555,13 @@ fn self_rate_filter() {
         .set_rate(2)
         .each_entity(|e, _p| {
             let world = e.world();
-            world.get::<&mut Count>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
     world.entity().set(Position { x: 1, y: 2 });
@@ -1394,9 +1570,10 @@ fn self_rate_filter() {
         world.progress();
     }
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 5);
-    });
+    };
 }
 
 #[test]
@@ -1420,9 +1597,13 @@ fn update_rate_filter() {
     let root = world.system_named::<()>("root").run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Counter>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Counter::entity_id(world))
+                    .get_ref::<&mut Counter>()
+                    .unwrap();
                 c.root += 1;
-            });
+            };
         }
     });
 
@@ -1432,9 +1613,13 @@ fn update_rate_filter() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Counter>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Counter::entity_id(world))
+                        .get_ref::<&mut Counter>()
+                        .unwrap();
                     c.l1 += 1;
-                });
+                };
             }
         });
 
@@ -1444,9 +1629,13 @@ fn update_rate_filter() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Counter>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Counter::entity_id(world))
+                        .get_ref::<&mut Counter>()
+                        .unwrap();
                     c.l2 += 1;
-                });
+                };
             }
         });
 
@@ -1455,11 +1644,12 @@ fn update_rate_filter() {
     for _i in 0..12 {
         world.progress();
         frame_count += 1;
-        world.get::<&Counter>(|c| {
+        {
+            let c = WorldSingletonExt::singleton::<Counter>(&world).unwrap();
             assert_eq!(c.root, frame_count / root_mult);
             assert_eq!(c.l1, frame_count / l1_mult);
             assert_eq!(c.l2, frame_count / l2_mult);
-        });
+        };
     }
 
     let _l1 = System::new_from_existing(world.entity_from_id(l1)).set_rate(4); // Run twice as slow
@@ -1472,57 +1662,66 @@ fn update_rate_filter() {
     for _i in 0..32 {
         world.progress();
         frame_count += 1;
-        world.get::<&Counter>(|c| {
+        {
+            let c = WorldSingletonExt::singleton::<Counter>(&world).unwrap();
             assert_eq!(c.root, frame_count / root_mult);
             assert_eq!(c.l1, frame_count / l1_mult);
             assert_eq!(c.l2, frame_count / l2_mult);
-        });
+        };
     }
 }
 
 #[test]
 fn test_auto_defer_each() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().add(Tag).set(Value { value: 10 });
-    let e2 = world.entity().add(Tag).set(Value { value: 20 });
-    let e3 = world.entity().add(Tag).set(Value { value: 30 });
+    let e1 = world.entity().add(Tag).set(Value { value: 10 }).id();
+    let e2 = world.entity().add(Tag).set(Value { value: 20 }).id();
+    let e3 = world.entity().add(Tag).set(Value { value: 30 }).id();
 
-    let s = world.system::<&mut Value>().with(Tag).each_entity(|e, v| {
-        v.value += 1;
-        e.remove(Tag);
-    });
+    let s = world
+        .system::<&mut Value>()
+        .with(Tag)
+        .each_entity_with(|e, v, stage| {
+            v.value += 1;
+            stage.entity_view(e.id()).remove(Tag);
+        });
 
-    s.run();
+    let system = s.id();
 
-    assert!(!e1.has(Tag));
-    assert!(!e2.has(Tag));
-    assert!(!e3.has(Tag));
+    run_system(&mut world, system);
 
-    assert!(e1.has(Value::id()));
-    assert!(e2.has(Value::id()));
-    assert!(e3.has(Value::id()));
+    assert!(!world.entity_from_id(e1).has(Tag));
+    assert!(!world.entity_from_id(e2).has(Tag));
+    assert!(!world.entity_from_id(e3).has(Tag));
 
-    e1.get::<&Value>(|v| {
+    assert!(world.entity_from_id(e1).has(Value::id()));
+    assert!(world.entity_from_id(e2).has(Value::id()));
+    assert!(world.entity_from_id(e3).has(Value::id()));
+
+    {
+        let v = world.entity_from_id(e1).get_ref::<&Value>().unwrap();
         assert_eq!(v.value, 11);
-    });
+    };
 
-    e2.get::<&Value>(|v| {
+    {
+        let v = world.entity_from_id(e2).get_ref::<&Value>().unwrap();
         assert_eq!(v.value, 21);
-    });
+    };
 
-    e3.get::<&Value>(|v| {
+    {
+        let v = world.entity_from_id(e3).get_ref::<&Value>().unwrap();
         assert_eq!(v.value, 31);
-    });
+    };
 }
 
 #[test]
 fn test_auto_defer_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().add(Tag).set(Value { value: 10 });
-    let e2 = world.entity().add(Tag).set(Value { value: 20 });
-    let e3 = world.entity().add(Tag).set(Value { value: 30 });
+    let e1 = world.entity().add(Tag).set(Value { value: 10 }).id();
+    let e2 = world.entity().add(Tag).set(Value { value: 20 }).id();
+    let e3 = world.entity().add(Tag).set(Value { value: 30 }).id();
 
     let s = world.system::<&mut Value>().with(Tag).run(|mut it| {
         while it.next() {
@@ -1534,27 +1733,32 @@ fn test_auto_defer_iter() {
         }
     });
 
-    s.run();
+    let system = s.id();
 
-    assert!(!e1.has(Tag));
-    assert!(!e2.has(Tag));
-    assert!(!e3.has(Tag));
+    run_system(&mut world, system);
 
-    assert!(e1.has(Value::id()));
-    assert!(e2.has(Value::id()));
-    assert!(e3.has(Value::id()));
+    assert!(!world.entity_from_id(e1).has(Tag));
+    assert!(!world.entity_from_id(e2).has(Tag));
+    assert!(!world.entity_from_id(e3).has(Tag));
 
-    e1.get::<&Value>(|v| {
+    assert!(world.entity_from_id(e1).has(Value::id()));
+    assert!(world.entity_from_id(e2).has(Value::id()));
+    assert!(world.entity_from_id(e3).has(Value::id()));
+
+    {
+        let v = world.entity_from_id(e1).get_ref::<&Value>().unwrap();
         assert_eq!(v.value, 11);
-    });
+    };
 
-    e2.get::<&Value>(|v| {
+    {
+        let v = world.entity_from_id(e2).get_ref::<&Value>().unwrap();
         assert_eq!(v.value, 21);
-    });
+    };
 
-    e3.get::<&Value>(|v| {
+    {
+        let v = world.entity_from_id(e3).get_ref::<&Value>().unwrap();
         assert_eq!(v.value, 31);
-    });
+    };
 }
 
 #[test]
@@ -1586,16 +1790,38 @@ fn custom_pipeline() {
         .kind(post_frame)
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&Count>(|c| assert_eq!(c.0, 2));
-                it.world().get::<&mut Count>(|c| c.0 += 1);
+                {
+                    let w = it.world();
+                    let c = WorldSingletonExt::singleton::<Count>(&*w).unwrap();
+                    assert_eq!(c.0, 2);
+                };
+                {
+                    let w = it.world();
+                    let mut c = w
+                        .entity_from_id(Count::entity_id(w))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
+                    c.0 += 1;
+                };
             }
         });
     world.entity_from_id(post_sys.id()).add(tag);
 
     let on_sys = world.system_named::<()>("on").kind(on_frame).run(|mut it| {
         while it.next() {
-            it.world().get::<&Count>(|c| assert_eq!(c.0, 1));
-            it.world().get::<&mut Count>(|c| c.0 += 1);
+            {
+                let w = it.world();
+                let c = WorldSingletonExt::singleton::<Count>(&*w).unwrap();
+                assert_eq!(c.0, 1);
+            };
+            {
+                let w = it.world();
+                let mut c = w
+                    .entity_from_id(Count::entity_id(w))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
+                c.0 += 1;
+            };
         }
     });
     world.entity_from_id(on_sys.id()).add(tag);
@@ -1605,18 +1831,35 @@ fn custom_pipeline() {
         .kind(pre_frame)
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&Count>(|c| assert_eq!(c.0, 0));
-                it.world().get::<&mut Count>(|c| c.0 += 1);
+                {
+                    let w = it.world();
+                    let c = WorldSingletonExt::singleton::<Count>(&*w).unwrap();
+                    assert_eq!(c.0, 0);
+                };
+                {
+                    let w = it.world();
+                    let mut c = w
+                        .entity_from_id(Count::entity_id(w))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
+                    c.0 += 1;
+                };
             }
         });
     world.entity_from_id(pre_sys.id()).add(tag);
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 0));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 0);
+    };
 
     world.set_pipeline(pip.id());
     world.progress();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 3));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 3);
+    };
 }
 
 #[test]
@@ -1636,68 +1879,82 @@ fn custom_pipeline_w_kind() {
     world.system::<()>().kind(tag).run(|mut it| {
         while it.next() {
             let world = it.world();
-            world.get::<&mut Count>(|c| {
-                assert_eq!(c, 0);
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
+                assert_eq!(c.0, 0);
                 c.0 += 1;
-            });
+            };
         }
     });
 
     world.system::<()>().kind(tag).run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 assert_eq!(c.0, 1);
                 c.0 += 1;
-            });
+            };
         }
     });
 
     world.system::<()>().kind(tag).run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 assert_eq!(c.0, 2);
                 c.0 += 1;
-            });
+            };
         }
     });
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 0);
-    });
+    };
 
     world.set_pipeline(pip.id());
 
     world.progress();
 
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 3);
-    });
+    };
 }
 
 #[test]
 fn instanced_query_w_singleton_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Velocity>()
         .add_trait::<flecs::Singleton>();
     world.set(Velocity { x: 1, y: 2 });
 
-    let e1 = world.entity().set(Position { x: 10, y: 20 });
-    e1.set(SelfRef { value: e1.id() });
-    let e2 = world.entity().set(Position { x: 20, y: 30 });
-    e2.set(SelfRef { value: e2.id() });
-    let e3 = world.entity().set(Position { x: 30, y: 40 });
-    e3.set(SelfRef { value: e3.id() });
-    let e4 = world.entity().set(Position { x: 40, y: 50 });
-    e4.set(SelfRef { value: e4.id() });
-    let e5 = world.entity().set(Position { x: 50, y: 60 });
-    e5.set(SelfRef { value: e5.id() });
+    let e1 = world.entity().set(Position { x: 10, y: 20 }).id();
+    world.entity_from_id(e1).set(SelfRef { value: e1 });
+    let e2 = world.entity().set(Position { x: 20, y: 30 }).id();
+    world.entity_from_id(e2).set(SelfRef { value: e2 });
+    let e3 = world.entity().set(Position { x: 30, y: 40 }).id();
+    world.entity_from_id(e3).set(SelfRef { value: e3 });
+    let e4 = world.entity().set(Position { x: 40, y: 50 }).id();
+    world.entity_from_id(e4).set(SelfRef { value: e4 });
+    let e5 = world.entity().set(Position { x: 50, y: 60 }).id();
+    world.entity_from_id(e5).set(SelfRef { value: e5 });
 
-    e4.add(TagA::id());
-    e5.add(TagA::id());
+    world.entity_from_id(e4).add(TagA::id());
+    world.entity_from_id(e5).add(TagA::id());
 
     world.set(Count(0));
 
@@ -1707,71 +1964,102 @@ fn instanced_query_w_singleton_each() {
             assert_eq!(e.id(), s.value);
             p.x += v.x;
             p.y += v.y;
-            e.world().get::<&mut Count>(|c| {
+            {
+                let w = e.world();
+                let mut c = w
+                    .entity_from_id(Count::entity_id(w))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 5));
+    run_system(&mut world, system);
 
-    e1.get::<&Position>(|p| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 5);
+    };
+
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
+    };
 }
 
 #[test]
 fn instanced_query_w_base_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     let base = world.entity().set(Velocity { x: 1, y: 2 });
 
-    let e1 = world.entity().is_a(base).set(Position { x: 10, y: 20 });
-    e1.set(SelfRef { value: e1.id() });
-    let e2 = world.entity().is_a(base).set(Position { x: 20, y: 30 });
-    e2.set(SelfRef { value: e2.id() });
-    let e3 = world.entity().is_a(base).set(Position { x: 30, y: 40 });
-    e3.set(SelfRef { value: e3.id() });
+    let e1 = world
+        .entity()
+        .is_a(base)
+        .set(Position { x: 10, y: 20 })
+        .id();
+    world.entity_from_id(e1).set(SelfRef { value: e1 });
+    let e2 = world
+        .entity()
+        .is_a(base)
+        .set(Position { x: 20, y: 30 })
+        .id();
+    world.entity_from_id(e2).set(SelfRef { value: e2 });
+    let e3 = world
+        .entity()
+        .is_a(base)
+        .set(Position { x: 30, y: 40 })
+        .id();
+    world.entity_from_id(e3).set(SelfRef { value: e3 });
     let e4 = world
         .entity()
         .is_a(base)
         .set(Position { x: 40, y: 50 })
-        .add(TagA::id());
-    e4.set(SelfRef { value: e4.id() });
+        .add(TagA::id())
+        .id();
+    world.entity_from_id(e4).set(SelfRef { value: e4 });
     let e5 = world
         .entity()
         .is_a(base)
         .set(Position { x: 50, y: 60 })
-        .add(TagA::id());
-    e5.set(SelfRef { value: e5.id() });
+        .add(TagA::id())
+        .id();
+    world.entity_from_id(e5).set(SelfRef { value: e5 });
     let e6 = world
         .entity()
         .set(Position { x: 60, y: 70 })
-        .set(Velocity { x: 2, y: 3 });
-    e6.set(SelfRef { value: e6.id() });
+        .set(Velocity { x: 2, y: 3 })
+        .id();
+    world.entity_from_id(e6).set(SelfRef { value: e6 });
     let e7 = world
         .entity()
         .set(Position { x: 70, y: 80 })
-        .set(Velocity { x: 4, y: 5 });
-    e7.set(SelfRef { value: e7.id() });
+        .set(Velocity { x: 4, y: 5 })
+        .id();
+    world.entity_from_id(e7).set(SelfRef { value: e7 });
 
     world.set(Count(0));
 
@@ -1781,67 +2069,84 @@ fn instanced_query_w_base_each() {
             assert_eq!(e.id(), s.value);
             p.x += v.x;
             p.y += v.y;
-            e.world().get::<&mut Count>(|c| {
+            {
+                let w = e.world();
+                let mut c = w
+                    .entity_from_id(Count::entity_id(w))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 7));
+    run_system(&mut world, system);
 
-    e1.get::<&Position>(|p| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 7);
+    };
+
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
-    e6.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e6).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
-    });
-    e7.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e7).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
-    });
+    };
 }
 
 #[test]
 fn instanced_query_w_singleton_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Velocity>()
         .add_trait::<flecs::Singleton>();
     world.set(Velocity { x: 1, y: 2 });
 
-    let e1 = world.entity().set(Position { x: 10, y: 20 });
-    e1.set(SelfRef { value: e1.id() });
-    let e2 = world.entity().set(Position { x: 20, y: 30 });
-    e2.set(SelfRef { value: e2.id() });
-    let e3 = world.entity().set(Position { x: 30, y: 40 });
-    e3.set(SelfRef { value: e3.id() });
-    let e4 = world.entity().set(Position { x: 40, y: 50 });
-    e4.set(SelfRef { value: e4.id() });
-    let e5 = world.entity().set(Position { x: 50, y: 60 });
-    e5.set(SelfRef { value: e5.id() });
+    let e1 = world.entity().set(Position { x: 10, y: 20 }).id();
+    world.entity_from_id(e1).set(SelfRef { value: e1 });
+    let e2 = world.entity().set(Position { x: 20, y: 30 }).id();
+    world.entity_from_id(e2).set(SelfRef { value: e2 });
+    let e3 = world.entity().set(Position { x: 30, y: 40 }).id();
+    world.entity_from_id(e3).set(SelfRef { value: e3 });
+    let e4 = world.entity().set(Position { x: 40, y: 50 }).id();
+    world.entity_from_id(e4).set(SelfRef { value: e4 });
+    let e5 = world.entity().set(Position { x: 50, y: 60 }).id();
+    world.entity_from_id(e5).set(SelfRef { value: e5 });
 
-    e4.add(TagA::id());
-    e5.add(TagA::id());
+    world.entity_from_id(e4).add(TagA::id());
+    world.entity_from_id(e5).add(TagA::id());
 
     world.set(Count(0));
 
@@ -1857,73 +2162,104 @@ fn instanced_query_w_singleton_iter() {
                     p[i].x += v[0].x;
                     p[i].y += v[0].y;
                     assert_eq!(it.get_entity(i).unwrap().id(), s[i].value);
-                    it.world().get::<&mut Count>(|c| {
+                    {
+                        let w = it.world();
+                        let mut c = w
+                            .entity_from_id(Count::entity_id(w))
+                            .get_ref::<&mut Count>()
+                            .unwrap();
                         c.0 += 1;
-                    });
+                    };
                 }
             }
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 5));
+    run_system(&mut world, system);
 
-    e1.get::<&Position>(|p| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 5);
+    };
+
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
+    };
 }
 
 #[test]
 fn instanced_query_w_base_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
     let base = world.entity().set(Velocity { x: 1, y: 2 });
 
-    let e1 = world.entity().is_a(base).set(Position { x: 10, y: 20 });
-    e1.set(SelfRef { value: e1.id() });
-    let e2 = world.entity().is_a(base).set(Position { x: 20, y: 30 });
-    e2.set(SelfRef { value: e2.id() });
-    let e3 = world.entity().is_a(base).set(Position { x: 30, y: 40 });
-    e3.set(SelfRef { value: e3.id() });
+    let e1 = world
+        .entity()
+        .is_a(base)
+        .set(Position { x: 10, y: 20 })
+        .id();
+    world.entity_from_id(e1).set(SelfRef { value: e1 });
+    let e2 = world
+        .entity()
+        .is_a(base)
+        .set(Position { x: 20, y: 30 })
+        .id();
+    world.entity_from_id(e2).set(SelfRef { value: e2 });
+    let e3 = world
+        .entity()
+        .is_a(base)
+        .set(Position { x: 30, y: 40 })
+        .id();
+    world.entity_from_id(e3).set(SelfRef { value: e3 });
     let e4 = world
         .entity()
         .is_a(base)
         .set(Position { x: 40, y: 50 })
-        .add(TagA::id());
-    e4.set(SelfRef { value: e4.id() });
+        .add(TagA::id())
+        .id();
+    world.entity_from_id(e4).set(SelfRef { value: e4 });
     let e5 = world
         .entity()
         .is_a(base)
         .set(Position { x: 50, y: 60 })
-        .add(TagA::id());
-    e5.set(SelfRef { value: e5.id() });
+        .add(TagA::id())
+        .id();
+    world.entity_from_id(e5).set(SelfRef { value: e5 });
     let e6 = world
         .entity()
         .set(Position { x: 60, y: 70 })
-        .set(Velocity { x: 2, y: 3 });
-    e6.set(SelfRef { value: e6.id() });
+        .set(Velocity { x: 2, y: 3 })
+        .id();
+    world.entity_from_id(e6).set(SelfRef { value: e6 });
     let e7 = world
         .entity()
         .set(Position { x: 70, y: 80 })
-        .set(Velocity { x: 4, y: 5 });
-    e7.set(SelfRef { value: e7.id() });
+        .set(Velocity { x: 4, y: 5 })
+        .id();
+    world.entity_from_id(e7).set(SelfRef { value: e7 });
 
     world.set(Count(0));
 
@@ -1944,50 +2280,67 @@ fn instanced_query_w_base_iter() {
                         p[i].y += v[0].y;
                     }
                     assert_eq!(it.get_entity(i).unwrap().id(), s[i].value);
-                    it.world().get::<&mut Count>(|c| {
+                    {
+                        let w = it.world();
+                        let mut c = w
+                            .entity_from_id(Count::entity_id(w))
+                            .get_ref::<&mut Count>()
+                            .unwrap();
                         c.0 += 1;
-                    });
+                    };
                 }
             }
         });
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 7));
+    run_system(&mut world, system);
 
-    e1.get::<&Position>(|p| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 7);
+    };
+
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
-    e6.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e6).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
-    });
-    e7.get::<&Position>(|p| {
+    };
+    {
+        let p = world.entity_from_id(e7).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
-    });
+    };
 }
 
 #[test]
 fn create_w_no_template_args() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world.entity().set(Position { x: 10, y: 20 });
 
@@ -2000,16 +2353,23 @@ fn create_w_no_template_args() {
         .each_entity(move |e, _| {
             let world = e.world();
             assert!(e == entity_id);
-            world.get::<&mut Count>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         });
 
-    s.run();
+    let system = s.id();
 
-    world.get::<&Count>(|c| {
+    run_system(&mut world, system);
+
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 1);
-    });
+    };
 }
 
 #[derive(Component)]
@@ -2056,11 +2416,15 @@ fn system_w_type_kind_type_pipeline() {
                     let e = it.get_entity(i).unwrap();
                     let world = e.world();
                     assert!(e == entity_id);
-                    world.get::<&mut Count2>(|c| {
+                    {
+                        let mut c = world
+                            .entity_from_id(Count2::entity_id(world))
+                            .get_ref::<&mut Count2>()
+                            .unwrap();
                         assert_eq!(c.a, 0);
                         assert_eq!(c.b, 1);
                         c.a += 1;
-                    });
+                    };
                 }
             }
         });
@@ -2075,73 +2439,93 @@ fn system_w_type_kind_type_pipeline() {
                     let world = it.world();
                     let e = it.get_entity(i).unwrap();
                     assert!(e == entity_id);
-                    world.get::<&mut Count2>(|c| {
+                    {
+                        let mut c = world
+                            .entity_from_id(Count2::entity_id(world))
+                            .get_ref::<&mut Count2>()
+                            .unwrap();
                         assert_eq!(c.b, 0);
                         c.b += 1;
-                    });
+                    };
                 }
             }
         });
 
     world.progress();
 
-    world.get::<&Count2>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(c.a, 1);
         assert_eq!(c.b, 1);
-    });
+    };
 }
 
 #[test]
 fn default_ctor() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count(0));
 
     let sys = world.system::<&Position>().each_entity(|e, p| {
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-        e.world().get::<&mut Count>(|c| {
+        {
+            let w = e.world();
+            let mut c = w
+                .entity_from_id(Count::entity_id(w))
+                .get_ref::<&mut Count>()
+                .unwrap();
             c.0 += 1;
-        });
+        };
     });
 
     world.entity().set(Position { x: 10, y: 20 });
 
     let sys_var = world.system_from(unsafe { sys.entity_view(&world) });
 
-    sys_var.run();
+    let system = sys_var.id();
 
-    world.get::<&Count>(|c| {
+    run_system(&mut world, system);
+
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 1);
-    });
+    };
 }
 
 #[test]
 fn entity_ctor() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count(0));
 
     let sys = world.system::<()>().run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count::entity_id(world))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 c.0 += 1;
-            });
+            };
         }
     });
 
     let sys_from_id = world.system_from(unsafe { sys.entity_view(&world) });
 
-    sys_from_id.run();
-    world.get::<&Count>(|c| {
+    let system = sys_from_id.id();
+
+    run_system(&mut world, system);
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 1);
-    });
+    };
 }
 
 #[test]
 fn ensure_instanced_w_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 10, y: 20 });
     let e1_id = e1.id();
@@ -2151,16 +2535,22 @@ fn ensure_instanced_w_each() {
     let sys = world.system::<&Position>().each_iter(move |it, row, _| {
         let e = it.get_entity(row).unwrap();
         assert!(e == e1_id);
-        it.world().get::<&mut Count>(|count| {
+        {
+            let w = it.world();
+            let mut count = w
+                .entity_from_id(Count::entity_id(w))
+                .get_ref::<&mut Count>()
+                .unwrap();
             count.0 += 1;
-        });
+        };
     });
 
     let _q = sys.query();
 
-    assert_eq!(world.get::<&Count>(|c| c.0), 0);
-    sys.run();
-    assert_eq!(world.get::<&Count>(|c| c.0), 1);
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
+    let system = sys.id();
+    run_system(&mut world, system);
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
 }
 
 #[test]
@@ -2189,10 +2579,11 @@ fn multithread_system_w_query_each() {
 
     world.progress();
 
-    world.entity_from_id(e1).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2224,10 +2615,11 @@ fn multithread_system_w_query_each_w_iter() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2259,10 +2651,11 @@ fn multithread_system_w_query_each_w_world() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2296,10 +2689,11 @@ fn multithread_system_w_query_iter() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2337,10 +2731,11 @@ fn multithread_system_w_query_iter_w_iter() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2378,10 +2773,11 @@ fn multithread_system_w_query_iter_w_world() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2408,14 +2804,22 @@ fn multithread_system_w_get_var() {
             let other = it.get_var_by_name("other");
             assert!(e == bob_id);
             assert!(other == alice_id);
-            it.world().get::<&mut Count>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count::entity_id(w))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
                 count.0 += 1;
-            });
+            };
         });
 
     world.progress();
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
 }
 
 #[test]
@@ -2442,15 +2846,17 @@ fn run_callback() {
 
     world.progress();
 
-    world.entity_from_id(entity).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    world.entity_from_id(entity).get::<&Velocity>(|v| {
+    {
+        let v = world.entity_from_id(entity).get_ref::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -2466,9 +2872,13 @@ fn startup_system() {
             let world = it.world();
             while it.next() {
                 assert!(it.delta_time() == 0.0);
-                world.get::<&mut Count2>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Count2::entity_id(world))
+                        .get_ref::<&mut Count2>()
+                        .unwrap();
                     c.a += 1;
-                });
+                };
             }
         });
 
@@ -2479,22 +2889,28 @@ fn startup_system() {
             let world = it.world();
             while it.next() {
                 assert_ne!(it.delta_time(), 0.0);
-                world.get::<&mut Count2>(|c| {
+                {
+                    let mut c = world
+                        .entity_from_id(Count2::entity_id(world))
+                        .get_ref::<&mut Count2>()
+                        .unwrap();
                     c.b += 1;
-                });
+                };
             }
         });
 
     world.progress();
-    world.get::<&Count2>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(c.a, 1);
         assert_eq!(c.b, 1);
-    });
+    };
     world.progress();
-    world.get::<&Count2>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(c.a, 1);
         assert_eq!(c.b, 2);
-    });
+    };
 }
 
 #[test]
@@ -2503,27 +2919,36 @@ fn interval_tick_source() {
 
     let t = world.timer().set_interval(2.1);
 
-    t.get::<&mut flecs::timer::Timer>(|timer| {
+    {
+        let mut timer = t.get_ref::<&mut flecs::timer::Timer>().unwrap();
         timer.time = 0.0;
-    });
+    };
 
     world.set(Count2 { a: 0, b: 0 });
 
     world.system::<()>().set_tick_source(t).run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count2>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count2::entity_id(world))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 c.a += 1;
-            });
+            };
         }
     });
 
     world.system::<()>().set_tick_source(t).run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count2>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count2::entity_id(world))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 c.b += 1;
-            });
+            };
         }
     });
 
@@ -2554,18 +2979,26 @@ fn rate_tick_source() {
     world.system::<()>().set_tick_source(t).run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count2>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count2::entity_id(world))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 c.a += 1;
-            });
+            };
         }
     });
 
     world.system::<()>().set_tick_source(t).run(|mut it| {
         let world = it.world();
         while it.next() {
-            world.get::<&mut Count2>(|c| {
+            {
+                let mut c = world
+                    .entity_from_id(Count2::entity_id(world))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 c.b += 1;
-            });
+            };
         }
     });
 
@@ -2600,7 +3033,14 @@ fn nested_rate_tick_source() {
         .set_tick_source(t3.id())
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&mut Count>(|c| c.0 += 1);
+                {
+                    let w = it.world();
+                    let mut c = w
+                        .entity_from_id(Count::entity_id(w))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
+                    c.0 += 1;
+                };
             }
         });
 
@@ -2609,7 +3049,14 @@ fn nested_rate_tick_source() {
         .set_tick_source(t6.id())
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&mut Count2>(|c| c.a += 1);
+                {
+                    let w = it.world();
+                    let mut c = w
+                        .entity_from_id(Count2::entity_id(w))
+                        .get_ref::<&mut Count2>()
+                        .unwrap();
+                    c.a += 1;
+                };
             }
         });
 
@@ -2617,30 +3064,54 @@ fn nested_rate_tick_source() {
     for _ in 0..2 {
         world.progress();
     }
-    world.get::<&Count>(|c| assert_eq!(c.0, 0));
-    world.get::<&Count2>(|c| assert_eq!(c.a, 0));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 0);
+    };
+    {
+        let c = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
+        assert_eq!(c.a, 0);
+    };
 
     // frame 3: t3 ticks → sys_a fires (count=1), t6 doesn't (needs 2 t3 ticks)
     world.progress();
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
-    world.get::<&Count2>(|c| assert_eq!(c.a, 0));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
+    {
+        let c = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
+        assert_eq!(c.a, 0);
+    };
 
     // frames 4–5: neither fires
     for _ in 0..2 {
         world.progress();
     }
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
-    world.get::<&Count2>(|c| assert_eq!(c.a, 0));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
+    {
+        let c = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
+        assert_eq!(c.a, 0);
+    };
 
     // frame 6: t3 ticks again (count=2) AND t6 ticks (sys_b fires, a=1)
     world.progress();
-    world.get::<&Count>(|c| assert_eq!(c.0, 2));
-    world.get::<&Count2>(|c| assert_eq!(c.a, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 2);
+    };
+    {
+        let c = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
+        assert_eq!(c.a, 1);
+    };
 }
 
 #[test]
 fn table_get() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 10, y: 20 });
     let e2 = world.entity().set(Position { x: 20, y: 30 });
@@ -2667,12 +3138,14 @@ fn table_get() {
             }
         });
 
-    sys.run();
+    let system = sys.id();
+
+    run_system(&mut world, system);
 }
 
 #[test]
 fn range_get() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 10, y: 20 });
     let e2 = world.entity().set(Position { x: 20, y: 30 });
@@ -2699,7 +3172,9 @@ fn range_get() {
             }
         });
 
-    sys.run();
+    let system = sys.id();
+
+    run_system(&mut world, system);
 }
 
 #[test]
@@ -2794,20 +3269,34 @@ fn singleton_tick_source() {
         .set_tick_source(TagA::id())
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&mut Count>(|count| {
+                {
+                    let w = it.world();
+                    let mut count = w
+                        .entity_from_id(Count::entity_id(w))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
                     count.0 += 1;
-                });
+                };
             }
         });
 
     world.progress_time(1.0);
-    world.get::<&Count>(|c| assert_eq!(c.0, 0));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 0);
+    };
 
     world.progress_time(1.0);
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
 
     world.progress_time(2.0);
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert_eq!(c.0, 1);
+    };
 }
 
 #[test]
@@ -2823,12 +3312,22 @@ fn pipeline_step_with_kind_enum() {
 
     world.system::<()>().kind(custom_step).run(move |mut it| {
         while it.next() {
-            it.world().get::<&mut Count>(|c| c.0 += 1);
+            {
+                let w = it.world();
+                let mut c = w
+                    .entity_from_id(Count::entity_id(w))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
+                c.0 += 1;
+            };
         }
     });
 
     world.progress();
-    world.get::<&Count>(|c| assert!(c.0 > 0));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert!(c.0 > 0);
+    };
 }
 
 #[test]
@@ -2846,14 +3345,28 @@ fn pipeline_step_depends_on_pipeline_step_with_enum() {
 
     world.system::<()>().kind(custom_step2).run(move |mut it| {
         while it.next() {
-            it.world().get::<&mut Count>(|c| c.0 += 1);
+            {
+                let w = it.world();
+                let mut c = w
+                    .entity_from_id(Count::entity_id(w))
+                    .get_ref::<&mut Count>()
+                    .unwrap();
+                c.0 += 1;
+            };
         }
     });
 
     world.progress();
-    world.get::<&Count>(|c| assert!(c.0 > 0));
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert!(c.0 > 0);
+    };
 }
 
+// SW-15: the four `register_twice_*` tests keep the legacy `System::run` fluent.
+// They re-run the same `System` handle across `.update()` re-registration, so the
+// handle is held live across each run; `run_with`'s `&mut World` cannot coexist
+// with it until the handle is decoupled from the world borrow in a later sub-wave.
 #[test]
 fn register_twice_w_each() {
     let world = World::new();
@@ -2862,29 +3375,41 @@ fn register_twice_w_each() {
 
     let sys = world.system_named::<()>("Test").run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.a += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&mut Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
-    });
+    };
 
     let sys = sys.update::<()>().run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.b += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&mut Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.b, 1);
-    });
+    };
 }
 
 #[test]
@@ -2895,29 +3420,41 @@ fn register_twice_w_run() {
 
     let sys = world.system_named::<()>("Test").run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.a += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
-    });
+    };
 
     let sys = sys.update::<()>().run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.b += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.b, 1);
-    });
+    };
 }
 
 #[test]
@@ -2928,29 +3465,41 @@ fn register_twice_w_run_each() {
 
     let sys = world.system_named::<()>("Test").run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.a += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
-    });
+    };
 
     let sys = sys.update::<()>().run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.b += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.b, 1);
-    });
+    };
 }
 
 #[test]
@@ -2961,29 +3510,41 @@ fn register_twice_w_each_run() {
 
     let sys = world.system_named::<()>("Test").run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.a += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
-    });
+    };
 
     let sys = sys.update::<()>().run(|mut it| {
         while it.next() {
-            it.world().get::<&mut Count2>(|count| {
+            {
+                let w = it.world();
+                let mut count = w
+                    .entity_from_id(Count2::entity_id(w))
+                    .get_ref::<&mut Count2>()
+                    .unwrap();
                 count.b += 1;
-            });
+            };
         }
     });
     sys.run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.b, 1);
-    });
+    };
 }
 
 #[test]
@@ -2996,16 +3557,22 @@ fn lookup_and_update_each() {
         .system_named::<()>("Test")
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&mut Count2>(|count| {
+                {
+                    let w = it.world();
+                    let mut count = w
+                        .entity_from_id(Count2::entity_id(w))
+                        .get_ref::<&mut Count2>()
+                        .unwrap();
                     count.a += 1;
-                });
+                };
             }
         })
         .run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
-    });
+    };
 
     let e = world.lookup("Test");
     assert!(*e.id() != 0);
@@ -3014,17 +3581,23 @@ fn lookup_and_update_each() {
     sys.update::<()>()
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&mut Count2>(|count| {
+                {
+                    let w = it.world();
+                    let mut count = w
+                        .entity_from_id(Count2::entity_id(w))
+                        .get_ref::<&mut Count2>()
+                        .unwrap();
                     count.b += 1;
-                });
+                };
             }
         })
         .run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
         assert_eq!(count.b, 1);
-    });
+    };
 }
 
 #[test]
@@ -3037,16 +3610,22 @@ fn lookup_and_update_run() {
         .system_named::<()>("Test")
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&mut Count2>(|count| {
+                {
+                    let w = it.world();
+                    let mut count = w
+                        .entity_from_id(Count2::entity_id(w))
+                        .get_ref::<&mut Count2>()
+                        .unwrap();
                     count.a += 1;
-                });
+                };
             }
         })
         .run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
-    });
+    };
 
     let e = world.lookup("Test");
     assert!(*e.id() != 0);
@@ -3055,17 +3634,23 @@ fn lookup_and_update_run() {
     sys.update::<()>()
         .run(|mut it| {
             while it.next() {
-                it.world().get::<&mut Count2>(|count| {
+                {
+                    let w = it.world();
+                    let mut count = w
+                        .entity_from_id(Count2::entity_id(w))
+                        .get_ref::<&mut Count2>()
+                        .unwrap();
                     count.b += 1;
-                });
+                };
             }
         })
         .run();
 
-    world.get::<&Count2>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count2>(&world).unwrap();
         assert_eq!(count.a, 1);
         assert_eq!(count.b, 1);
-    });
+    };
 }
 
 #[test]
@@ -3082,6 +3667,10 @@ fn lookup_and_update_ctx() {
     let mut sys = world.system_from(e);
     assert!(sys.context().is_null());
 
+    // SW-15: kept on the raw `set_context`/`context` pointer API. This test pins
+    // the exact round-tripped context pointer identity, which the typed `ctx`
+    // surface (keyed by TypeId, not raw pointer) cannot express; it converts when
+    // set_context is removed.
     let mut my_ctx: i32 = 42;
     sys.set_context(&mut my_ctx as *mut i32 as *mut c_void);
     assert!(sys.context() == &mut my_ctx as *mut i32 as *mut c_void);
@@ -3098,7 +3687,7 @@ fn set_group() {
     #[derive(Component)]
     struct GroupTgtC;
 
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().add((GroupRel::id(), GroupTgtA::id()));
     let e2 = world.entity().add((GroupRel::id(), GroupTgtB::id()));
@@ -3158,11 +3747,16 @@ fn set_group() {
             while it.next() {
                 for i in it.iter() {
                     let e = it.get_entity(i).unwrap();
-                    it.world().get::<&mut Count>(|count| {
+                    {
+                        let w = it.world();
+                        let mut count = w
+                            .entity_from_id(Count::entity_id(w))
+                            .get_ref::<&mut Count>()
+                            .unwrap();
                         if e == e1_id || e == e4_id || e == e2_id || e == e5_id {
                             count.0 += 1;
                         }
-                    });
+                    };
                 }
             }
         });
@@ -3172,9 +3766,14 @@ fn set_group() {
         .with_group(tgt_b_id)
         .run(|mut it| while it.next() {});
 
-    sys.run();
+    let system = sys.id();
 
-    world.get::<&Count>(|c| assert!(c.0 > 0));
+    run_system(&mut world, system);
+
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
+        assert!(c.0 > 0);
+    };
 }
 
 #[test]
@@ -3185,15 +3784,20 @@ fn run_w_0_src_query() {
 
     world.system::<()>().write(Position::id()).run(|it| {
         let world = it.world();
-        world.get::<&mut Count>(|c| {
+        {
+            let mut c = world
+                .entity_from_id(Count::entity_id(world))
+                .get_ref::<&mut Count>()
+                .unwrap();
             c.0 += 1;
-        });
+        };
     });
 
     world.progress();
-    world.get::<&Count>(|c| {
+    {
+        let c = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(c.0, 1);
-    });
+    };
 }
 
 #[test]
@@ -3268,7 +3872,9 @@ fn custom_pipeline_w_name() {
         .build();
 
     assert_eq!(unsafe { pip.entity_view(&world) }.name(), "MyPipeline");
-    assert_eq!(world.lookup("MyPipeline"), unsafe { pip.entity_view(&world) });
+    assert_eq!(world.lookup("MyPipeline"), unsafe {
+        pip.entity_view(&world)
+    });
 
     let count = std::rc::Rc::new(core::cell::Cell::new(0));
     let count_c = count.clone();

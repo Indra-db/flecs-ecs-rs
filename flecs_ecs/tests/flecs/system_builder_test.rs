@@ -4,11 +4,28 @@
 use crate::common_test::*;
 use alloc::rc::Rc;
 use core::cell::Cell;
+use flecs_ecs::addons::system::{RunArgs, System};
+use flecs_ecs::core::WorldProvider;
 use flecs_ecs::prelude::*;
+
+/// Run a built system on the exclusive register (spec §5.7). Today a `System`
+/// handle still carries the `&World` borrow it was built from, so a detached
+/// handle is reconstructed here to satisfy `run_with`'s `&mut World` argument;
+/// the ergonomic same-world call lands when the handle is decoupled in a later
+/// sub-wave.
+fn run_system(world: &mut World, system: Entity) {
+    let ptr = (&*world).world_ptr_mut();
+    // SAFETY: `ptr` is this world's live pointer; the detached handle only names
+    // the system id to `run_with`, whose own `&mut World` argument is the world
+    // it runs on.
+    let wref = unsafe { WorldRef::from_ptr(ptr) };
+    System::new_from_existing(EntityView::new_from(wref, system))
+        .run_with(world, RunArgs::default());
+}
 
 #[test]
 fn system_builder_builder_assign_same_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world
         .entity()
@@ -28,13 +45,14 @@ fn system_builder_builder_assign_same_type() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_builder_build_to_auto() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world
         .entity()
@@ -54,13 +72,14 @@ fn system_builder_builder_build_to_auto() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_builder_build_n_statements() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world
         .entity()
@@ -80,14 +99,15 @@ fn system_builder_builder_build_n_statements() {
         assert_eq!(e.id(), e1);
     });
 
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
 
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_1_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
     world.entity().set(Velocity { x: 0, y: 0 });
@@ -101,13 +121,14 @@ fn system_builder_1_type() {
     });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_add_1_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
     world.entity().set(Velocity { x: 0, y: 0 });
@@ -124,13 +145,14 @@ fn system_builder_add_1_type() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_add_2_types() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world
         .entity()
@@ -152,13 +174,14 @@ fn system_builder_add_2_types() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_add_1_type_w_1_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world
         .entity()
@@ -179,13 +202,14 @@ fn system_builder_add_1_type_w_1_type() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_add_2_types_w_1_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world
         .entity()
@@ -208,13 +232,14 @@ fn system_builder_add_2_types_w_1_type() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_add_pair() {
-    let world = World::new();
+    let mut world = World::new();
 
     let likes = world.entity();
     let bob = world.entity();
@@ -235,13 +260,14 @@ fn system_builder_add_pair() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_add_not() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
     world
@@ -262,13 +288,14 @@ fn system_builder_add_not() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_add_or() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
     let e2 = world.entity().set(Velocity { x: 0, y: 0 }).id();
@@ -288,13 +315,14 @@ fn system_builder_add_or() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 2);
 }
 
 #[test]
 fn system_builder_add_optional() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
     let e2 = world
@@ -321,13 +349,14 @@ fn system_builder_add_optional() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 2);
 }
 
 #[test]
 fn system_builder_ptr_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
     let e2 = world
@@ -352,13 +381,14 @@ fn system_builder_ptr_type() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 2);
 }
 
 #[test]
 fn system_builder_const_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
     world.entity().set(Velocity { x: 0, y: 0 });
@@ -372,13 +402,14 @@ fn system_builder_const_type() {
     });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_string_term() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Register so that short name is accessible
     world.component_named::<Position>("Position");
@@ -398,7 +429,8 @@ fn system_builder_string_term() {
         })
         .expect("valid system query expression");
 
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
 
     assert_eq!(count.get(), 1);
 }
@@ -415,7 +447,7 @@ fn system_builder_singleton_term() {
         value: i32,
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Singleton>()
@@ -450,14 +482,15 @@ fn system_builder_singleton_term() {
     let e = world.entity();
     e.set(EntityComp { value: e.id() });
 
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
 
     assert_eq!(count.get(), 3);
 }
 
 #[test]
 fn system_builder_10_terms() {
-    let world = World::new();
+    let mut world = World::new();
 
     let count = Rc::new(Cell::new(0i32));
     let count2 = count.clone();
@@ -497,14 +530,15 @@ fn system_builder_10_terms() {
             }
         });
 
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
 
     assert_eq!(count.get(), 1);
 }
 
 #[test]
 fn system_builder_16_terms() {
-    let world = World::new();
+    let mut world = World::new();
 
     let count = Rc::new(Cell::new(0i32));
     let count2 = count.clone();
@@ -556,7 +590,8 @@ fn system_builder_16_terms() {
             }
         });
 
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
 
     assert_eq!(count.get(), 1);
 }
@@ -577,7 +612,7 @@ fn system_builder_name_arg() {
 
 #[test]
 fn system_builder_create_w_no_template_args() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
 
@@ -593,7 +628,8 @@ fn system_builder_create_w_no_template_args() {
         });
 
     assert_eq!(count.get(), 0);
-    s.run();
+    let system = s.id();
+    run_system(&mut world, system);
     assert_eq!(count.get(), 1);
 }
 
