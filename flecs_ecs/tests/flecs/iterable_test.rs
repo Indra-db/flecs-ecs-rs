@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[test]
@@ -20,7 +21,7 @@ fn iterable_page_each() {
     let q = world.new_query::<&SelfRef>();
 
     let mut count = 0;
-    q.page(1, 3).each_entity(|e, self_| {
+    q.page(1, 3).each_entity_shared(&world, |e, self_| {
         count += 1;
         assert_ne!(e.id(), e1.id());
         assert_ne!(e.id(), e5.id());
@@ -31,7 +32,7 @@ fn iterable_page_each() {
 
 #[test]
 fn iterable_page_iter() {
-    let world = World::new();
+    let mut world = World::new();
     let e1 = world.entity();
     e1.set(SelfRef { value: *e1 });
     let e2 = world.entity();
@@ -48,7 +49,7 @@ fn iterable_page_iter() {
     let q = world.new_query::<&SelfRef>();
 
     let mut count = 0;
-    q.page(1, 3).run(|mut it| {
+    q.page(1, 3).run_exclusive(&mut world, |mut it| {
         while it.next() {
             let self_ = it.field::<SelfRef>(0);
             assert_eq!(it.count(), 3);
@@ -76,7 +77,7 @@ fn iterable_worker_each() {
     let q = world.new_query::<&SelfRef>();
 
     let mut count = 0;
-    q.worker(0, 2).each_entity(|e, self_| {
+    q.worker(0, 2).each_entity_shared(&world, |e, self_| {
         count += 1;
         assert_ne!(e.id(), e4.id());
         assert_ne!(e.id(), e5.id());
@@ -87,7 +88,7 @@ fn iterable_worker_each() {
 
 #[test]
 fn iterable_worker_iter() {
-    let world = World::new();
+    let mut world = World::new();
     let e1 = world.entity();
     e1.set(SelfRef { value: *e1 });
     let e2 = world.entity();
@@ -104,7 +105,7 @@ fn iterable_worker_iter() {
     let q = world.new_query::<&SelfRef>();
 
     let mut count = 0;
-    q.worker(0, 2).run(|mut it| {
+    q.worker(0, 2).run_exclusive(&mut world, |mut it| {
         while it.next() {
             count += it.count() as i32;
         }
@@ -112,7 +113,7 @@ fn iterable_worker_iter() {
     assert_eq!(count, 3);
 
     count = 0;
-    q.worker(1, 2).run(|mut it| {
+    q.worker(1, 2).run_exclusive(&mut world, |mut it| {
         while it.next() {
             count += it.count() as i32;
         }
