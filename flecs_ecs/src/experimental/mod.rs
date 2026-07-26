@@ -71,11 +71,13 @@ pub mod batches;
 pub mod bundle;
 pub mod chunks;
 pub mod disjoint;
+pub mod entity_mut;
 pub mod exclusive;
 pub mod iter_ctx;
 
 pub use batches::{LockedBatches, QueryBatchesExt};
 pub use bundle::{Bundle, EntityBundleExt, WorldBundleExt};
+pub use entity_mut::EntityMut;
 pub use chunks::{ChunkCursor, EachArity, EachCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
@@ -213,6 +215,7 @@ pub mod prelude {
     pub use super::entity_access::{EntityGuardExt, GuardTuple};
     pub use super::batches::QueryBatchesExt;
     pub use super::bundle::{Bundle, EntityBundleExt, WorldBundleExt};
+    pub use super::entity_mut::EntityMut;
     pub use super::chunks::QueryChunksExt;
     pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
     pub use super::iter_ctx::{Iter, QueryIterCtxExt};
