@@ -246,41 +246,43 @@ macro_rules! impl_bundle {
 use flecs_ecs_derive::tuples;
 tuples!(impl_bundle, 1, 31);
 
-impl World {
-    /// Records (once per bundle type per world) the bundle's resolved component
-    /// id set, keyed by `TypeId<B>` in the §8.2 per-world cache. Stores the
-    /// SORTED, de-duplicated id array, never a table pointer: tables can be
-    /// deleted, component ids cannot.
-    ///
-    /// The first call sorts the ids, rejects any duplicate component type (which
-    /// would alias mutable storage), and memoizes the result so later spawns
-    /// skip the sort and the duplicate check.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the bundle contains a duplicate component type.
-    fn record_bundle_ids<B: Bundle>(&self, ids: &[u64]) {
-        let type_id = TypeId::of::<B>();
-        let cache = &self.world_ctx().bundle_ids;
-        if cache.borrow().contains_key(&type_id) {
-            return;
-        }
-
-        let mut sorted: Vec<u64> = ids.to_vec();
-        sorted.sort_unstable();
-        for w in sorted.windows(2) {
-            assert!(
-                w[0] != w[1],
-                "bundle contains a duplicate component type (id {}); \
-                 each component may appear in a bundle at most once",
-                w[0]
-            );
-        }
-        cache
-            .borrow_mut()
-            .insert(type_id, sorted.into_boxed_slice());
+/// Records (once per bundle type per world) the bundle's resolved component
+/// id set, keyed by `TypeId<B>` in the §8.2 per-world cache. Stores the
+/// SORTED, de-duplicated id array, never a table pointer: tables can be
+/// deleted, component ids cannot.
+///
+/// The first call sorts the ids, rejects any duplicate component type (which
+/// would alias mutable storage), and memoizes the result so later spawns
+/// skip the sort and the duplicate check.
+///
+/// # Panics
+///
+/// Panics if the bundle contains a duplicate component type.
+fn record_bundle_ids<B: Bundle>(world: &World, ids: &[u64]) {
+    let type_id = TypeId::of::<B>();
+    let cache = &world.world_ctx().bundle_ids;
+    if cache.borrow().contains_key(&type_id) {
+        return;
     }
 
+    let mut sorted: Vec<u64> = ids.to_vec();
+    sorted.sort_unstable();
+    for w in sorted.windows(2) {
+        assert!(
+            w[0] != w[1],
+            "bundle contains a duplicate component type (id {}); \
+             each component may appear in a bundle at most once",
+            w[0]
+        );
+    }
+    cache
+        .borrow_mut()
+        .insert(type_id, sorted.into_boxed_slice());
+}
+
+/// Bundle construction on [`World`] (spec §4.11). Provisional name; the
+/// intended final surface is inherent `World::spawn` / `World::spawn_batch`.
+pub trait WorldBundleExt {
     /// Constructs one entity from a bundle in a single archetype move (spec
     /// §4.11).
     ///
@@ -304,7 +306,29 @@ impl World {
     /// Panics if the bundle contains a duplicate component type, if the bundle
     /// arity exceeds 31, or if the world is in its multithreaded execution
     /// phase. Must be called on an immediate (non-deferred) world.
-    pub fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_> {
+    fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_>;
+
+    /// Constructs `count` entities from one bundle in a single `ecs_bulk_init`
+    /// call (spec §4.11).
+    ///
+    /// The bundle is cloned once per row except for the last row, which moves
+    /// the original in. Component values are laid out column-major into
+    /// temporary buffers and moved into storage in one bulk operation; `OnAdd`
+    /// and `OnSet` fire for every row exactly as they would for `count`
+    /// individual `spawn` calls.
+    ///
+    /// Returns the ids flecs allocated, in creation order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the bundle contains a duplicate component type, if the bundle
+    /// arity exceeds 31, or if the world is in its multithreaded execution
+    /// phase. Must be called on an immediate (non-deferred) world.
+    fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity>;
+}
+
+impl WorldBundleExt for World {
+    fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_> {
         const {
             assert!(
                 B::ARITY <= MAX_BUNDLE_ARITY,
@@ -319,7 +343,7 @@ impl World {
         let arity = B::ARITY;
         let mut ids = [0u64; ID_BUF];
         B::resolve_ids(world, &mut ids[..arity]);
-        self.record_bundle_ids::<B>(&ids[..arity]);
+        record_bundle_ids::<B>(self, &ids[..arity]);
 
         // The bundle's bytes are moved (memcpy) into storage by flecs; wrap in
         // `ManuallyDrop` so Rust never drops the source and no double-drop can
@@ -360,23 +384,7 @@ impl World {
         }
     }
 
-    /// Constructs `count` entities from one bundle in a single `ecs_bulk_init`
-    /// call (spec §4.11).
-    ///
-    /// The bundle is cloned once per row except for the last row, which moves
-    /// the original in. Component values are laid out column-major into
-    /// temporary buffers and moved into storage in one bulk operation; `OnAdd`
-    /// and `OnSet` fire for every row exactly as they would for `count`
-    /// individual `spawn` calls.
-    ///
-    /// Returns the ids flecs allocated, in creation order.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the bundle contains a duplicate component type, if the bundle
-    /// arity exceeds 31, or if the world is in its multithreaded execution
-    /// phase. Must be called on an immediate (non-deferred) world.
-    pub fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity> {
+    fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity> {
         const {
             assert!(
                 B::ARITY <= MAX_BUNDLE_ARITY,
@@ -397,7 +405,7 @@ impl World {
         let arity = B::ARITY;
         let mut ids = [0u64; ID_BUF];
         B::resolve_ids(world, &mut ids[..arity]);
-        self.record_bundle_ids::<B>(&ids[..arity]);
+        record_bundle_ids::<B>(self, &ids[..arity]);
 
         let mut sizes = [0usize; ID_BUF];
         B::sizes(&mut sizes[..arity]);
@@ -477,7 +485,9 @@ impl World {
     }
 }
 
-impl<'a> EntityView<'a> {
+/// Bundle insertion on [`EntityView`] (spec §4.11). Provisional name; the
+/// intended final surface is `EntityMut::insert`.
+pub trait EntityBundleExt: Sized {
     /// Adds and sets a whole bundle on an existing entity in a **single**
     /// archetype move (spec §4.11), not N.
     ///
@@ -506,7 +516,11 @@ impl<'a> EntityView<'a> {
     ///
     /// Panics if the bundle contains a duplicate component type, if the bundle
     /// arity exceeds 31, or if the entity is not alive.
-    pub fn insert<B: Bundle>(self, bundle: B) -> Self {
+    fn insert<B: Bundle>(self, bundle: B) -> Self;
+}
+
+impl<'a> EntityBundleExt for EntityView<'a> {
+    fn insert<B: Bundle>(self, bundle: B) -> Self {
         const {
             assert!(
                 B::ARITY <= MAX_BUNDLE_ARITY,
@@ -520,7 +534,7 @@ impl<'a> EntityView<'a> {
         let arity = B::ARITY;
         let mut ids = [0u64; ID_BUF];
         B::resolve_ids(world, &mut ids[..arity]);
-        world.record_bundle_ids::<B>(&ids[..arity]);
+        record_bundle_ids::<B>(&world, &ids[..arity]);
 
         if world.is_deferred() {
             // `ecs_commit` cannot run while deferred; apply per component and let

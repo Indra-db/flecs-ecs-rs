@@ -1083,6 +1083,7 @@ impl World {
         for id in self.components_array().iter_mut() {
             *id = 0;
         }
+        #[cfg(feature = "flecs_experimental")]
         self.world_ctx().bundle_ids.borrow_mut().clear();
     }
 

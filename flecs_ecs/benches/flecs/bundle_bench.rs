@@ -1,6 +1,7 @@
 use core::hint::black_box;
 
 use crate::common_bench::*;
+use flecs_ecs::experimental::prelude::*;
 
 const BATCH_COUNT: usize = 1000;
 

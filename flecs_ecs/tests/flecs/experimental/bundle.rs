@@ -5,6 +5,7 @@ use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use alloc::sync::Arc;
 
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::macros::*;
 
 #[derive(Component, Debug, PartialEq)]
