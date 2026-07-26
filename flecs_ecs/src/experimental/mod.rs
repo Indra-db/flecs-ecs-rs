@@ -68,6 +68,10 @@ pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
 /// `continue`, and `?` all work as written. A `&mut T` column binds as
 /// `&mut T` per row, a `&T` column as `&T`. The number of bound names must
 /// match the number of query columns.
+///
+/// The inner row loop iterates the columns' native slice iterators zipped
+/// together (`RowSlice::rows`), so the bounds check is hoisted out of the per-row
+/// path and the loop advances by pointer, matching hand-written slice iteration.
 #[macro_export]
 macro_rules! each {
     ( ( $($name:ident),+ $(,)? ) in $($rest:tt)+ ) => {
@@ -85,13 +89,10 @@ macro_rules! each {
         while let ::core::option::Option::Some(( $(mut $name,)+ )) =
             $crate::experimental::chunks::ChunkCursor::next(&mut __cursor)
         {
-            let __len = $crate::experimental::chunks::RowSlice::row_len(
-                $crate::each!(@first $($name),+)
-            );
-            for __row in 0..__len {
-                $(
-                    let $name = $crate::experimental::chunks::RowSlice::row(&mut $name, __row);
-                )+
+            // Zip the columns' native slice iterators so the row loop is a
+            // bounds-check-free pointer walk. The zip nesting and its matching
+            // destructure pattern are built by the same left fold.
+            for $crate::each!(@pat $($name),+) in $crate::each!(@zip $($name),+) {
                 { $($body)* }
             }
         }
@@ -106,8 +107,7 @@ macro_rules! each {
         while let ::core::option::Option::Some(mut $name) =
             $crate::experimental::chunks::ChunkCursor::next(&mut __cursor)
         {
-            for __row in 0..$crate::experimental::chunks::RowSlice::row_len(&$name) {
-                let $name = $crate::experimental::chunks::RowSlice::row(&mut $name, __row);
+            for $name in $crate::experimental::chunks::RowSlice::rows(&mut $name) {
                 { $($body)* }
             }
         }
@@ -116,7 +116,27 @@ macro_rules! each {
         $crate::each!(@single $name ( $($cur)* $next ) $($rest)*)
     };
 
-    (@first $first:ident $(, $rest:ident)*) => { & $first };
+    // Left fold: nest `RowSlice::rows(&mut a).zip(rows(&mut b)).zip(...)`.
+    (@zip $first:ident $(, $rest:ident)*) => {
+        $crate::each!(@zip_acc
+            ( $crate::experimental::chunks::RowSlice::rows(&mut $first) )
+            $($rest),*)
+    };
+    (@zip_acc ( $($acc:tt)* ) $next:ident $(, $rest:ident)*) => {
+        $crate::each!(@zip_acc
+            ( ($($acc)*).zip($crate::experimental::chunks::RowSlice::rows(&mut $next)) )
+            $($rest),*)
+    };
+    (@zip_acc ( $($acc:tt)* )) => { $($acc)* };
+
+    // Left fold: the destructure pattern matching the zip nesting, `(((a, b), c), d)`.
+    (@pat $first:ident $(, $rest:ident)*) => {
+        $crate::each!(@pat_acc ( $first ) $($rest),*)
+    };
+    (@pat_acc ( $($acc:tt)* ) $next:ident $(, $rest:ident)*) => {
+        $crate::each!(@pat_acc ( ($($acc)*, $next) ) $($rest),*)
+    };
+    (@pat_acc ( $($acc:tt)* )) => { $($acc)* };
 }
 
 /// Convenience re-exports for the experimental surface.

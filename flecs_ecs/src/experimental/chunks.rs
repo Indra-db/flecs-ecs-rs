@@ -71,21 +71,36 @@ impl<T: ComponentOrPairId> ChunkElement for Option<&mut T> {
     }
 }
 
-/// Per-row indexing of a chunk column, preserving mutability: `&mut [T]` yields
+/// Per-row access to a chunk column, preserving mutability: `&mut [T]` yields
 /// `&mut T`, `&[T]` yields `&T`. Used by the [`each!`](crate::each) macro to
 /// build the inner row loop.
+///
+/// [`rows`](RowSlice::rows) is the pre-checked path: it returns the column's
+/// native slice iterator (`slice::Iter` / `slice::IterMut`), so the macro's row
+/// loop advances by pointer without a per-row bounds check. [`row`](RowSlice::row)
+/// / [`row_len`](RowSlice::row_len) are the indexed fallback.
 #[doc(hidden)]
 pub trait RowSlice {
     type Row<'r>
     where
         Self: 'r;
+    type RowIter<'r>: Iterator<Item = Self::Row<'r>>
+    where
+        Self: 'r;
     fn row_len(&self) -> usize;
     fn row(&mut self, index: usize) -> Self::Row<'_>;
+    /// The column's native slice iterator, yielding one `Row` per element with
+    /// the bounds check hoisted out of the row loop.
+    fn rows(&mut self) -> Self::RowIter<'_>;
 }
 
 impl<T> RowSlice for &mut [T] {
     type Row<'r>
         = &'r mut T
+    where
+        Self: 'r;
+    type RowIter<'r>
+        = core::slice::IterMut<'r, T>
     where
         Self: 'r;
     #[inline(always)]
@@ -96,11 +111,19 @@ impl<T> RowSlice for &mut [T] {
     fn row(&mut self, index: usize) -> &mut T {
         &mut (**self)[index]
     }
+    #[inline(always)]
+    fn rows(&mut self) -> core::slice::IterMut<'_, T> {
+        (**self).iter_mut()
+    }
 }
 
 impl<T> RowSlice for &[T] {
     type Row<'r>
         = &'r T
+    where
+        Self: 'r;
+    type RowIter<'r>
+        = core::slice::Iter<'r, T>
     where
         Self: 'r;
     #[inline(always)]
@@ -110,6 +133,10 @@ impl<T> RowSlice for &[T] {
     #[inline(always)]
     fn row(&mut self, index: usize) -> &T {
         &(**self)[index]
+    }
+    #[inline(always)]
+    fn rows(&mut self) -> core::slice::Iter<'_, T> {
+        (**self).iter()
     }
 }
 

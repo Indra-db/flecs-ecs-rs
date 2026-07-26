@@ -473,8 +473,8 @@ pub fn query_experimental(criterion: &mut Criterion) {
         b.iter(|| {
             let mut sum = 0u64;
             q4.chunks(&mut world).for_each(|(a, b_, c, d)| {
-                for i in 0..a.len() {
-                    sum += (a[i].0 + b_[i].0 + c[i].0 + d[i].0) as u64;
+                for (((a, b_), c), d) in a.iter().zip(b_).zip(c).zip(d) {
+                    sum += (a.0 + b_.0 + c.0 + d.0) as u64;
                 }
             });
             black_box(sum)
