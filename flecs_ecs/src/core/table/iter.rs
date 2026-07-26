@@ -37,6 +37,15 @@ impl core::fmt::Display for FieldError {
 
 impl core::error::Error for FieldError {}
 
+#[cold]
+#[inline(never)]
+fn field_type_mismatch(expected: u64, term_id: u64) -> ! {
+    panic!(
+        "{}: id mismatch: expected {expected}, got term id {term_id} whose component type does not match",
+        FlecsErrorCode::InvalidParameter,
+    );
+}
+
 pub struct TableIter<'a, const IS_RUN: bool = true, P = ()> {
     pub(crate) iter: &'a mut sys::ecs_iter_t,
     pub(crate) count: usize,
@@ -533,11 +542,9 @@ where
             let matches = id == term_id
                 || (unsafe { sys::ecs_id_is_pair(term_id) }
                     && unsafe { sys::ecs_get_typeid(self.world().world_ptr_mut(), term_id) == id });
-            assert!(
-                matches,
-                "{}: id mismatch: expected {id}, got term id {term_id} whose component type does not match",
-                FlecsErrorCode::InvalidParameter,
-            );
+            if !matches {
+                field_type_mismatch(id, term_id);
+            }
         }
     }
 
@@ -590,7 +597,6 @@ where
     /// * [`TableIter::field_unchecked`] - Unsafe variant without aliasing checks
     #[inline(always)]
     pub fn field<T: ComponentId>(&self, index: i8) -> Field<'_, T::UnderlyingType, true> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, true, true, false>(index);
         self.world()
             .check_thread_affinity_shared::<T::UnderlyingType>();
@@ -677,7 +683,6 @@ where
         &self,
         index: i8,
     ) -> Field<'_, T::UnderlyingType, false> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, true, true, false>(index);
         self.field_internal::<T::UnderlyingType, false>(index)
     }
@@ -743,7 +748,6 @@ where
         &self,
         index: i8,
     ) -> Option<Field<'_, T::UnderlyingType, true>> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, true, true, false>(index);
         self.world()
             .check_thread_affinity_shared::<T::UnderlyingType>();
@@ -812,7 +816,6 @@ where
         &self,
         index: i8,
     ) -> Option<Field<'_, T::UnderlyingType, false>> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, true, true, false>(index);
         self.get_field_internal::<T::UnderlyingType, false>(index)
     }
@@ -866,7 +869,6 @@ where
     /// * [`TableIter::field_mut_unchecked`] - Unsafe variant without aliasing checks
     #[inline(always)]
     pub fn field_mut<T: ComponentId>(&self, index: i8) -> FieldMut<'_, T::UnderlyingType, true> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, false, true, false>(index);
         self.world()
             .check_thread_affinity_exclusive::<T::UnderlyingType>();
@@ -958,7 +960,6 @@ where
         &self,
         index: i8,
     ) -> FieldMut<'_, T::UnderlyingType, false> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, false, true, false>(index);
         self.field_internal_mut::<T::UnderlyingType, false>(index)
     }
@@ -1024,7 +1025,6 @@ where
         &self,
         index: i8,
     ) -> Option<FieldMut<'_, T::UnderlyingType, true>> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, false, true, false>(index);
         self.world()
             .check_thread_affinity_exclusive::<T::UnderlyingType>();
@@ -1096,7 +1096,6 @@ where
         &self,
         index: i8,
     ) -> Option<FieldMut<'_, T::UnderlyingType, false>> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, false, true, false>(index);
         self.get_field_internal_mut::<T::UnderlyingType, false>(index)
     }
@@ -1657,7 +1656,6 @@ where
         &self,
         index: i8,
     ) -> Result<Field<'_, T::UnderlyingType, true>, FieldError> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, true, true, false>(index);
         self.world()
             .check_thread_affinity_shared::<T::UnderlyingType>();
@@ -1670,7 +1668,6 @@ where
         &self,
         index: i8,
     ) -> Result<FieldMut<'_, T::UnderlyingType, true>, FieldError> {
-        #[cfg(any(debug_assertions, feature = "flecs_force_enable_ecs_asserts"))]
         self.field_safety_checks::<T, false, true, false>(index);
         self.world()
             .check_thread_affinity_exclusive::<T::UnderlyingType>();

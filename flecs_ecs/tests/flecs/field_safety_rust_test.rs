@@ -27,6 +27,24 @@ fn field_index_shared_field_above_zero_panics() {
     });
 }
 
+/// The field type/id check must run in release builds too: reading a field as
+/// the wrong component type would reinterpret its bytes. This panics regardless
+/// of `debug_assertions`.
+#[test]
+#[should_panic(expected = "id mismatch")]
+fn field_wrong_type_panics_in_release() {
+    let world = World::new();
+    world.entity().set(Position { x: 1, y: 1 });
+
+    let query = world.new_query::<&Position>();
+    query.run(|mut it| {
+        while it.next() {
+            let wrong = it.field::<Velocity>(0);
+            core::hint::black_box(wrong[0].x);
+        }
+    });
+}
+
 #[test]
 #[should_panic]
 fn field_index_out_of_bounds_panics() {
