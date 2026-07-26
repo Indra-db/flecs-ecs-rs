@@ -66,7 +66,7 @@ Review findings (orchestrator review of the prototype):
 
 Frictions for the spec (from the prototype):
 
-- Chunk read path pays slice bounds-checks per row where `each` uses pointer adds; the cursor should expose pre-checked iterators (or users push through `iter_mut().zip`) so reads vectorise.
+- ~~Chunk read path pays slice bounds-checks per row~~ Resolved (`a2e3ef7d`): `RowSlice::rows()` exposes native slice iterators and `each!` zips them; measured chunk read 2.85 µs vs locked `each` 3.09 µs, macro read at parity with `each`.
 - `Ref`/`Mut` need `Debug where T: Debug` (and likely `Display`) for test ergonomics.
 - Guard tuples do not model `Option<&T>`; owned/optional access stays on `cloned`. Decide whether that is final or whether an optional guard element ships.
 - Tuple impls are hand-capped at arity 5; move to the crate's `tuples!` macro for the final surface.
