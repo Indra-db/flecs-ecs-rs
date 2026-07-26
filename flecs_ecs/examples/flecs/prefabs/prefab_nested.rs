@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 // Nested prefabs make it possible to reuse an existing prefab inside another
 // prefab. An example of where this could be useful is a car with four wheels:
@@ -50,12 +51,13 @@ fn main() {
         // component, and an IsA relationship to the Wheel prefab.
         println!("{:?}", inst.archetype());
 
-        // Get the TirePressure component & print its value
-        inst.try_get::<Option<&TirePressure>>(|p| {
-            if let Some(p) = p {
-                println!("pressure: {}", p.value);
-            }
-        });
+        // Get the TirePressure component & print its value. A single optional
+        // term is spelled as a one-element tuple; the all-optional read is
+        // always Some.
+        let (p,) = inst.get_ref::<(Option<&TirePressure>,)>().unwrap();
+        if let Some(p) = &p {
+            println!("pressure: {}", p.value);
+        }
     } else {
         println!("entity lookup failed");
     }

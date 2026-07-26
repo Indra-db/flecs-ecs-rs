@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component, Clone)]
@@ -32,7 +33,7 @@ pub struct ImpulseSpeed {
 // by adding or overriding components on the variant.
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create a base prefab for SpaceShips.
     let spaceship = world
@@ -74,15 +75,14 @@ fn main() {
     inst.set(Defence { value: 100.0 });
 
     // Queries can match components from multiple levels of inheritance
-    world.each_entity::<(&Position, &ImpulseSpeed, &Defence, &FreightCapacity)>(
-        |e, (p, s, d, c)| {
-            println!("{}:", e.name());
-            println!(" - position: {}, {}", p.x, p.y);
-            println!(" - impulse speed: {}", s.value);
-            println!(" - defense: {}", d.value);
-            println!(" - capacity: {}", c.value);
-        },
-    );
+    let q = world.new_query::<(&Position, &ImpulseSpeed, &Defence, &FreightCapacity)>();
+    q.each_entity_exclusive(&mut world, |e, (p, s, d, c)| {
+        println!("{}:", e.name());
+        println!(" - position: {}, {}", p.x, p.y);
+        println!(" - impulse speed: {}", s.value);
+        println!(" - defense: {}", d.value);
+        println!(" - capacity: {}", c.value);
+    });
 
     // Output:
     //   my_freighter:
