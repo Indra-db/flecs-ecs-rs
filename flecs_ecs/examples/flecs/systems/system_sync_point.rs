@@ -35,8 +35,11 @@ fn main() {
         .with(&PositionSP::id())
         .set_inout_none()
         .with(&mut VelocitySP::id()) // VelocitySP is written, but shouldn't be matched
-        .each_entity(|e, ()| {
-            e.set(VelocitySP { x: 1.0, y: 2.0 });
+        // The callback issues a command on the entity it is visiting. each_entity_with
+        // hands both the visited entity and a Stage: the command channel is explicit,
+        // and the set is enqueued on the stage and merged at the sync point.
+        .each_entity_with(|e, (), stage| {
+            stage.entity_view(e.id()).set(VelocitySP { x: 1.0, y: 2.0 });
         });
 
     // This system reads VelocitySP, which causes the insertion of a sync point.

@@ -1,6 +1,5 @@
 use crate::z_ignore_test_common::*;
 
-use core::{borrow::Borrow, ffi::c_void};
 use flecs_ecs::prelude::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -40,21 +39,19 @@ fn rand(max: u64) -> f32 {
 fn main() {
     let world = World::new();
 
-    // Applications can pass context data to a system. A common use case where this
-    // comes in handy is when a system needs to iterate more than one query. The
-    // following example shows how to pass a custom query into a system for a simple
-    // collision detection example.
+    // Applications often need a system to reach a second query. A common use
+    // case is a system that iterates more than one query, as in this simple
+    // collision detection example. Instead of stashing the query behind a raw
+    // context pointer, the closure simply captures it by value.
 
-    let mut query_collide = world.new_query::<(&Position, &Radius)>();
+    let query_collide = world.new_query::<(&Position, &Radius)>();
 
     let sys = world
         .system::<(&Position, &Radius)>()
-        .set_context(&mut query_collide as *mut Query<(&Position, &Radius)> as *mut c_void)
-        .each_iter(|mut it, index, (p1, r1)| {
-            let query = unsafe { it.context::<Query<(&Position, &Radius)>>() };
+        .each_iter(move |it, index, (p1, r1)| {
             let e1 = it.entity(index);
 
-            query.each_entity(|e2, (p2, r2)| {
+            query_collide.each_entity(|e2, (p2, r2)| {
                 if e1 == *e2 {
                     // don't collide with self
                     return;

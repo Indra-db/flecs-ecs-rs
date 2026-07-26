@@ -84,13 +84,11 @@ fn main() {
 
     // Deterministic summary, read back single-threaded after the sync point.
     let mut arrived = 0;
-    world
-        .query::<()>()
-        .with(Arrived::id())
-        .build()
-        .each(|_| arrived += 1);
+    let q_arrived = world.query::<()>().with(Arrived::id()).build();
+    q_arrived.each_exclusive(&mut world, |_| arrived += 1);
     let mut total_x = 0.0;
-    world.new_query::<&Position>().each(|p| total_x += p.x);
+    let q_position = world.new_query::<&Position>();
+    q_position.each_exclusive(&mut world, |p| total_x += p.x);
 
     println!("runners arrived: {arrived}");
     println!("total distance: {total_x}");

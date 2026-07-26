@@ -1,0 +1,5 @@
+---
+source: flecs_ecs/examples/flecs/z_ignore_test_common.rs
+expression: str_output
+---
+"runners arrived: 8\ntotal distance: 1080\n"
