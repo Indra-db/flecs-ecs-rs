@@ -22,6 +22,7 @@ mod bypass_paths;
 mod singleton;
 mod exclusive;
 mod system_with;
+mod typed_ctx;
 
 #[derive(Component, Clone, Debug, Default)]
 struct Position {

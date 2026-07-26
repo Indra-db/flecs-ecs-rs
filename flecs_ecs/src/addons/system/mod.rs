@@ -147,6 +147,44 @@ impl<'a> System<'a> {
         unsafe { (*self.system_ptr()).ctx }
     }
 
+    /// Read the typed context stored by
+    /// [`SystemBuilder::ctx`](crate::addons::system::SystemBuilder::ctx), or
+    /// `None` if none was set or the stored value has a different type (spec
+    /// §5.3).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entity is not a system.
+    pub fn ctx<C: 'static>(&self) -> Option<&C> {
+        let ctx = unsafe { (*self.system_ptr()).ctx };
+        if ctx.is_null() {
+            return None;
+        }
+        // SAFETY: a non-null ctx set through `SystemBuilder::ctx` is the thin
+        // `*mut Box<dyn Any>` it installed; `downcast_ref` returns `None` on a
+        // type mismatch. The borrow is tied to `&self`.
+        let boxed = unsafe { &*(ctx as *const alloc::boxed::Box<dyn core::any::Any>) };
+        boxed.downcast_ref::<C>()
+    }
+
+    /// Mutably read the typed context stored by
+    /// [`SystemBuilder::ctx`](crate::addons::system::SystemBuilder::ctx), or
+    /// `None` (spec §5.3).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the entity is not a system.
+    pub fn ctx_mut<C: 'static>(&mut self) -> Option<&mut C> {
+        let ctx = unsafe { (*self.system_ptr()).ctx };
+        if ctx.is_null() {
+            return None;
+        }
+        // SAFETY: as `ctx`, but `&mut self` proves exclusive access to the
+        // system's context.
+        let boxed = unsafe { &mut *(ctx as *mut alloc::boxed::Box<dyn core::any::Any>) };
+        boxed.downcast_mut::<C>()
+    }
+
     /// Get the underlying query for the system
     ///
     /// # Panics

@@ -40,6 +40,9 @@ pub(crate) struct WorldCtx {
     // set_threads/set_stage_count wrappers.
     #[cfg(feature = "flecs_safety_locks")]
     pub(crate) safety_locks: crate::core::SafetyLocks,
+    // Typed world context (spec §5.3): the capture-based replacement for the
+    // `*mut c_void` `set_context`. Owned by the world and dropped with it.
+    pub(crate) typed_ctx: Option<alloc::boxed::Box<dyn core::any::Any>>,
 }
 
 impl WorldCtx {
@@ -55,6 +58,7 @@ impl WorldCtx {
             world_dead: Arc::new(Mutex::new(false)),
             #[cfg(feature = "flecs_safety_locks")]
             safety_locks: crate::core::SafetyLocks::new(),
+            typed_ctx: None,
         }
     }
 

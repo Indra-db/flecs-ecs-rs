@@ -1049,6 +1049,48 @@ impl World {
         unsafe { sys::ecs_get_ctx(self.raw_world.as_ptr()) }
     }
 
+    /// Store a typed world context (spec §5.3).
+    ///
+    /// The capture-based replacement for the `*mut c_void`
+    /// [`set_context`](World::set_context): the value is owned by the world and
+    /// dropped when the world is dropped. Read it back with [`World::ctx`]. A
+    /// previously stored value is replaced (and dropped).
+    ///
+    /// ```
+    /// use flecs_ecs::prelude::*;
+    ///
+    /// let mut world = World::new();
+    /// world.set_ctx(42u32);
+    /// assert_eq!(world.ctx::<u32>(), Some(&42));
+    /// assert_eq!(world.ctx::<i8>(), None); // wrong type
+    /// ```
+    pub fn set_ctx<C: 'static>(&mut self, value: C) {
+        // SAFETY: `&mut self` proves exclusive access to this world, so the
+        // binding-context struct behind the world pointer can be mutated.
+        let ctx = unsafe {
+            &mut *(sys::ecs_get_binding_ctx(self.raw_world.as_ptr()) as *mut crate::core::world_ctx::WorldCtx)
+        };
+        ctx.typed_ctx = Some(alloc::boxed::Box::new(value));
+    }
+
+    /// Read the typed world context set by [`World::set_ctx`], or `None` if none
+    /// was set or the stored value has a different type.
+    pub fn ctx<C: 'static>(&self) -> Option<&C> {
+        self.world_ctx()
+            .typed_ctx
+            .as_ref()
+            .and_then(|b| b.downcast_ref::<C>())
+    }
+
+    /// Mutably read the typed world context set by [`World::set_ctx`], or `None`.
+    pub fn ctx_mut<C: 'static>(&mut self) -> Option<&mut C> {
+        // SAFETY: `&mut self` proves exclusive access to this world.
+        let ctx = unsafe {
+            &mut *(sys::ecs_get_binding_ctx(self.raw_world.as_ptr()) as *mut crate::core::world_ctx::WorldCtx)
+        };
+        ctx.typed_ctx.as_mut().and_then(|b| b.downcast_mut::<C>())
+    }
+
     #[expect(dead_code, reason = "possibly used in the future")]
     pub(crate) fn get_context(world: *mut sys::ecs_world_t) -> *mut WorldCtx {
         unsafe { sys::ecs_get_binding_ctx(world) as *mut WorldCtx }

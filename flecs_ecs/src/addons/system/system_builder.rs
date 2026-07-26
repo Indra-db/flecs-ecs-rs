@@ -139,6 +139,47 @@ where
             _phantom: core::marker::PhantomData,
         }
     }
+
+    /// Store a typed value owned by the system (spec §5.3).
+    ///
+    /// The capture-based replacement for the `*mut c_void`
+    /// [`set_context`](crate::core::SystemAPI::set_context): the value is owned by
+    /// the system entity and dropped when the system is dropped (world teardown or
+    /// explicit deletion). Retrieve it with [`System::ctx`](crate::addons::system::System::ctx)
+    /// / [`System::ctx_mut`](crate::addons::system::System::ctx_mut).
+    ///
+    /// Do not mix with the raw [`set_context`](crate::core::SystemAPI::set_context)
+    /// on the same system: they share the one context slot.
+    pub fn ctx<C: 'static>(&mut self, value: C) -> &mut Self {
+        // Drop any previously-installed typed ctx before overwriting the slot.
+        if let Some(free) = self.desc.ctx_free.take()
+            && !self.desc.ctx.is_null()
+        {
+            unsafe { free(self.desc.ctx) };
+        }
+        let boxed: alloc::boxed::Box<dyn core::any::Any> = alloc::boxed::Box::new(value);
+        let thin = alloc::boxed::Box::into_raw(alloc::boxed::Box::new(boxed))
+            as *mut core::ffi::c_void;
+        self.desc.ctx = thin;
+        self.desc.ctx_free = Some(free_typed_system_ctx);
+        self
+    }
+}
+
+/// Drop trampoline for a typed system context installed by
+/// [`SystemBuilder::ctx`]. Runs when flecs frees the system's context slot
+/// (system deletion / world teardown).
+#[flecs_ecs_derive::extern_abi]
+fn free_typed_system_ctx(ptr: *mut core::ffi::c_void) {
+    if !ptr.is_null() {
+        // SAFETY: `ptr` is the thin `*mut Box<dyn Any>` installed by
+        // `SystemBuilder::ctx`; flecs calls this exactly once for it.
+        unsafe {
+            drop(alloc::boxed::Box::from_raw(
+                ptr as *mut alloc::boxed::Box<dyn core::any::Any>,
+            ));
+        }
+    }
 }
 
 #[doc(hidden)]
