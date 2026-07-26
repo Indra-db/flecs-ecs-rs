@@ -37,6 +37,16 @@ impl World {
     ///
     /// The returned [`Cursor`] borrows `data` for as long as it is alive, so
     /// `data` cannot be used again until the cursor is dropped.
+    ///
+    /// ```compile_fail,E0502
+    /// # use flecs_ecs::prelude::*;
+    /// # #[derive(Component, meta)] struct Position { x: f32, y: f32 }
+    /// # let world = World::new();
+    /// let mut data = Position { x: 1.0, y: 2.0 };
+    /// let cursor = world.cursor(&mut data);
+    /// let _read = data.x; // `data` is still borrowed by `cursor`
+    /// drop(cursor);
+    /// ```
     pub fn cursor<'a, T: ComponentId>(&'a self, data: &'a mut T) -> Cursor<'a> {
         unsafe { Cursor::new(self, T::id(), data as *mut T) }
     }
