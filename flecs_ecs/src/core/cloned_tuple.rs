@@ -283,6 +283,10 @@ pub trait ClonedTuple: Sized {
                 safety_info[index] = LockInfo {
                     key: get_ptr.lock_key,
                     id,
+                    #[cfg(debug_assertions)]
+                    resolved_entity: entity,
+                    #[cfg(debug_assertions)]
+                    resolved_id: id,
                 };
             }
         }

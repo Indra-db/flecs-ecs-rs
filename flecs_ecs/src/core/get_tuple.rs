@@ -31,6 +31,15 @@ pub(crate) fn get_ptr_null() -> sys::ecs_rust_get_ptr_t {
 pub struct LockInfo {
     pub(crate) key: crate::core::LockKey,
     pub(crate) id: u64,
+    /// Debug-only identity of the storage the resolved pointer actually points
+    /// into, for the guard revalidation net (spec §7). Equals `(entity, id)`
+    /// for a plain component, but an enum resolves into its CONSTANT entity's
+    /// storage under a `(Constant, _)` pair, so the net must re-resolve against
+    /// the owner recorded here, not the queried term. Compiled out of release.
+    #[cfg(debug_assertions)]
+    pub(crate) resolved_entity: u64,
+    #[cfg(debug_assertions)]
+    pub(crate) resolved_id: u64,
 }
 
 #[cfg(feature = "flecs_safety_locks")]
@@ -311,6 +320,14 @@ pub trait GetTuple: Sized {
             );
         }
 
+        // Owner identity of the storage the resolved pointer points into, for
+        // the debug revalidation net. Defaults to the queried term; the enum
+        // branch rebinds it to the constant entity's `(Constant, _)` pair.
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+        let mut resolved_entity = entity;
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+        let mut resolved_id = id;
+
         let get_ptr = if T::OnlyType::IS_ENUM {
             let target: sys::ecs_id_t = unsafe { sys::ecs_get_target(world_ptr, entity, id, 0) };
 
@@ -335,6 +352,14 @@ pub trait GetTuple: Sized {
                         "missing enum constant value {}",
                         core::any::type_name::<T>()
                     );
+
+                    // The pointer lives in the constant entity's storage under
+                    // this pair; revalidate against that owner, not the query.
+                    #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+                    {
+                        resolved_entity = target;
+                        resolved_id = pair_id;
+                    }
 
                     constant_value
                 }
@@ -448,6 +473,10 @@ or use `Option<{}> instead to handle individual cases.",
                 let lock_info = LockInfo {
                     key: get_ptr.lock_key,
                     id,
+                    #[cfg(debug_assertions)]
+                    resolved_entity,
+                    #[cfg(debug_assertions)]
+                    resolved_id,
                 };
                 if T::IS_IMMUTABLE {
                     safety_info[index] = SafetyInfo::Read(lock_info);

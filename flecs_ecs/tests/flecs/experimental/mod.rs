@@ -13,6 +13,8 @@ mod chunks;
 mod disjoint;
 #[cfg(feature = "flecs_safety_locks")]
 mod entity_guard;
+#[cfg(feature = "flecs_safety_locks")]
+mod enum_guard;
 mod iter_ctx;
 #[cfg(feature = "flecs_safety_locks")]
 mod guard_pin;

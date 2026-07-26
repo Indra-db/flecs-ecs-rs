@@ -68,12 +68,15 @@ fn safety_key(si: &SafetyInfo) -> LockKey {
     }
 }
 
-/// Component id behind a term's safety info, for the debug-only guard backstop.
+/// Identity `(owner_entity, component_id)` of the storage a term's pointer
+/// actually resolves into, for the debug-only guard backstop. Equals the
+/// queried term for a plain component, but an enum resolves into its constant
+/// entity's storage, so the net must revalidate against the recorded owner.
 #[cfg(debug_assertions)]
 #[inline(always)]
-fn safety_id(si: &SafetyInfo) -> u64 {
+fn safety_resolved(si: &SafetyInfo) -> (u64, u64) {
     match si {
-        SafetyInfo::Read(li) | SafetyInfo::Write(li) => li.id,
+        SafetyInfo::Read(li) | SafetyInfo::Write(li) => (li.resolved_entity, li.resolved_id),
     }
 }
 
@@ -335,15 +338,17 @@ where
     #[inline(always)]
     unsafe fn acquire(world: WorldRef<'w>, id: Entity) -> Result<Self::Guards, AccessError> {
         let r = unsafe { resolve_and_lock::<Self>(world, id)? };
+        #[cfg(debug_assertions)]
+        let (dbg_entity, dbg_component_id) = safety_resolved(&r.data.safety_info()[0]);
         let parts = GuardParts {
             ptr: r.data.component_ptrs()[0],
             world: r.world,
             locks: r.locks,
             key: safety_key(&r.data.safety_info()[0]),
             #[cfg(debug_assertions)]
-            entity: *id,
+            entity: dbg_entity,
             #[cfg(debug_assertions)]
-            component_id: safety_id(&r.data.safety_info()[0]),
+            component_id: dbg_component_id,
         };
         Ok(unsafe { <&T as GuardElement<'w>>::wrap(parts) })
     }
@@ -358,15 +363,17 @@ where
     #[inline(always)]
     unsafe fn acquire(world: WorldRef<'w>, id: Entity) -> Result<Self::Guards, AccessError> {
         let r = unsafe { resolve_and_lock::<Self>(world, id)? };
+        #[cfg(debug_assertions)]
+        let (dbg_entity, dbg_component_id) = safety_resolved(&r.data.safety_info()[0]);
         let parts = GuardParts {
             ptr: r.data.component_ptrs()[0],
             world: r.world,
             locks: r.locks,
             key: safety_key(&r.data.safety_info()[0]),
             #[cfg(debug_assertions)]
-            entity: *id,
+            entity: dbg_entity,
             #[cfg(debug_assertions)]
-            component_id: safety_id(&r.data.safety_info()[0]),
+            component_id: dbg_component_id,
         };
         Ok(unsafe { <&mut T as GuardElement<'w>>::wrap(parts) })
     }
@@ -390,15 +397,17 @@ macro_rules! impl_guard_tuple {
                 Ok(( $( {
                     index += 1;
                     let _i = index as usize;
+                    #[cfg(debug_assertions)]
+                    let (_dbg_entity, _dbg_component_id) = safety_resolved(&si[_i]);
                     unsafe { $t::wrap(GuardParts {
                         ptr: ptrs[_i],
                         world: r.world,
                         locks: r.locks,
                         key: safety_key(&si[_i]),
                         #[cfg(debug_assertions)]
-                        entity: *id,
+                        entity: _dbg_entity,
                         #[cfg(debug_assertions)]
-                        component_id: safety_id(&si[_i]),
+                        component_id: _dbg_component_id,
                     }) }
                 }, )+ ))
             }
