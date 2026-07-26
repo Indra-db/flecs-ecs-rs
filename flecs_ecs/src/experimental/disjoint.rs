@@ -34,8 +34,23 @@
 //!
 //! Tag terms (no component data) cannot alias storage and are ignored.
 
-use crate::core::WorldProvider;
+use crate::core::{QueryDisjointCache, WorldProvider, WorldRef};
 use crate::sys;
+
+/// Return the disjointness verdict for `query`, reading it from `cache` when
+/// present (spec §4.7) and computing it once on a cache miss. Transient
+/// iterables (`QueryIter`, `ChainedIter`) have no cache and recompute per call.
+#[inline]
+pub(crate) fn is_proven_disjoint_cached(
+    cache: Option<&QueryDisjointCache>,
+    world: WorldRef<'_>,
+    query: *const sys::ecs_query_t,
+) -> bool {
+    match cache {
+        Some(cache) => cache.get_or_init(|| is_proven_disjoint(world, query)),
+        None => is_proven_disjoint(world, query),
+    }
+}
 
 /// Maximum number of data terms the fixed-size scratch buffer tracks. A query
 /// with more terms than this fails the proof (conservative).

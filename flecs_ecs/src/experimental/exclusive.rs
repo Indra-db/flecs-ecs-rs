@@ -147,10 +147,13 @@ where
 {
     fn each_exclusive(&self, world: &mut World, func: impl FnMut(T::TupleType<'_>)) {
         let world_ref = self.world();
+        // Cached world identity (spec §4.7): the query stores its real world, so
+        // the per-call check is one field read plus one pointer compare against
+        // the &mut World's pointer (always a real, unstaged world). No FFI.
         assert!(
             core::ptr::eq(
-                world_ref.real_world().world_ptr(),
-                (&*world).world().real_world().world_ptr()
+                unsafe { (*self.query_ptr()).real_world },
+                (&*world).world_ptr()
             ),
             "each_exclusive requires the query's own world: the &mut World passed in belongs to a \
              different world and cannot prove exclusive access to this query's storage"
@@ -160,7 +163,12 @@ where
         // still be intra-query disjoint for a lock-free run to be sound (nothing
         // would otherwise catch two mutable terms hitting the same storage).
         // When not proven, fall back to the locked path, which is always correct.
-        if !super::disjoint::is_proven_disjoint(world_ref, self.query_ptr()) {
+        // The verdict is cached on the query and computed at most once.
+        if !super::disjoint::is_proven_disjoint_cached(
+            self.disjoint_cache(),
+            world_ref,
+            self.query_ptr(),
+        ) {
             self.each(func);
             return;
         }

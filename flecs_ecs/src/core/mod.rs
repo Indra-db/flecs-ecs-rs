@@ -78,7 +78,7 @@ pub use id::Id;
 pub use id_view::IdView;
 pub use observer::Observer;
 pub use observer_builder::{ObserverBuilder, ObserverUpdater};
-pub use query::{Query, QueryHandle};
+pub use query::{Query, QueryDisjointCache, QueryHandle};
 pub use query_builder::*;
 pub use query_iter::{ChainedIter, QueryIter};
 pub(crate) use query_iter::IterGuard;

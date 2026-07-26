@@ -256,16 +256,22 @@ where
 {
     fn chunks<'w>(&self, world: &'w mut World) -> ChunkCursor<'w, P, T> {
         let world_ref = self.world();
+        // Cached world identity (spec §4.7): read the query's real world and
+        // pointer-compare against the &mut World (always a real world). No FFI.
         assert!(
             core::ptr::eq(
-                world_ref.real_world().world_ptr(),
-                (&*world).world().real_world().world_ptr()
+                unsafe { (*self.query_ptr()).real_world },
+                (&*world).world_ptr()
             ),
             "chunks() requires the query's own world: the &mut World passed in belongs to a \
              different world and cannot prove exclusive access to this query's storage"
         );
         assert!(
-            super::disjoint::is_proven_disjoint(world_ref, self.query_ptr()),
+            super::disjoint::is_proven_disjoint_cached(
+                self.disjoint_cache(),
+                world_ref,
+                self.query_ptr(),
+            ),
             "chunks() requires a provably-disjoint query: distinct dense self component ids, no \
              wildcards, sparse, or traversal terms. This query could not be proven disjoint."
         );

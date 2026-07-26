@@ -65,6 +65,15 @@ pub trait IterOperations {
 
     #[doc(hidden)]
     fn query_ptr(&self) -> *const sys::ecs_query_t;
+
+    /// The per-query cache of the build-time disjointness verdict (spec §4.7),
+    /// if this iterable owns one. Only [`Query`] does; transient iterables
+    /// (`QueryIter`, `ChainedIter`) return `None` and recompute per call.
+    #[doc(hidden)]
+    #[inline]
+    fn disjoint_cache(&self) -> Option<&QueryDisjointCache> {
+        None
+    }
 }
 
 pub trait QueryAPI<'a, P, T>: IterOperations + WorldProvider<'a>

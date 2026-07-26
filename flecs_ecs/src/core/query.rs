@@ -491,7 +491,39 @@ where
     pub(crate) query: NonNull<sys::ecs_query_t>,
     // this is a leaked box, which is valid during the lifecycle of the query object.
     world_ctx: NonNull<WorldCtx>,
+    proof: QueryDisjointCache,
     _phantom: PhantomData<T>,
+}
+
+/// Per-query cache of the build-time disjointness verdict (spec §4.7).
+///
+/// The verdict is a conservative `bool`: `true` means the query's data terms
+/// provably address pairwise-distinct, dense, self-sourced storage, so a
+/// lock-free exclusive run cannot alias. It is computed lazily on first use of
+/// an exclusive-register iteration entry point (`each_exclusive` / `chunks`) and
+/// is stable by construction: flecs forbids adding any trait except `With` to a
+/// component already queried for (`flecs_trait_can_add_after_query`, vendored
+/// `flecs.c:4298`, enforced at `flecs.c:4331`), so no later mutation can
+/// invalidate it. Per-call cost after the first is one branch.
+#[doc(hidden)]
+#[derive(Default)]
+pub struct QueryDisjointCache {
+    verdict: core::cell::Cell<Option<bool>>,
+}
+
+impl QueryDisjointCache {
+    /// Return the cached verdict, computing it once with `compute` if unset.
+    #[inline]
+    pub(crate) fn get_or_init(&self, compute: impl FnOnce() -> bool) -> bool {
+        match self.verdict.get() {
+            Some(v) => v,
+            None => {
+                let v = compute();
+                self.verdict.set(Some(v));
+                v
+            }
+        }
+    }
 }
 
 // `Query` is deliberately `!Send`/`!Sync` (via its `NonNull` fields), like
@@ -781,6 +813,11 @@ where
     fn iter_next_func(&self) -> ExternIterNextFn {
         sys::ecs_query_next
     }
+
+    #[inline(always)]
+    fn disjoint_cache(&self) -> Option<&QueryDisjointCache> {
+        Some(&self.proof)
+    }
 }
 
 impl<T> QueryAPI<'_, (), T> for Query<T>
@@ -841,6 +878,7 @@ where
             Self {
                 query,
                 world_ctx,
+                proof: QueryDisjointCache::default(),
                 _phantom: core::marker::PhantomData,
             }
         }
@@ -890,6 +928,7 @@ where
                     return Some(Self {
                         query,
                         world_ctx,
+                        proof: QueryDisjointCache::default(),
                         _phantom: PhantomData,
                     });
                 }
@@ -913,6 +952,7 @@ where
             Some(Self {
                 query,
                 world_ctx,
+                proof: QueryDisjointCache::default(),
                 _phantom: PhantomData,
             })
         }
