@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 // When an entity is instantiated from a prefab, components are by default
@@ -71,11 +72,11 @@ fn main() {
     // We can get all components on the instance, regardless of whether they
     // are overridden or not. Note that the overridden components (Attack and
     // Damage) are initialized with the values from the prefab component:
-    inst.try_get::<(&Attack, &Defence, &Damage)>(|(attack, defence, damage)| {
+    if let Ok((attack, defence, damage)) = inst.try_get_ref::<(&Attack, &Defence, &Damage)>() {
         println!("attack: {}", attack.value);
         println!("defence: {}", defence.value);
         println!("damage: {}", damage.value);
-    });
+    }
 
     // Output:
     //  Damage, (Identifier,Name), (IsA,SpaceShip)

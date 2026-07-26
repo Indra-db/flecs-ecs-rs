@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 // ChildOf hierarchies are optimized for scenarios with few parents that have
@@ -30,19 +31,19 @@ fn iterate_tree(entity: EntityView, position_parent: &Position) {
     // Print hierarchical name of entity & the entity type
     println!("{} [{}]", entity.path().unwrap(), entity.archetype());
 
-    // Get the position of the entity
-    entity.get::<&Position>(|position| {
-        // Calculate actual position
-        let actual_position = Position {
-            x: position.x + position_parent.x,
-            y: position.y + position_parent.y,
-        };
-        println!("{{{}, {}}}\n", actual_position.x, actual_position.y);
+    // Get the position of the entity through a guard, then compute the actual
+    // position as an ordinary expression.
+    let position = entity.get_ref::<&Position>().unwrap();
+    let actual_position = Position {
+        x: position.x + position_parent.x,
+        y: position.y + position_parent.y,
+    };
+    drop(position); // release the read guard before recursing into the children
+    println!("{{{}, {}}}\n", actual_position.x, actual_position.y);
 
-        // Iterate children recursively
-        entity.each_child(|child| {
-            iterate_tree(child, &actual_position);
-        });
+    // Iterate children recursively
+    entity.each_child(|child| {
+        iterate_tree(child, &actual_position);
     });
 }
 

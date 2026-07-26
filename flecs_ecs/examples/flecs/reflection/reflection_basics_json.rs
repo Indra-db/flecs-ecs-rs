@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -22,10 +23,9 @@ fn main() {
     let e = world.entity().set(Position { x: 2.0, y: 4.0 });
 
     // Convert position component to JSON string
-    e.get::<&Position>(|p| {
-        let expr: String = world.to_json::<Position>(p);
-        println!("Position: {expr}");
-    });
+    let p = e.get_ref::<&Position>().unwrap();
+    let expr: String = world.to_json::<Position>(&p);
+    println!("Position: {expr}");
 
     // Output:
     //  Position: {x: 2, y: 4}

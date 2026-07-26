@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 // This example shows how queries can be used to match simple inheritance trees.
 
@@ -28,7 +29,7 @@ struct Marksman;
 struct BuilderX;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Make the ECS aware of the inheritance relationships. Note that IsA
     // relationship used here is the same as in the prefab example.
@@ -58,7 +59,7 @@ fn main() {
     let r = world.query::<()>().with(RangedUnit).build();
 
     // Iterate the rule
-    r.each_entity(|e, rangedunit| {
+    r.each_entity_exclusive(&mut world, |e, rangedunit| {
         println!("Unit {} found", e.name());
     });
 

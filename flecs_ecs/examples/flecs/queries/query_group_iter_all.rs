@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 // This example demonstrates how to iterate over all active groups of a
@@ -14,7 +15,7 @@ pub struct Position {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     let asset_a = world.entity_named("Asset_A");
     let asset_b = world.entity_named("Asset_B");
@@ -60,9 +61,11 @@ fn main() {
         let asset = world.entity_from_id(group_id);
         println!("Group {}:", asset.path().unwrap());
 
-        query.with_group(group_id).each_entity(|e, p| {
-            println!(" - {}: {{{}, {}}}", e.path().unwrap(), p.x, p.y);
-        });
+        query
+            .with_group(group_id)
+            .each_entity_exclusive(&mut world, |e, p| {
+                println!(" - {}: {{{}, {}}}", e.path().unwrap(), p.x, p.y);
+            });
     }
 
     // Output (group iteration order is unspecified):

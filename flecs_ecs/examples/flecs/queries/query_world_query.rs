@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -15,7 +16,7 @@ pub struct Velocity {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create a few test entities for a Position, Velocity query
     world
@@ -36,7 +37,8 @@ fn main() {
     // hood this API uses flecs::query, which can be used directly for more
     // complex queries.
 
-    world.each_entity::<(&mut Position, &Velocity)>(|entity, (pos, vel)| {
+    let q = world.new_query::<(&mut Position, &Velocity)>();
+    q.each_entity_exclusive(&mut world, |entity, (pos, vel)| {
         pos.x += vel.x;
         pos.y += vel.y;
         println!("Entity {}: {:?}", entity.name(), pos);

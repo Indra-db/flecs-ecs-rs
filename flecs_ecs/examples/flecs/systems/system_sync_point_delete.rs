@@ -44,10 +44,12 @@ fn main() {
     world
         .system_named::<&Position>("DeleteEntity")
         .with(id::<&mut flecs::Wildcard>())
-        .each_entity(|e, p| {
+        // Deleting the visited entity is a command: each_entity_with hands a Stage
+        // to enqueue it on, so the delete is merged at the sync point.
+        .each_entity_with(|e, p, stage| {
             if p.x >= 3.0 {
                 println!("Delete entity {}", e.name());
-                e.destruct();
+                stage.entity_view(e.id()).destruct();
             }
         });
 

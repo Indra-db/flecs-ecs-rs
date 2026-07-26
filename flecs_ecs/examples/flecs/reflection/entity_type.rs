@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Component)]
@@ -21,10 +22,9 @@ fn main() {
     let e = world.entity().set(TypeWithEntity { e: bar.into() });
 
     // Convert TypeWithEntity component to flecs expression string
-    e.get::<&TypeWithEntity>(|p| {
-        let expr: String = world.to_expr(p);
-        println!("TypeWithEntity: {expr}");
-    });
+    let p = e.get_ref::<&TypeWithEntity>().unwrap();
+    let expr: String = world.to_expr(&*p);
+    println!("TypeWithEntity: {expr}");
 
     // Output:
     //  TypeWithEntity: {e: foo}

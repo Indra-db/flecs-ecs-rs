@@ -9,6 +9,7 @@
 #![allow(clippy::if_same_then_else)]
 use std::os::raw::c_void;
 
+use flecs_ecs::experimental::prelude::{EntityGuardExt, QueryExclusiveExt, WorldSingletonExt};
 use flecs_ecs::macros::*;
 use flecs_ecs::prelude::*;
 use flecs_ecs::sys;
@@ -160,7 +161,7 @@ fn flecs_system_docs_compile_test() {
     let q = world.new_query::<(&mut Position, &Velocity)>();
 
     // Query iteration (each)
-    q.each(|(p, v)| { /* ... */ });
+    q.each_exclusive(&mut world, |(p, v)| { /* ... */ });
 
     // System iteration (each)
     world
@@ -168,7 +169,7 @@ fn flecs_system_docs_compile_test() {
         .each(|(p, v)| { /* ... */ });
 
     // Query iteration (run)
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let mut p = it
                 .get_field_mut::<Position>(0)
@@ -202,7 +203,7 @@ fn flecs_system_docs_compile_test() {
         });
 
     // Query iteration (run_iter)
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let mut p = it.field_mut::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -415,7 +416,7 @@ fn flecs_system_docs_compile_test() {
 }
 
 fn flecs_query_docs_compile_test() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create Position, Velocity query that matches empty archetypes.
     let q = world
@@ -434,7 +435,7 @@ fn flecs_query_docs_compile_test() {
 
     let q = world.new_query::<(&mut Position, &Velocity)>();
 
-    q.each(|(p, v)| {
+    q.each_exclusive(&mut world, |(p, v)| {
         p.x += v.x;
         p.y += v.y;
     });
@@ -452,7 +453,7 @@ fn flecs_query_docs_compile_test() {
 
     let q = world.new_query::<(&mut Position, &Velocity)>();
 
-    q.each_entity(|e, (p, v)| {
+    q.each_entity_exclusive(&mut world, |e, (p, v)| {
         println!("Entity: {}", e.name());
         p.x += v.x;
         p.y += v.y;
@@ -474,17 +475,15 @@ fn flecs_query_docs_compile_test() {
     #[derive(Component, Default)]
     struct Tag;
 
-    world.new_query::<&Tag>().each_entity(|e, tag| { /* */ });
+    let q = world.new_query::<&Tag>();
+    q.each_entity_exclusive(&mut world, |e, tag| { /* */ });
 
-    world
-        .query::<()>()
-        .with(&Tag)
-        .build()
-        .each_entity(|e, _| { /* */ });
+    let q = world.query::<()>().with(&Tag).build();
+    q.each_entity_exclusive(&mut world, |e, _| { /* */ });
 
     let q = world.new_query::<(&Position, &Velocity)>();
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let mut p = it.field_mut::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -498,7 +497,7 @@ fn flecs_query_docs_compile_test() {
 
     let q = world.new_query::<&Position>();
 
-    q.each_entity(|e, p| {
+    q.each_entity_exclusive(&mut world, |e, p| {
         e.add(Velocity::id()); // OK
     });
 
@@ -514,7 +513,7 @@ fn flecs_query_docs_compile_test() {
 
     world.defer_begin();
 
-    q.each_entity(|e, p| {
+    q.each_entity_exclusive(&mut world, |e, p| {
         e.add(Velocity::id()); // OK
     });
 
@@ -522,7 +521,7 @@ fn flecs_query_docs_compile_test() {
 
     let q = world.new_query::<(&mut Position, &Velocity)>();
 
-    q.each(|(p, v)| { /* */ });
+    q.each_exclusive(&mut world, |(p, v)| { /* */ });
 
     let q = world.query::<&mut Position>().with(&Velocity::id()).build();
 
@@ -565,7 +564,7 @@ fn flecs_query_docs_compile_test() {
 
     let q = world.new_query::<&mut (Eats, Apples)>();
 
-    q.each(|eats| {
+    q.each_exclusive(&mut world, |eats| {
         eats.value += 1.0;
     });
 
@@ -635,7 +634,7 @@ fn flecs_query_docs_compile_test() {
         .with(&Velocity::id())
         .build();
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = it.field_mut::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -684,12 +683,13 @@ fn flecs_query_docs_compile_test() {
         .with(Mass::id())
         .build();
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = it.field_mut::<Position>(0);
             let v = it.field::<Mass>(2); // not 4, because of the Or expression
 
             let vs_id = it.id(1);
+            let world = it.world();
             if vs_id == world.component_id::<Velocity>() {
                 // We can only use ecs_field if the field type is the same for all results,
                 // but we can use table_range() to get the table column directly.
@@ -733,7 +733,7 @@ fn flecs_query_docs_compile_test() {
 
     let q = world.new_query::<(&Position, Option<&Velocity>)>();
 
-    q.each(|(p, v)| {
+    q.each_exclusive(&mut world, |(p, v)| {
         if let Some(v) = v {
             // ...
         }
@@ -746,7 +746,7 @@ fn flecs_query_docs_compile_test() {
         .set_oper(OperKind::Optional)
         .build();
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = it.get_field_mut::<Position>(0);
             if let Some(v) = it.get_field::<Velocity>(1) {
@@ -812,7 +812,7 @@ fn flecs_query_docs_compile_test() {
         .scope_close()
         .build();
 
-    let game = world.entity().add(SimTime::id());
+    let game = world.entity().add(SimTime::id()).id();
 
     let q = world
         .query::<()>()
@@ -822,7 +822,7 @@ fn flecs_query_docs_compile_test() {
         .set_src(game) // fixed source, match SimTime on Game
         .build();
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let mut p = it.field_mut::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -842,7 +842,7 @@ fn flecs_query_docs_compile_test() {
         .build();
 
     // Because all components are now part of the query type, we can use each
-    q.each_entity(|e, (p, v, st)| {
+    q.each_entity_exclusive(&mut world, |e, (p, v, st)| {
         p.x += v.x * st.value;
         p.y += v.y * st.value;
     });
@@ -858,7 +858,7 @@ fn flecs_query_docs_compile_test() {
         .build();
 
     // Ok (note that it.count() will be 0)
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let sc = it.field::<SimConfig>(0);
             let mut st = it.field_mut::<SimTime>(1);
@@ -867,7 +867,7 @@ fn flecs_query_docs_compile_test() {
     });
 
     // Ok
-    q.each(|(sc, st)| {
+    q.each_exclusive(&mut world, |(sc, st)| {
         st.value += sc.sim_speed;
     });
 
@@ -877,7 +877,7 @@ fn flecs_query_docs_compile_test() {
     });
 
     // Not ok: there is no entity to pass to first argument
-    q.each_entity(|e, (sc, st)| {
+    q.each_entity_exclusive(&mut world, |e, (sc, st)| {
         st.value += sc.sim_speed;
     });
 
@@ -1007,7 +1007,7 @@ fn flecs_query_docs_compile_test() {
         .self_()
         .build();
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let mut p = it.field_mut::<Position>(0);
             let m = it.field::<Mass>(1);
@@ -1052,15 +1052,19 @@ fn flecs_query_docs_compile_test() {
 
     let location_var = q.find_var("$Location").unwrap();
 
-    q.iterable().set_var(location_var, earth).each(|it| {
-        // iterate as usual
-    });
+    q.iterable()
+        .set_var(location_var, earth)
+        .each_exclusive(&mut world, |it| {
+            // iterate as usual
+        });
 
     let earth = world.entity();
 
-    q.iterable().set_var_expr("$Location", earth).each(|it| {
-        // iterate as usual
-    });
+    q.iterable()
+        .set_var_expr("$Location", earth)
+        .each_exclusive(&mut world, |it| {
+            // iterate as usual
+        });
 
     #[derive(Component, Default)]
     struct Movement {
@@ -1105,7 +1109,7 @@ fn flecs_query_docs_compile_test() {
     // Setting a component will update the changed state
     let e = world.entity().set(Position { x: 10.0, y: 20.0 });
 
-    q_write.run(|mut it| {
+    q_write.run_exclusive(&mut world, |mut it| {
         while it.next() {
             if !changed {
                 // If no changes are made to the iterated table, the skip function can be
@@ -1119,7 +1123,7 @@ fn flecs_query_docs_compile_test() {
         }
     });
 
-    q_read.run(|mut it| {
+    q_read.run_exclusive(&mut world, |mut it| {
         while it.next() {
             if it.is_changed() {
                 // Check if the current table has changed. The change state will be reset
@@ -1355,12 +1359,13 @@ fn flecs_entities_components_docs_compile_test() {
     // Get the entity for the Position component
     let pos = world.component::<Position>();
     // Component entities have the Component component
-    pos.get::<&flecs::Component>(|comp_data| {
+    {
+        let comp_data = pos.get_ref::<&flecs::Component>().unwrap();
         println!(
             "size: {}, alignment: {}",
             comp_data.size, comp_data.alignment
         );
-    });
+    }
 
     // Register a sparse component
     world.component::<Position>().add_trait::<flecs::Sparse>();
@@ -1435,7 +1440,10 @@ fn flecs_entities_components_docs_compile_test() {
     // Set singleton
     world.set(TimeOfDay { value: 0.5 });
     // Get singleton
-    world.get::<&TimeOfDay>(|time| println!("{}", time.value));
+    {
+        let time = WorldSingletonExt::singleton::<TimeOfDay>(&world).unwrap();
+        println!("{}", time.value);
+    }
 
     // Set singleton
     world.set(TimeOfDay { value: 0.5 });
@@ -1457,7 +1465,7 @@ fn flecs_entities_components_docs_compile_test() {
 }
 
 fn flecs_docs_relationships_compile_test() {
-    let world = World::new();
+    let mut world = World::new();
 
     let likes = world.entity();
     let bob = world.entity();
@@ -1470,7 +1478,7 @@ fn flecs_docs_relationships_compile_test() {
     bob.remove((likes, alice));
 
     let bob = world.entity();
-    let eats = world.entity();
+    let eats = world.entity().id();
     let apples = world.entity();
     let pears = world.entity();
     bob.add((eats, apples));
@@ -1517,13 +1525,10 @@ fn flecs_docs_relationships_compile_test() {
         }
     });
 
-    world
-        .query::<()>()
-        .with((eats, apples))
-        .build()
-        .each_entity(|e, _| {
-            // Iterate as usual
-        });
+    let q = world.query::<()>().with((eats, apples)).build();
+    q.each_entity_exclusive(&mut world, |e, _| {
+        // Iterate as usual
+    });
 
     world
         .query::<()>()
@@ -1625,24 +1630,28 @@ fn flecs_docs_relationships_compile_test() {
         .set(Defense { value: 75 });
 
     // Obtain the inherited component from Spaceship
-    let is_100 = frigate.get::<&mut MaxSpeed>(|v| {
+    let is_100 = {
+        let v = frigate.get_ref::<&mut MaxSpeed>().unwrap();
         v.value == 100 // True
-    });
+    };
 
     // Obtain the overridden component from Frigate
-    let is_75 = frigate.get::<&mut Defense>(|v| {
+    let is_75 = {
+        let v = frigate.get_ref::<&mut Defense>().unwrap();
         v.value == 75 // True
-    });
+    };
 
     let fast_frigate = world.entity().is_a(frigate).set(MaxSpeed { value: 200 });
     // Obtain the overridden component from FastFrigate
-    let is_200 = fast_frigate.get::<&mut MaxSpeed>(|v| {
+    let is_200 = {
+        let v = fast_frigate.get_ref::<&mut MaxSpeed>().unwrap();
         v.value == 200 // True
-    });
+    };
     // Obtain the inherited component from Frigate
-    let is_75 = fast_frigate.get::<&mut Defense>(|v| {
+    let is_75 = {
+        let v = fast_frigate.get_ref::<&mut Defense>().unwrap();
         v.value == 75 // True
-    });
+    };
 
     let spaceship = world.entity();
     let cockpit = world.entity();
@@ -1707,9 +1716,10 @@ fn flecs_docs_quick_start_compile_test() {
         .set(Velocity { x: 1.0, y: 2.0 });
 
     // Get a component
-    e.get::<&Position>(|p| {
+    {
+        let p = e.get_ref::<&Position>().unwrap();
         println!("Position: ({}, {})", p.x, p.y);
-    });
+    }
 
     // Remove component
     e.remove(Position::id());
@@ -1724,9 +1734,10 @@ fn flecs_docs_quick_start_compile_test() {
 
     let pos_e = world.entity_from::<Position>();
 
-    pos_e.get::<&flecs::Component>(|c| {
+    {
+        let c = pos_e.get_ref::<&flecs::Component>().unwrap();
         println!("Component size: {}", c.size);
-    });
+    }
 
     // Option 1: create Tag as empty struct
     #[derive(Component)]
@@ -1789,6 +1800,7 @@ fn flecs_docs_quick_start_compile_test() {
     parent.destruct();
 
     let parent = world.entity_named("parent");
+    let parent_id = parent.id();
     let child = world.entity_named("child").child_of(parent);
     println!("Child path: {}", child.path().unwrap()); // output: 'parent::child'
 
@@ -1802,7 +1814,7 @@ fn flecs_docs_quick_start_compile_test() {
         .cascade()
         .build();
 
-    q.each(|(p, p_parent)| {
+    q.each_exclusive(&mut world, |(p, p_parent)| {
         // Do the thing
     });
 
@@ -1820,17 +1832,19 @@ fn flecs_docs_quick_start_compile_test() {
     world.set(Gravity { x: 10, y: 20 });
 
     // Get singleton component
-    world.get::<&Gravity>(|g| {
+    {
+        let g = WorldSingletonExt::singleton::<Gravity>(&world).unwrap();
         println!("Gravity: {}, {}", g.x, g.y);
-    });
+    }
 
     let grav_e = world.entity_from::<Gravity>();
 
     grav_e.set(Gravity { x: 10, y: 20 });
 
-    grav_e.get::<&Gravity>(|g| {
+    {
+        let g = grav_e.get_ref::<&Gravity>().unwrap();
         println!("Gravity: {}, {}", g.x, g.y);
-    });
+    }
 
     world
         .query::<(&Velocity, &Gravity)>()
@@ -1839,7 +1853,8 @@ fn flecs_docs_quick_start_compile_test() {
         .build();
 
     // For simple queries the world::each function can be used
-    world.each::<(&mut Position, &Velocity)>(|(p, v)| {
+    let q = world.new_query::<(&mut Position, &Velocity)>();
+    q.each_exclusive(&mut world, |(p, v)| {
         // EntityView argument is optional, use each_entity to get it
         p.x += v.x;
         p.y += v.y;
@@ -1848,16 +1863,16 @@ fn flecs_docs_quick_start_compile_test() {
     // More complex queries can first be created, then iterated
     let q = world
         .query::<&Position>()
-        .with((flecs::ChildOf::ID, parent))
+        .with((flecs::ChildOf::ID, parent_id))
         .build();
 
     // Option 1: the each() callback iterates over each entity
-    q.each_entity(|e, p| {
+    q.each_entity_exclusive(&mut world, |e, p| {
         println!("{}: ({}, {})", e.name(), p.x, p.y);
     });
 
     // Option 2: the run() callback offers more control over the iteration
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = it.field_mut::<Position>(0);
 
@@ -2310,9 +2325,10 @@ fn flecs_docs_prefabs_compile_test() {
     let inst_2 = world.entity().is_a(spaceship);
 
     // Get instantiated component
-    inst_1.get::<&Defense>(|defense| {
+    {
+        let defense = inst_1.get_ref::<&Defense>().unwrap();
         println!("Defense value: {}", defense.value);
-    });
+    }
 
     let myprefab = world.entity().add(id::<flecs::Prefab>());
 
@@ -2354,14 +2370,16 @@ fn flecs_docs_prefabs_compile_test() {
     let inst = world.entity().is_a(spaceship);
 
     // Component is retrieved from instance
-    inst.get::<&Health>(|health| {
+    {
+        let health = inst.get_ref::<&Health>().unwrap();
         println!("Health value: {}", health.value);
-    });
+    }
 
     // Component is retrieved from prefab
-    inst.get::<&Defense>(|defense| {
+    {
+        let defense = inst.get_ref::<&Defense>().unwrap();
         println!("Defense value: {}", defense.value);
-    });
+    }
 
     if inst.owns(Defense::id()) {
         // not inherited
@@ -2428,12 +2446,14 @@ fn flecs_docs_prefabs_compile_test() {
 
     // Create prefab instance
     let inst = world.entity().is_a(freighter);
-    inst.get::<&Health>(|health| {
+    {
+        let health = inst.get_ref::<&Health>().unwrap();
         println!("Health value: {}", health.value); // 150
-    });
-    inst.get::<&Defense>(|defense| {
+    }
+    {
+        let defense = inst.get_ref::<&Defense>().unwrap();
         println!("Defense value: {}", defense.value); // 50
-    });
+    }
 
     let spaceship = world.prefab_named("Spaceship");
     let cockpit = world.prefab_named("Cockpit").child_of(spaceship);
@@ -2599,13 +2619,15 @@ fn flecs_docs_component_traits_compile_test() {
     // has a value of type Position
 
     // Gets value from Position component
-    e.get::<&Position>(|pos| {
+    {
+        let pos = e.get_ref::<&Position>().unwrap();
         println!("Position: ({}, {})", pos.x, pos.y);
-    });
+    }
     // Gets (unintended) value from (Serializable, Position) pair
-    e.get::<&(Serializable, Position)>(|pos| {
+    {
+        let pos = e.get_ref::<&(Serializable, Position)>().unwrap();
         println!("Serializable Position: ({}, {})", pos.x, pos.y);
-    });
+    }
 
     // This is currently not supported in Rust due to safety concerns.
 
@@ -2646,7 +2668,7 @@ fn flecs_docs_component_traits_compile_test() {
 
     assert!(!inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(inst.try_get::<&Mass>(|mass| {}).is_none());
+    assert!(inst.try_get_ref::<&Mass>().is_err());
 
     let locatedin = world.entity();
     let manhattan = world.entity();

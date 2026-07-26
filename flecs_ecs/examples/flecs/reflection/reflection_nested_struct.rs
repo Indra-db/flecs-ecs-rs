@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Default, Component)]
@@ -26,10 +27,9 @@ fn main() {
     });
 
     // Convert Line component to flecs expression string
-    e.get::<&mut Line>(|line| {
-        // Convert component to string
-        println!("{}", world.to_expr(line));
-    });
+    let line = e.get_ref::<&mut Line>().unwrap();
+    // Convert component to string
+    println!("{}", world.to_expr(&*line));
 
     // Output:
     //  {start: {x: 10, y: 20}, stop: {x: 30, y: 40}}

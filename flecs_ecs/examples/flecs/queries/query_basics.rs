@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -15,7 +16,7 @@ pub struct Velocity {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create a query for Position, Velocity. Queries are the fastest way to
     // iterate entities as they cache results.
@@ -39,14 +40,14 @@ fn main() {
 
     // `The each_entity()` function iterates each entity individually and accepts an
     // entity argument plus arguments for each query component:
-    query.each_entity(|e, (pos, vel)| {
+    query.each_entity_exclusive(&mut world, |e, (pos, vel)| {
         pos.x += vel.x;
         pos.y += vel.y;
         println!("{}: [{:?}]", e.name(), pos);
     });
 
     // There's an equivalent function that does not include the entity argument
-    query.each(|(pos, vel)| {
+    query.each_exclusive(&mut world, |(pos, vel)| {
         pos.x += vel.x;
         pos.y += vel.y;
         println!("[{pos:?}]");
@@ -54,7 +55,7 @@ fn main() {
 
     // Run is a bit more verbose, but allows for more control over how entities
     // are iterated as it provides multiple entities in the same callback.
-    query.run(|mut it| {
+    query.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let mut p = it.field_mut::<Position>(0);
             let v = it.field::<Velocity>(1);

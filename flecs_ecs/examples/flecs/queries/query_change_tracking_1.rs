@@ -2,6 +2,7 @@
 #![allow(warnings)]
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 // Queries have a builtin mechanism for tracking changes per matched table. This
@@ -69,7 +70,7 @@ fn print_world_positions(entity: EntityView, world_pos: &WorldPosition) {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     let transform_query = world
         .query_named::<(&Position, Option<&Position>, &mut WorldPosition)>("update_transforms")
@@ -89,18 +90,20 @@ fn main() {
         .entity_named("child")
         .set(Position { x: 10.0, y: 20.0 })
         .set(WorldPosition { x: 0.0, y: 0.0 })
-        .child_of(parent);
+        .child_of(parent)
+        .id();
 
     let independent = world
         .entity_named("independent")
         .set(Position { x: 50.0, y: 30.0 })
         .set(WorldPosition { x: 0.0, y: 0.0 })
         // this is to make sure independent entity is in a different archetype
-        .add(DummyTag);
+        .add(DummyTag)
+        .id();
 
     // Since this is the first time the query is iterated, all tables
     // will show up as changed and not skipped
-    transform_query.run(update_transforms);
+    transform_query.run_exclusive(&mut world, update_transforms);
 
     // Output:
     //  non-skip archetype: Position, WorldPosition
@@ -110,10 +113,10 @@ fn main() {
     // Set the child position to a new value. This will change the table that
     // the child entity is in, which will cause the query to return true when
     // we call changed().
-    child.set(Position { x: 110.0, y: 210.0 });
+    world.entity_from_id(child).set(Position { x: 110.0, y: 210.0 });
 
     // When we iterate the query, we'll see that one table has changed and thus not skipped
-    transform_query.run(update_transforms);
+    transform_query.run_exclusive(&mut world, update_transforms);
 
     println!();
 
@@ -122,7 +125,7 @@ fn main() {
     //  non-skip archetype: Position, WorldPosition, (ChildOf,parent)
     //  skip archetype: Position, WorldPosition, DummyTag
 
-    print_world_pos.each_entity(print_world_positions);
+    print_world_pos.each_entity_exclusive(&mut world, print_world_positions);
 
     // Output:
     //  parent: WorldPosition { x: 110.0, y: 210.0 }
@@ -130,9 +133,9 @@ fn main() {
     //  child: WorldPosition { x: 120.0, y: 230.0 }
 
     // now the same, but for independent entity, which is in a different archetype.
-    independent.set(Position { x: 60.0, y: 40.0 });
+    world.entity_from_id(independent).set(Position { x: 60.0, y: 40.0 });
 
-    transform_query.run(update_transforms);
+    transform_query.run_exclusive(&mut world, update_transforms);
 
     println!();
 
@@ -141,7 +144,7 @@ fn main() {
     //  skip archetype: Position, WorldPosition, (ChildOf,parent)
     //  non-skip archetype: Position, WorldPosition, DummyTag
 
-    print_world_pos.each_entity(print_world_positions);
+    print_world_pos.each_entity_exclusive(&mut world, print_world_positions);
 
     // Output:
     //  parent: WorldPosition { x: 110.0, y: 210.0 }

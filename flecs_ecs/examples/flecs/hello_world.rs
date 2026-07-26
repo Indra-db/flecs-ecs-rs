@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -52,25 +53,25 @@ fn main() {
     world.progress();
     world.progress();
 
-    // - get panics if the component is not present, use try_get for a non-panicking version which does not run the callback.
-    // - or use Option to handle the individual component missing.
-    world.entity_from_id(bob).get::<&Position>(|pos| {
+    // get_ref borrows the component through a guard.
+    // - a required &Position returns None (as an AccessError via try_get_ref) if
+    //   absent; wrap the term in Option to handle a missing component instead.
+    let bob_ref = world.entity_from_id(bob);
+    let pos = bob_ref.get_ref::<&Position>().unwrap();
+    // See if Bob has moved (he has)
+    println!("{}'s position: {:?}", bob_ref.name(), pos);
+    drop(pos);
+
+    // Option example: a missing component becomes None instead of a panic.
+    let (pos,) = bob_ref.get_ref::<(Option<&Position>,)>().unwrap();
+    let has_pos = pos.is_some();
+    if let Some(pos) = &pos {
         // See if Bob has moved (he has)
-        println!("{}'s position: {:?}", world.entity_from_id(bob).name(), pos);
-    });
+        println!("{}'s try_get position: {:?}", bob_ref.name(), pos);
+    }
+    drop(pos);
 
-    // Option example
-    let has_run = world.entity_from_id(bob)
-        .try_get::<Option<&Position>>(|pos| {
-            if let Some(pos) = pos {
-                // See if Bob has moved (he has)
-                //println!( "{}'s try_get position: {:?}", bob.name(), pos);
-                println!("{}'s try_get position: {:?}", world.entity_from_id(bob).name(), pos);
-            }
-        })
-        .is_some();
-
-    if has_run {
+    if has_pos {
         println!("Bob has a position component, so the try_get callback ran.");
     }
 

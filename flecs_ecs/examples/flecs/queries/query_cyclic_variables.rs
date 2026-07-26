@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 // This example shows how a rule may have terms with cyclic dependencies on
 // variables.
@@ -8,7 +9,7 @@ use flecs_ecs::prelude::*;
 struct Likes;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     let bob = world.entity_named("Bob");
     let alice = world.entity_named("Alice");
@@ -50,7 +51,7 @@ fn main() {
 
     // Because the query doesn't use the This variable we cannot use "each"
     // which iterates the entities array. Instead we can use iter like this:
-    rule.run(|mut it| {
+    rule.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let x = it.get_var(x_var);
             let y = it.get_var(y_var);

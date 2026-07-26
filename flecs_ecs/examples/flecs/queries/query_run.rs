@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -20,7 +21,7 @@ pub struct Mass {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     let query = world.new_query::<(&mut Position, &Velocity)>();
 
@@ -43,7 +44,7 @@ fn main() {
 
     // The run() function provides a flecs::iter object which contains all sorts
     // of information on the entities currently being iterated.
-    query.run(|mut it| {
+    query.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let mut position = it.field_mut::<Position>(0);
             let velocity = it.field::<Velocity>(1);

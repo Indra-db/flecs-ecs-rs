@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -38,10 +39,9 @@ fn main() {
     });
 
     // Convert TypeWithEnum component to flecs expression string
-    e.get::<&TypeWithEnum>(|p| {
-        let expr: String = world.to_expr(p);
-        println!("TypeWithEnum: {expr}");
-    });
+    let p = e.get_ref::<&TypeWithEnum>().unwrap();
+    let expr: String = world.to_expr(&*p);
+    println!("TypeWithEnum: {expr}");
 
     // Output:
     //  TypeWithEnum: {color: Green}

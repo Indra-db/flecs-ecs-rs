@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -18,7 +19,7 @@ pub struct Velocity {
 pub struct Walking;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create an entity with name Bob
     let bob = world
@@ -30,14 +31,16 @@ fn main() {
         // useful for tags, or when adding a component with its default value.
         .add(Walking);
 
-    // Get the value for the Position component
-    // - get panics if the component is not present, use try_get for a non-panicking version which does not run the callback.
-    // - or use Option to handle the individual component missing.
-    bob.get::<Option<&Position>>(|pos| {
-        if let Some(pos) = pos {
-            println!("Bob's position: {pos:?}");
-        }
-    });
+    // Get the value for the Position component. get_ref returns an RAII guard
+    // borrowed straight from storage instead of running a callback.
+    // - a required &Position returns None (via try_get_ref, an AccessError) when
+    //   absent; wrapping the term in Option makes a missing component observable.
+    // - a single Option term is spelled as a one-element tuple.
+    let (pos,) = bob.get_ref::<(Option<&Position>,)>().unwrap();
+    if let Some(pos) = &pos {
+        println!("Bob's position: {pos:?}");
+    }
+    drop(pos); // release the read guard before writing Position again
 
     // Overwrite the value of the Position component
     bob.set(Position { x: 20.0, y: 30.0 });
@@ -57,8 +60,11 @@ fn main() {
     // Remove tag
     alice.remove(Walking);
 
-    // Iterate all entities with position
-    world.each_entity::<&Position>(|entity, pos| {
+    // Iterate all entities with position. Query iteration on the exclusive
+    // register borrows &mut World, which proves no guard is outstanding and lets
+    // the closure receive plain references with no lock traffic.
+    let q = world.new_query::<&Position>();
+    q.each_entity_exclusive(&mut world, |entity, pos| {
         println!("{} has {:?}", entity.name(), pos);
     });
 

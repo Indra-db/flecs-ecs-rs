@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -12,7 +13,7 @@ pub struct Position {
 struct Npc;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create a query for Position, Npc. By adding the Npc component using the
     // "with" method, the component is not a part of the query type, and as a
@@ -36,7 +37,7 @@ fn main() {
     world.entity_named("e3").set(Position { x: 10.0, y: 20.0 });
 
     // Note how the Npc tag is not part of the each signature
-    query.each_entity(|entity, pos| {
+    query.each_entity_exclusive(&mut world, |entity, pos| {
         println!("Entity {}: {:?}", entity.name(), pos);
     });
 

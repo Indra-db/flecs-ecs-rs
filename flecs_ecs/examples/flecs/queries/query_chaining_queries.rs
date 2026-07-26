@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::QueryExclusiveExt;
 use flecs_ecs::prelude::*;
 // this example is to showcase how you can chain queries together where the second query
 // uses the results of the first query to query the results
@@ -24,7 +25,7 @@ struct ArtifactPower {
 }
 
 fn main() {
-    let forest = World::new();
+    let mut forest = World::new();
 
     // Populate the forest with creatures. Some are enchanted.
     for i in 0..10 {
@@ -65,7 +66,7 @@ fn main() {
     let mut query_enchanted = forest.query::<()>().with(&Enchanted).build();
 
     // Iterate over creatures to find the enchanted ones
-    query_creatures.run(|mut iter| {
+    query_creatures.run_exclusive(&mut forest, |mut iter| {
 
         while iter.next() {
 

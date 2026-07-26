@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component, Default)]
@@ -15,7 +16,7 @@ struct WorldTransform {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Whenever we add LocalTransform, also add WorldTransform.
     world
@@ -62,7 +63,7 @@ fn main() {
         .cascade()
         .build();
 
-    query.each(|(t_local, t_parent, t_world)| {
+    query.each_exclusive(&mut world, |(t_local, t_parent, t_world)| {
         t_world.x = t_local.x;
         t_world.y = t_local.y;
         if let Some(t_parent) = t_parent {
@@ -72,11 +73,10 @@ fn main() {
     });
 
     // Print world positions
-    world
-        .new_query::<&WorldTransform>()
-        .each_entity(|entity, p| {
-            println!("{}: {{{}, {}}}", entity.name(), p.x, p.y);
-        });
+    let world_positions = world.new_query::<&WorldTransform>();
+    world_positions.each_entity_exclusive(&mut world, |entity, p| {
+        println!("{}: {{{}, {}}}", entity.name(), p.x, p.y);
+    });
 
     // Output:
     //  Sun: {1, 1}

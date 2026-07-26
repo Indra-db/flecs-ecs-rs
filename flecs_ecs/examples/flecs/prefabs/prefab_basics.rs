@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 // Prefabs are entities that can be used as templates for other entities. They
 // are created with a builtin Prefab tag, which by default excludes them from
@@ -26,7 +27,7 @@ pub struct Defence {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Add the traits to mark the component to be inherited
     world
@@ -39,19 +40,35 @@ fn main() {
     // Create a prefab instance
     let inst = world.entity_named("my_spaceship").is_a(spaceship);
 
-    // Because of the IsA relationship, the instance now shares the Defense
-    // component with the prefab, and can be retrieved as a regular component:
-    inst.try_get::<&Defence>(|d_inst| {
-        println!("{d_inst:?}");
-        // Because the component is shared, changing the value on the prefab will
-        // also change the value for the instance:
-        // this is safe during a table lock because it also has the component and won't cause the table to move.
-        spaceship.set(Defence { value: 100.0 });
-        println!("after set: {d_inst:?}");
-    });
+    // Drop down to plain entity ids so the &mut World reads below are free of any
+    // live view borrow.
+    let spaceship = spaceship.id();
+    let inst = inst.id();
+
+    // Because of the IsA relationship, the instance shares the Defence component
+    // with the prefab, and can be read as a regular component. An EntityMut reads
+    // straight from storage on the exclusive register, so the value is current.
+    println!(
+        "{:?}",
+        world.entity_mut(inst).unwrap().get::<Defence>().unwrap()
+    );
+
+    // Because the component is shared, changing the value on the prefab also
+    // changes it for the instance. On the exclusive register the write is
+    // immediate, so the read-back below observes the new value with no deferral.
+    world
+        .entity_mut(spaceship)
+        .unwrap()
+        .set(Defence { value: 100.0 });
+
+    println!(
+        "after set: {:?}",
+        world.entity_mut(inst).unwrap().get::<Defence>().unwrap()
+    );
 
     // Prefab components can be iterated like regular components:
-    world.each_entity::<&Defence>(|entity, d| {
+    let q = world.new_query::<&Defence>();
+    q.each_entity_exclusive(&mut world, |entity, d| {
         println!("{}: defence: {}", entity.path().unwrap(), d.value);
     });
 

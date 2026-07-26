@@ -1,6 +1,7 @@
 use crate::z_ignore_test_common::*;
 
 use core::ffi::c_void;
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 use flecs_ecs::sys;
 use std::sync::Mutex;
@@ -73,7 +74,7 @@ fn callback_group_delete(
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Register components in order so that id for First is lower than Third
     world.component::<First>();
@@ -136,8 +137,9 @@ fn main() {
     //     - table [Position, Tag, (Group, Third)]
     //
 
-    query.run(|mut it| {
+    query.run_exclusive(&mut world, |mut it| {
         while it.next() {
+            let world = it.world();
             let group = world.entity_from_id(it.group_id());
             let pos = it.field::<Position>(0);
 
