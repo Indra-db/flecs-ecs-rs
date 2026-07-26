@@ -10,14 +10,17 @@
 //! the plain `each`. `Iter` borrows the running iteration for `'a` and is
 //! `!Send`/`!Sync`.
 //!
-//! This wave ships the **query** surface only (`each_iter` / `each_iter_shared`);
-//! the system-builder and observer terminals (and the observer-only event
-//! metadata of spec §5.6) arrive with the surface swap.
+//! This wave ships the **query** terminals only (`each_iter` /
+//! `each_iter_shared`); the system-builder and observer terminals arrive with
+//! the surface swap. [`Iter`] already carries the observer event metadata of
+//! spec §5.6 ([`event`](Iter::event), [`event_id`](Iter::event_id),
+//! [`pair`](Iter::pair)) so those terminals can hand it out unchanged.
 
 use core::marker::PhantomData;
 
 use crate::core::{
-    ComponentPointers, EntityView, IterGuard, QueryAPI, QueryTuple, World, WorldProvider, WorldRef,
+    ComponentPointers, EntityView, Id, IterGuard, QueryAPI, QueryTuple, World, WorldProvider,
+    WorldRef,
 };
 use crate::sys;
 
@@ -88,6 +91,46 @@ impl<'a> Iter<'a> {
         );
         // SAFETY: row < count and entities has count valid entries.
         EntityView::new_from(self.world, unsafe { *iter.entities.add(row) })
+    }
+
+    /// The event being dispatched (spec §5.6). **Observer-only**: meaningful
+    /// inside an observer callback, where it names the event entity
+    /// (`flecs::OnAdd`, `flecs::OnSet`, a custom event, ..). Outside an
+    /// observer invocation the iterator carries no event and the returned view
+    /// wraps the zero id (`view.id() == 0`).
+    #[inline(always)]
+    pub fn event(&self) -> EntityView<'a> {
+        // SAFETY: `iter` points to the live iterator this context borrows.
+        EntityView::new_from(self.world, unsafe { (*self.iter).event })
+    }
+
+    /// The (component) id the event was emitted for (spec §5.6).
+    /// **Observer-only**: meaningful inside an observer callback. Outside an
+    /// observer invocation the iterator carries no event id and this returns
+    /// the zero [`Id`].
+    #[inline(always)]
+    pub fn event_id(&self) -> Id {
+        // SAFETY: as `event`.
+        Id::new(unsafe { (*self.iter).event_id })
+    }
+
+    /// The id matched for field `index` when that id is a pair, else `None`
+    /// (spec §5.6). Valid in any iteration, not only observers: for a wildcard
+    /// pair term this is the concrete pair matched for the current batch.
+    ///
+    /// # Panics
+    /// In debug builds, if `index` is not a valid field index for this
+    /// iteration.
+    #[inline]
+    pub fn pair(&self, index: i8) -> Option<Id> {
+        // SAFETY: `iter` points to the live iterator this context borrows;
+        // ecs_field_id validates `index` against the iterator in debug builds.
+        let id = unsafe { sys::ecs_field_id(self.iter, index) };
+        if unsafe { sys::ecs_id_is_pair(id) } {
+            Some(Id::new(id))
+        } else {
+            None
+        }
     }
 }
 
