@@ -7,12 +7,30 @@
 //! [`core::cell::RefMut`] over a `RefCell`. A conflicting borrow panics; the
 //! `try_*` entry points return the conflict as an [`AccessError`] instead.
 //!
-//! Each guard also holds one flecs defer level open (opened by
-//! `ecs_rust_get_scope_begin` / `ecs_defer_begin`) for its whole lifetime, so
-//! structural mutations issued through the shared world while the guard is live
-//! are queued and applied only once the last guard drops. That is what keeps
-//! the borrowed component pointer valid: without it a `&World`-driven
-//! `add`/`remove` could move the entity to another table and dangle the guard.
+//! A guard holds **no** flecs defer level of its own. Instead each live guard
+//! increments a per-stage **pin counter** on acquire and decrements it on drop
+//! (spec §7.1); the read path issues zero defer FFI. The flecs defer level is
+//! opened lazily, once per write episode, by the shared-register write wrappers:
+//! the first `set` / `add` / `remove` (etc.) issued while the pin is nonzero
+//! opens one `ecs_defer_begin`, and the last guard to drop closes it with one
+//! `ecs_defer_end`. That is what keeps the borrowed component pointer valid:
+//! structural mutations issued through the shared world while a guard is live
+//! are queued and applied only once the last guard drops, so a `&World`-driven
+//! `add`/`remove` cannot move the entity to another table and dangle the guard.
+//!
+//! # Leaking a guard (`mem::forget`)
+//!
+//! [`mem::forget`](core::mem::forget)ting a guard skips its [`Drop`], so its
+//! borrow is never released and its pin is never decremented. This leaks, it
+//! does not corrupt (spec §7.2): the stuck borrow makes every later conflicting
+//! access to that storage panic (or `try_*`-error) forever, and the stuck pin
+//! keeps shared-register writes on the deferred path forever. A leaked *read*
+//! guard with no write issued leaks only the Rust pin (no C defer level). A
+//! guard leaked while a write episode's level is open leaks that one level,
+//! which delays the queued writes and their observers until the next world sync
+//! point (a `progress()` pipeline merge drains the world queue); it never
+//! aliases, grants access, or aborts at world destruction. Every leaked resource
+//! is a monotonic denial, never a grant.
 
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
@@ -57,7 +75,9 @@ impl core::fmt::Display for AccessError {
 
 impl core::error::Error for AccessError {}
 
-/// Shared, immutable access to a single component, released on drop.
+/// Shared, immutable access to a single component. On drop it releases its read
+/// borrow and decrements the stage pin (spec §7.1); it holds no defer level of
+/// its own. See the [module docs](self) for the `mem::forget` leak contract.
 ///
 /// Provisional name; the intended final surface folds this into `get`. Deref
 /// to `&T`.
@@ -71,7 +91,9 @@ pub struct Ref<'w, T> {
     _marker: PhantomData<&'w T>,
 }
 
-/// Shared, mutable access to a single component, released on drop.
+/// Shared, mutable access to a single component. On drop it releases its write
+/// borrow and decrements the stage pin (spec §7.1); it holds no defer level of
+/// its own. See the [module docs](self) for the `mem::forget` leak contract.
 ///
 /// Provisional name; the intended final surface folds this into `get`. Deref /
 /// `DerefMut` to `&mut T`.
@@ -88,9 +110,9 @@ pub struct Mut<'w, T> {
 impl<'w, T> Ref<'w, T> {
     /// # Safety
     /// `ptr` must point to a live `T` in component storage kept valid for `'w`
-    /// by the defer level owned by this guard; a read borrow for `key` must
-    /// already be registered in `locks` (this guard assumes ownership of both
-    /// the borrow and one defer level on `world`).
+    /// by the stage pin this guard holds; a read borrow for `key` must already
+    /// be registered in `locks` and the pin already incremented (this guard
+    /// assumes ownership of one borrow and one pin on `world`'s stage).
     #[inline(always)]
     pub(crate) unsafe fn from_parts(
         ptr: NonNull<T>,
@@ -112,7 +134,8 @@ impl<'w, T> Ref<'w, T> {
 
 impl<'w, T> Mut<'w, T> {
     /// # Safety
-    /// As [`Ref::from_parts`], but a write borrow for `key` must be registered.
+    /// As [`Ref::from_parts`], but a write borrow for `key` must be registered
+    /// and the pin already incremented.
     #[inline(always)]
     pub(crate) unsafe fn from_parts(
         ptr: NonNull<T>,
@@ -214,15 +237,16 @@ impl<T: PartialEq> PartialEq for Mut<'_, T> {
 impl<T> Drop for Ref<'_, T> {
     #[inline(always)]
     fn drop(&mut self) {
+        // SAFETY: the stage map is owned by this thread and outlives the guard;
+        // world is a live world pointer. Releases this guard's read borrow and
+        // pin; `pin_release` closes the episode defer level only if this is the
+        // last guard and a write opened one. Runs even on unwind. Zero FFI on
+        // the read-only path.
         #[cfg(feature = "flecs_safety_locks")]
-        // SAFETY: the stage map is owned by this thread and outlives the guard.
         unsafe {
-            (*self.locks.as_ptr()).read_end(self.key);
-        }
-        // SAFETY: world is a live world pointer; ends the one defer level this
-        // guard opened. Runs even on unwind.
-        unsafe {
-            sys::ecs_rust_scope_end(self.world.as_ptr());
+            let map = &mut *self.locks.as_ptr();
+            map.read_end(self.key);
+            map.pin_release(self.world.as_ptr());
         }
     }
 }
@@ -230,14 +254,12 @@ impl<T> Drop for Ref<'_, T> {
 impl<T> Drop for Mut<'_, T> {
     #[inline(always)]
     fn drop(&mut self) {
+        // SAFETY: as Ref::drop, releasing a write borrow.
         #[cfg(feature = "flecs_safety_locks")]
-        // SAFETY: as Ref::drop.
         unsafe {
-            (*self.locks.as_ptr()).write_end(self.key);
-        }
-        // SAFETY: as Ref::drop.
-        unsafe {
-            sys::ecs_rust_scope_end(self.world.as_ptr());
+            let map = &mut *self.locks.as_ptr();
+            map.write_end(self.key);
+            map.pin_release(self.world.as_ptr());
         }
     }
 }

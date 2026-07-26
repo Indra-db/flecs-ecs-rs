@@ -77,6 +77,17 @@ pub(crate) fn sparse_lock_key(cr: *mut sys::ecs_component_record_t) -> LockKey {
 #[derive(Default)]
 pub(crate) struct StageLocks {
     entries: Vec<(LockKey, u16)>,
+    /// Number of live shared-register guards ([`Ref`](crate::experimental::Ref)
+    /// / [`Mut`](crate::experimental::Mut)) on this stage. Single-owner per
+    /// thread, no atomics, mirroring the borrow map. Guards do not each open a
+    /// flecs defer level; instead the first shared-register write issued while
+    /// `pin > 0` lazily opens one episode-scoped level, closed when `pin`
+    /// returns to zero. See spec §7.1.
+    pin: u32,
+    /// Whether the lazy per-episode defer level opened by a shared-register
+    /// write is currently open on this stage. Set by [`StageLocks::open_episode`]
+    /// and cleared by [`StageLocks::pin_release`] when `pin` reaches zero.
+    episode_open: bool,
 }
 
 #[cfg(feature = "flecs_safety_locks")]
@@ -149,6 +160,43 @@ impl StageLocks {
             if entry.1 == 0 {
                 self.entries.swap_remove(index);
             }
+        }
+    }
+
+    /// Register one live guard on this stage (spec §7.1). No FFI: guards do not
+    /// open a defer level on acquire.
+    #[inline(always)]
+    pub(crate) fn pin_inc(&mut self) {
+        self.pin += 1;
+    }
+
+    /// Release one live guard. If it was the last (`pin` reaches zero) and a
+    /// write episode's defer level is open, close it with a single
+    /// `ecs_defer_end`; otherwise no FFI (the read-only drop path). `world` must
+    /// be the world (or stage) pointer this map belongs to.
+    #[inline(always)]
+    pub(crate) fn pin_release(&mut self, world: *mut sys::ecs_world_t) {
+        debug_assert!(self.pin > 0, "unbalanced pin_release");
+        self.pin -= 1;
+        if self.pin == 0 && self.episode_open {
+            self.episode_open = false;
+            // SAFETY: world is a live world/stage pointer; balances the single
+            // level opened by `open_episode`.
+            unsafe { sys::ecs_defer_end(world) };
+        }
+    }
+
+    /// Shared-register write hook: if a guard is live (`pin > 0`) and no episode
+    /// level is open yet, open exactly one `ecs_defer_begin` so the write is
+    /// queued behind the live borrow (storage-pin, spec §3.6). When `pin == 0`
+    /// this is one branch and no FFI, leaving today's immediate semantics.
+    #[inline(always)]
+    pub(crate) fn open_episode(&mut self, world: *mut sys::ecs_world_t) {
+        if self.pin > 0 && !self.episode_open {
+            self.episode_open = true;
+            // SAFETY: world is a live world/stage pointer; the matching
+            // `ecs_defer_end` runs in `pin_release` when `pin` reaches zero.
+            unsafe { sys::ecs_defer_begin(world) };
         }
     }
 
@@ -301,6 +349,26 @@ pub(crate) fn stage_locks_dyn(world: &WorldRef) -> NonNull<StageLocks> {
         stage_locks::<false>(world)
     }
 }
+
+/// Shared-register write hook (spec §3.6, §7.1). Every safe `&World` /
+/// `EntityView` op that can move storage or write component data calls this
+/// before its body: if a guard is live on this stage it lazily opens the single
+/// episode-scoped defer level so the write is queued behind the live borrow.
+/// When no guard is live (`pin == 0`) it is one resolve plus one branch and
+/// leaves today's immediate semantics untouched.
+#[cfg(feature = "flecs_safety_locks")]
+#[inline]
+pub(crate) fn ensure_write_episode(world: &WorldRef) {
+    let locks = stage_locks_dyn(world);
+    // SAFETY: the stage map is owned by the calling thread.
+    unsafe { (*locks.as_ptr()).open_episode(world.raw_world.as_ptr()) };
+}
+
+/// No-op without the safety-lock bookkeeping: no guards exist, so no pin can be
+/// live and shared-register writes keep their immediate semantics.
+#[cfg(not(feature = "flecs_safety_locks"))]
+#[inline(always)]
+pub(crate) fn ensure_write_episode(_world: &super::WorldRef) {}
 
 #[cfg(feature = "flecs_safety_locks")]
 #[cold]
@@ -732,8 +800,11 @@ fn __internal_do_read_write_locks<
 #[cfg(feature = "flecs_safety_locks")]
 pub(crate) struct StageLocksScope {
     locks: NonNull<StageLocks>,
+    world: *mut sys::ecs_world_t,
     len: usize,
     saved: Vec<u16>,
+    saved_pin: u32,
+    saved_episode: bool,
 }
 
 #[cfg(feature = "flecs_safety_locks")]
@@ -742,14 +813,17 @@ impl StageLocksScope {
     pub(crate) fn new(world: &WorldRef<'_>) -> StageLocksScope {
         let locks = stage_locks_dyn(world);
         // SAFETY: stage map is owned by this thread.
-        let entries = unsafe { &(*locks.as_ptr()).entries };
+        let map = unsafe { &*locks.as_ptr() };
         // A borrow held across the whole iteration is the only way entries
         // exist on entry, which is rare; the empty case allocates nothing.
-        let saved = entries.iter().map(|entry| entry.1).collect();
+        let saved = map.entries.iter().map(|entry| entry.1).collect();
         StageLocksScope {
             locks,
-            len: entries.len(),
+            world: world.raw_world.as_ptr(),
+            len: map.entries.len(),
             saved,
+            saved_pin: map.pin,
+            saved_episode: map.episode_open,
         }
     }
 
@@ -758,17 +832,36 @@ impl StageLocksScope {
     /// Entries below `len` belong to borrows that outlive this scope, so they
     /// are never removed while it is open (their counts cannot reach zero) and
     /// keep their slots: restoring counts and truncating is exact.
+    ///
+    /// Guards taken inside a callback normally balance their own pin / episode
+    /// on drop (even on unwind), so on the common path the pin state already
+    /// matches the snapshot. This also reconciles it defensively: a pin or an
+    /// episode level left open by an interrupted iteration is restored to the
+    /// entry snapshot so a recovered panic cannot leave a stale pin (spec §7.1,
+    /// item 5).
     #[inline(always)]
     pub(crate) fn restore(&self) {
         // SAFETY: stage map is owned by this thread.
-        let entries = unsafe { &mut (*self.locks.as_ptr()).entries };
-        if entries.len() == self.len {
+        let map = unsafe { &mut *self.locks.as_ptr() };
+        if map.entries.len() != self.len {
+            map.entries.truncate(self.len);
+            for (entry, count) in map.entries.iter_mut().zip(self.saved.iter()) {
+                entry.1 = *count;
+            }
+        }
+        if map.pin == self.saved_pin && map.episode_open == self.saved_episode {
             return;
         }
-        entries.truncate(self.len);
-        for (entry, count) in entries.iter_mut().zip(self.saved.iter()) {
-            entry.1 = *count;
+        // An episode level opened during the interrupted iteration but not
+        // closed (its guards did not reach pin zero here) is balanced now: at
+        // most one level is ever open, so a single end restores the count.
+        if map.episode_open && !self.saved_episode {
+            // SAFETY: world is a live world/stage pointer; balances the level
+            // `open_episode` opened during the interrupted iteration.
+            unsafe { sys::ecs_defer_end(self.world) };
         }
+        map.pin = self.saved_pin;
+        map.episode_open = self.saved_episode;
     }
 }
 

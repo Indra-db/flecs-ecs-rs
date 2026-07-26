@@ -9,10 +9,13 @@
 //! the whole acquire (a missing one yields `None` /
 //! [`AccessError::MissingComponent`]), while `Option<&T>` / `Option<&mut T>`
 //! yield an `Option<Ref<_>>` / `Option<Mut<_>>` element that is `None` when the
-//! component is absent. An absent optional takes no lock and no defer level and
-//! cannot conflict; only present elements register borrows and hold levels.
-//! Owned copy-out of optional/absent components stays on
-//! [`EntityView::try_cloned`], surfaced here as [`EntityGuardExt::cloned_owned`].
+//! component is absent. An absent optional takes no lock and no pin and cannot
+//! conflict; only present elements register a borrow and increment the stage
+//! pin (spec §7.1). The acquire opens **no** flecs defer level: the read path is
+//! zero defer FFI, and a shared-register write lazily opens one episode-scoped
+//! level only while a guard is live. Owned copy-out of optional/absent
+//! components stays on [`EntityView::try_cloned`], surfaced here as
+//! [`EntityGuardExt::cloned_owned`].
 
 use core::ffi::c_void;
 use core::ptr::NonNull;
@@ -26,16 +29,19 @@ use crate::sys;
 
 use super::guard::{AccessError, Mut, Ref};
 
-/// Closes `count` defer levels on drop unless disarmed with
-/// [`PendingDefer::disarm`]. Covers a panic in `create_ptrs` (e.g. the static
-/// duplicate-component check) and every early-return path before the guards
-/// take ownership of the levels.
-struct PendingDefer {
+/// Decrements the `count` stage pins taken so far on drop unless disarmed with
+/// [`PinRollback::disarm`]. Covers every early-return path (a borrow conflict)
+/// and any unwind after the first pin is taken, so a mid-acquire panic cannot
+/// leave a stale pin (spec §7.1, §7.2). No FFI: releasing a pin only touches the
+/// Rust counter, and closes the episode level solely if the pin reaches zero
+/// with a level open, which cannot happen mid-acquire (no write is issued here).
+struct PinRollback {
+    locks: NonNull<StageLocks>,
     world: *mut sys::ecs_world_t,
     count: usize,
 }
 
-impl PendingDefer {
+impl PinRollback {
     #[inline(always)]
     fn disarm(mut self) {
         self.count = 0;
@@ -43,13 +49,13 @@ impl PendingDefer {
     }
 }
 
-impl Drop for PendingDefer {
+impl Drop for PinRollback {
     #[inline(always)]
     fn drop(&mut self) {
         for _ in 0..self.count {
-            // SAFETY: world is a live world pointer; balances the levels opened
-            // by scope_begin / ecs_defer_begin.
-            unsafe { sys::ecs_rust_scope_end(self.world) };
+            // SAFETY: the stage map is owned by this thread; balances the pins
+            // taken by this acquire.
+            unsafe { (*self.locks.as_ptr()).pin_release(self.world) };
         }
     }
 }
@@ -61,18 +67,20 @@ fn safety_key(si: &SafetyInfo) -> LockKey {
     }
 }
 
-/// Resolved, locked component data for a guard tuple: every requested component
-/// is present, its borrow is registered in `locks`, and `world`/level bookkeeping
-/// has been handed to the returned guards by the caller.
+/// Resolved, locked component data for a guard tuple: every present component's
+/// borrow is registered in `locks` and its pin taken, and `world`/pin ownership
+/// is handed to the returned guards by the caller.
 struct Resolved<G: GetTuple> {
     world: NonNull<sys::ecs_world_t>,
     locks: NonNull<StageLocks>,
     data: G::Pointers,
 }
 
-/// Open the defer scope, resolve pointers, and take one borrow per component
-/// with rollback. On success returns [`Resolved`]; the caller must build the
-/// guards (each assumes one defer level and one borrow).
+/// Resolve pointers and take one borrow plus one stage pin per present
+/// component, with rollback. Opens no defer level (spec §7.1): liveness and the
+/// record lookup are one FFI call, borrows and pins are Rust-side. On success
+/// returns [`Resolved`]; the caller builds the guards (each assumes one borrow
+/// and one pin, and releases both on drop).
 ///
 /// # Safety
 /// `world` and `id` must belong to the same live world.
@@ -82,18 +90,14 @@ unsafe fn resolve_and_lock<'w, G: GetTuple>(
 ) -> Result<Resolved<G>, AccessError> {
     let wptr = world.world_ptr_mut();
 
-    // Combined liveness check + record lookup + one defer level.
-    let record = unsafe { sys::ecs_rust_get_scope_begin(wptr, *id) };
+    // Liveness check + record lookup, no defer level.
+    let record = unsafe { sys::ecs_rust_get_record(wptr, *id) };
     if record.is_null() {
         return Err(AccessError::NotAlive);
     }
-    let mut pending = PendingDefer {
-        world: wptr,
-        count: 1,
-    };
 
-    // May panic on the static duplicate-mutable-component check; pending closes
-    // the level on unwind.
+    // May panic on the static duplicate-mutable-component check; no pin has been
+    // taken yet, so an unwind here needs no rollback.
     let data = unsafe { G::create_ptrs::<false>(world, id, record) };
 
     // A missing required element leaves has_all_components false; absent
@@ -103,34 +107,19 @@ unsafe fn resolve_and_lock<'w, G: GetTuple>(
     }
     let ptrs = data.component_ptrs();
     let k = ptrs.len();
-    // Present (non-null) elements each take one borrow and one defer level;
-    // absent optionals (null pointer) take neither and cannot conflict.
-    let n_present = ptrs.iter().filter(|p| !p.is_null()).count();
-
-    if n_present == 0 {
-        // Every requested element is an absent optional: the acquire holds no
-        // borrow and no defer level. `pending` closes the one level scope_begin
-        // opened as it drops on this return.
-        let locks = stage_locks_dyn(&world);
-        return Ok(Resolved {
-            world: unsafe { NonNull::new_unchecked(wptr) },
-            locks,
-            data,
-        });
-    }
-
-    // One defer level per present element: scope_begin gave the first, open the
-    // remaining present-1.
-    for _ in 1..n_present {
-        // SAFETY: wptr is a live world pointer.
-        unsafe { sys::ecs_defer_begin(wptr) };
-        pending.count += 1;
-    }
 
     let locks = stage_locks_dyn(&world);
+    // Present elements each take one borrow and one pin below; roll the pins
+    // back on a conflict early-return or an unwind.
+    let mut pins = PinRollback {
+        locks,
+        world: wptr,
+        count: 0,
+    };
+
     let safety = data.safety_info();
     for i in 0..k {
-        // Absent optional: no borrow to take, so nothing can conflict here.
+        // Absent optional: no borrow and no pin, so nothing can conflict here.
         if ptrs[i].is_null() {
             continue;
         }
@@ -153,7 +142,8 @@ unsafe fn resolve_and_lock<'w, G: GetTuple>(
         };
         if let Some((component, write)) = conflict {
             // Roll back only the borrows actually taken this call: present
-            // elements before i. Absent optionals took none.
+            // elements before i. Absent optionals took none. The pins taken for
+            // those same elements are released by `pins` on drop.
             for j in 0..i {
                 if ptrs[j].is_null() {
                     continue;
@@ -165,9 +155,14 @@ unsafe fn resolve_and_lock<'w, G: GetTuple>(
             }
             return Err(AccessError::Conflict { component, write });
         }
+        // Borrow taken: take the matching pin (spec §7.1). Balanced by the
+        // guard's Drop.
+        // SAFETY: stage map is owned by this thread.
+        unsafe { (*locks.as_ptr()).pin_inc() };
+        pins.count += 1;
     }
 
-    pending.disarm();
+    pins.disarm();
     Ok(Resolved {
         world: unsafe { NonNull::new_unchecked(wptr) },
         locks,
@@ -193,7 +188,7 @@ pub trait GuardElement<'w>: GetTupleTypeOperation {
 
     /// # Safety
     /// The [`GuardParts`] must describe a non-null component pointer valid for
-    /// `'w`, with its borrow already registered and one defer level owned.
+    /// `'w`, with its borrow already registered and its stage pin already taken.
     unsafe fn wrap(parts: GuardParts) -> Self::Guard;
 }
 
