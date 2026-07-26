@@ -379,6 +379,56 @@ where
     }
 }
 
+impl<'w, T> GuardTuple<'w> for Option<&T>
+where
+    T: ComponentOrPairId + DataComponent,
+{
+    type Guards = Option<Ref<'w, <T as ComponentOrPairId>::CastType>>;
+
+    #[inline(always)]
+    unsafe fn acquire(world: WorldRef<'w>, id: Entity) -> Result<Self::Guards, AccessError> {
+        let r = unsafe { resolve_and_lock::<Self>(world, id)? };
+        #[cfg(debug_assertions)]
+        let (dbg_entity, dbg_component_id) = safety_resolved(&r.data.safety_info()[0]);
+        let parts = GuardParts {
+            ptr: r.data.component_ptrs()[0],
+            world: r.world,
+            locks: r.locks,
+            key: safety_key(&r.data.safety_info()[0]),
+            #[cfg(debug_assertions)]
+            entity: dbg_entity,
+            #[cfg(debug_assertions)]
+            component_id: dbg_component_id,
+        };
+        Ok(unsafe { <Option<&T> as GuardElement<'w>>::wrap(parts) })
+    }
+}
+
+impl<'w, T> GuardTuple<'w> for Option<&mut T>
+where
+    T: ComponentOrPairId + DataComponent,
+{
+    type Guards = Option<Mut<'w, <T as ComponentOrPairId>::CastType>>;
+
+    #[inline(always)]
+    unsafe fn acquire(world: WorldRef<'w>, id: Entity) -> Result<Self::Guards, AccessError> {
+        let r = unsafe { resolve_and_lock::<Self>(world, id)? };
+        #[cfg(debug_assertions)]
+        let (dbg_entity, dbg_component_id) = safety_resolved(&r.data.safety_info()[0]);
+        let parts = GuardParts {
+            ptr: r.data.component_ptrs()[0],
+            world: r.world,
+            locks: r.locks,
+            key: safety_key(&r.data.safety_info()[0]),
+            #[cfg(debug_assertions)]
+            entity: dbg_entity,
+            #[cfg(debug_assertions)]
+            component_id: dbg_component_id,
+        };
+        Ok(unsafe { <Option<&mut T> as GuardElement<'w>>::wrap(parts) })
+    }
+}
+
 macro_rules! impl_guard_tuple {
     ($( $t:ident ),+) => {
         impl<'w, $($t),+> GuardTuple<'w> for ($($t,)+)
