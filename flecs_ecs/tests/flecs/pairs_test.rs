@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::prelude::*;
 
 // Local types used across multiple tests in this file.
@@ -174,9 +175,10 @@ fn pairs_set_component_pair() {
         Some("(PairData,Position)".to_string())
     );
 
-    entity.get::<&(PairData, Position)>(|t| {
+    {
+        let t = entity.get_ref::<&(PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 10);
-    });
+    }
 }
 
 #[test]
@@ -377,9 +379,10 @@ fn pairs_ensure_pair() {
     let e = world.entity();
     e.set_pair::<PairData, Position>(PairData { value: 10.0 });
 
-    e.get::<&(PairData, Position)>(|t| {
+    {
+        let t = e.get_ref::<&(PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 10);
-    });
+    }
 }
 
 #[test]
@@ -391,14 +394,16 @@ fn pairs_ensure_pair_existing() {
         .set_pair::<PairData, Position>(PairData { value: 20.0 });
 
     // Verify existing value, then mutate in-place
-    e.get::<&mut (PairData, Position)>(|t| {
+    {
+        let mut t = e.get_ref::<&mut (PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 20);
         t.value = 10.0;
-    });
+    }
 
-    e.get::<&(PairData, Position)>(|t| {
+    {
+        let t = e.get_ref::<&(PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 10);
-    });
+    }
 }
 
 #[test]
@@ -442,17 +447,19 @@ fn pairs_ensure_r_tag_o() {
         .entity()
         .set_pair::<Tag, Position>(Position { x: 10, y: 20 });
 
-    e.get::<&mut (Tag, Position)>(|t| {
+    {
+        let mut t = e.get_ref::<&mut (Tag, Position)>().unwrap();
         assert_eq!(t.x, 10);
         assert_eq!(t.y, 20);
         t.x = 30;
         t.y = 40;
-    });
+    }
 
-    e.get::<&(Tag, Position)>(|t| {
+    {
+        let t = e.get_ref::<&(Tag, Position)>().unwrap();
         assert_eq!(t.x, 30);
         assert_eq!(t.y, 40);
-    });
+    }
 }
 
 #[test]
@@ -670,10 +677,11 @@ fn pairs_get_r_o() {
 
     assert!(e.has((Position::id(), Tag::id())));
 
-    e.get::<&(Position, Tag)>(|ptr| {
+    {
+        let ptr = e.get_ref::<&(Position, Tag)>().unwrap();
         assert_eq!(ptr.x, 10);
         assert_eq!(ptr.y, 20);
-    });
+    }
 }
 
 #[test]
@@ -686,10 +694,11 @@ fn pairs_get_r_tag_o() {
 
     assert!(e.has((Tag::id(), Position::id())));
 
-    e.get::<&(Tag, Position)>(|ptr| {
+    {
+        let ptr = e.get_ref::<&(Tag, Position)>().unwrap();
         assert_eq!(ptr.x, 10);
         assert_eq!(ptr.y, 20);
-    });
+    }
 }
 
 #[test]
@@ -1107,10 +1116,9 @@ fn pairs_get_1_pair_arg() {
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
     assert!(e.has((LocalEats::id(), LocalApples::id())));
 
-    let result = e.try_get::<&(LocalEats, LocalApples)>(|a| {
-        assert_eq!(a.amount, 10);
-    });
+    let result = e.get_ref::<&(LocalEats, LocalApples)>();
     assert!(result.is_some());
+    assert_eq!(result.unwrap().amount, 10);
 }
 
 #[test]
@@ -1125,11 +1133,11 @@ fn pairs_get_2_pair_arg() {
     assert!(e.has((LocalEats::id(), LocalApples::id())));
     assert!(e.has((LocalEats::id(), LocalPears::id())));
 
-    let result = e.try_get::<(&(LocalEats, LocalApples), &(LocalEats, LocalPears))>(|(a, p)| {
-        assert_eq!(a.amount, 10);
-        assert_eq!(p.amount, 20);
-    });
+    let result = e.get_ref::<(&(LocalEats, LocalApples), &(LocalEats, LocalPears))>();
     assert!(result.is_some());
+    let (a, p) = result.unwrap();
+    assert_eq!(a.amount, 10);
+    assert_eq!(p.amount, 20);
 }
 
 #[test]
@@ -1142,9 +1150,10 @@ fn pairs_set_1_pair_arg() {
         .entity()
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
 
-    e.get::<&(LocalEats, LocalApples)>(|eats| {
+    {
+        let eats = e.get_ref::<&(LocalEats, LocalApples)>().unwrap();
         assert_eq!(eats.amount, 10);
-    });
+    }
 }
 
 #[test]
@@ -1158,13 +1167,15 @@ fn pairs_set_2_pair_arg() {
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 })
         .set_pair::<LocalEats, LocalPears>(LocalEats { amount: 20 });
 
-    e.get::<&(LocalEats, LocalApples)>(|eats| {
+    {
+        let eats = e.get_ref::<&(LocalEats, LocalApples)>().unwrap();
         assert_eq!(eats.amount, 10);
-    });
+    }
 
-    e.get::<&(LocalEats, LocalPears)>(|eats| {
+    {
+        let eats = e.get_ref::<&(LocalEats, LocalPears)>().unwrap();
         assert_eq!(eats.amount, 20);
-    });
+    }
 }
 
 #[test]
@@ -1177,10 +1188,9 @@ fn pairs_get_inline_pair_type() {
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
     assert!(e.has((LocalEats::id(), LocalApples::id())));
 
-    let result = e.try_get::<&(LocalEats, LocalApples)>(|a| {
-        assert_eq!(a.amount, 10);
-    });
+    let result = e.get_ref::<&(LocalEats, LocalApples)>();
     assert!(result.is_some());
+    assert_eq!(result.unwrap().amount, 10);
 }
 
 #[test]
@@ -1192,9 +1202,10 @@ fn pairs_set_inline_pair_type() {
         .entity()
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
 
-    e.get::<&(LocalEats, LocalApples)>(|eats| {
+    {
+        let eats = e.get_ref::<&(LocalEats, LocalApples)>().unwrap();
         assert_eq!(eats.amount, 10);
-    });
+    }
 }
 
 #[test]
@@ -1208,9 +1219,10 @@ fn pairs_get_pair_type_object() {
         .set_pair::<LocalApples, LocalEats>(LocalEats { amount: 10 });
     assert!(e.has((LocalApples::id(), LocalEats::id())));
 
-    e.get::<&(LocalApples, LocalEats)>(|a| {
+    {
+        let a = e.get_ref::<&(LocalApples, LocalEats)>().unwrap();
         assert_eq!(a.amount, 10);
-    });
+    }
 }
 
 #[test]
@@ -1222,9 +1234,10 @@ fn pairs_set_pair_type_object() {
         .entity()
         .set_pair::<LocalApples, LocalEats>(LocalEats { amount: 10 });
 
-    e.get::<&(LocalApples, LocalEats)>(|eats| {
+    {
+        let eats = e.get_ref::<&(LocalApples, LocalEats)>().unwrap();
         assert_eq!(eats.amount, 10);
-    });
+    }
 }
 
 #[test]
@@ -1238,18 +1251,20 @@ fn pairs_set_get_second_variants() {
         .entity()
         .set_pair::<LocalBegin, LocalEvent>(LocalEvent { value: "Big Bang" });
     assert!(e1.has((LocalBegin::id(), LocalEvent::id())));
-    e1.get::<&(LocalBegin, LocalEvent)>(|v| {
+    {
+        let v = e1.get_ref::<&(LocalBegin, LocalEvent)>().unwrap();
         assert_eq!(v.value, "Big Bang");
-    });
+    }
 
     // Variant 2: same (C++ set<Begin,Event> == set_second<Begin,Event> == set_pair in Rust)
     let e2 = world
         .entity()
         .set_pair::<LocalBegin, LocalEvent>(LocalEvent { value: "Big Bang" });
     assert!(e2.has((LocalBegin::id(), LocalEvent::id())));
-    e2.get::<&(LocalBegin, LocalEvent)>(|v| {
+    {
+        let v = e2.get_ref::<&(LocalBegin, LocalEvent)>().unwrap();
         assert_eq!(v.value, "Big Bang");
-    });
+    }
 }
 
 #[test]
@@ -1364,10 +1379,11 @@ fn pairs_set_r_existing_value() {
     let p = Position { x: 10, y: 20 };
     let e = world.entity().set_pair::<Position, Tag>(p);
 
-    e.get::<&(Position, Tag)>(|ptr| {
+    {
+        let ptr = e.get_ref::<&(Position, Tag)>().unwrap();
         assert_eq!(ptr.x, 10);
         assert_eq!(ptr.y, 20);
-    });
+    }
 }
 
 #[test]

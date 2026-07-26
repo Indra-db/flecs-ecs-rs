@@ -3,6 +3,7 @@
 #![allow(clippy::float_cmp)]
 
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldSingletonExt};
 use flecs_ecs::macros::*;
 
 use crate::common_test::*;
@@ -18,48 +19,48 @@ fn singleton_set_get_singleton() {
 
     world.set(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
 fn singleton_ensure_singleton() {
     // C++ ensure<T>() = get-or-add mutable ref.
-    // Rust equivalent: set default then mutate via get::<&mut T>.
-    let world = World::new();
+    // Rust equivalent: set default then mutate via singleton_mut.
+    let mut world = World::new();
 
     world.set(Position::default());
-    world.get::<&mut Position>(|p| {
+    {
+        let p = world.singleton_mut::<Position>().unwrap();
         p.x = 10;
         p.y = 20;
-    });
+    }
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
 fn singleton_get_mut_singleton() {
     let world = World::new();
 
-    // Before setting: try_get returns None (nullptr in C++)
-    let result = world.try_get::<&mut Position>(|_p| ());
-    assert!(result.is_none());
+    // Before setting: singleton returns None (nullptr in C++)
+    assert!(WorldSingletonExt::singleton::<Position>(&world).is_none());
 
     world.set(Position { x: 10, y: 20 });
 
     // After setting: try_get returns Some
-    let result = world.try_get::<&mut Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
@@ -71,11 +72,11 @@ fn singleton_emplace_singleton() {
 
     world.set(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
@@ -89,18 +90,22 @@ fn singleton_modified_singleton() {
     world
         .observer::<flecs::OnSet, &Position>()
         .each_entity(|e, _p| {
-            e.world().get::<&mut Count>(|c| c.0 += 1);
+            let w = e.world();
+            w.entity_from_id(Count::entity_id(w))
+                .get_ref::<&mut Count>()
+                .unwrap()
+                .0 += 1;
         });
 
     let e = world.entity();
     e.add(Position::id());
 
     // No OnSet yet
-    world.get::<&Count>(|c| assert_eq!(c.0, 0));
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
 
     e.modified(Position::id());
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
 }
 
 #[test]
@@ -113,12 +118,16 @@ fn singleton_add_singleton() {
         .observer::<flecs::OnAdd, ()>()
         .with(Position::id())
         .each_entity(|e, _| {
-            e.world().get::<&mut Count>(|c| c.0 += 1);
+            let w = e.world();
+            w.entity_from_id(Count::entity_id(w))
+                .get_ref::<&mut Count>()
+                .unwrap()
+                .0 += 1;
         });
 
     world.add(Position::id());
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
 }
 
 #[test]
@@ -130,17 +139,21 @@ fn singleton_remove_singleton() {
     world
         .observer::<flecs::OnRemove, &Position>()
         .each_entity(|e, _p| {
-            e.world().get::<&mut Count>(|c| c.0 += 1);
+            let w = e.world();
+            w.entity_from_id(Count::entity_id(w))
+                .get_ref::<&mut Count>()
+                .unwrap()
+                .0 += 1;
         });
 
     // C++ uses world.ensure<Position>() which just adds (no OnRemove).
     world.add(Position::id());
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 0));
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
 
     world.remove(Position::id());
 
-    world.get::<&Count>(|c| assert_eq!(c.0, 1));
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
 }
 
 #[test]
@@ -176,11 +189,11 @@ fn singleton_singleton_system() {
 
     world.progress();
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 11);
-    assert_eq!(y, 21);
+    let p = result.unwrap();
+    assert_eq!(p.x, 11);
+    assert_eq!(p.y, 21);
 }
 
 #[test]
@@ -193,10 +206,11 @@ fn singleton_get_singleton() {
     assert!(s.has(Position::id()));
     assert_eq!(*s.id(), *world.component_id::<Position>());
 
-    s.get::<&Position>(|p| {
+    {
+        let p = s.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-    });
+    }
 }
 
 #[test]
@@ -216,26 +230,30 @@ fn singleton_type_id_from_world() {
 #[test]
 fn singleton_set_lambda() {
     // C++ `world.set(lambda)` mutates singleton via lambda.
-    // Rust: set default then use get::<&mut T>(closure) to mutate.
-    let world = World::new();
+    // Rust: set default then use singleton_mut to mutate.
+    let mut world = World::new();
 
     world.set(Position::default());
-    world.get::<&mut Position>(|p| {
+    {
+        let p = world.singleton_mut::<Position>().unwrap();
         p.x = 10;
         p.y = 20;
-    });
+    }
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
-    assert_eq!(result.unwrap(), (10, 20));
+    {
+        let result = WorldSingletonExt::singleton::<Position>(&world).unwrap();
+        assert_eq!((result.x, result.y), (10, 20));
+    }
 
     // Second "set lambda": increment
-    world.get::<&mut Position>(|p| {
+    {
+        let p = world.singleton_mut::<Position>().unwrap();
         p.x += 1;
         p.y += 1;
-    });
+    }
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
-    assert_eq!(result.unwrap(), (11, 21));
+    let result = WorldSingletonExt::singleton::<Position>(&world).unwrap();
+    assert_eq!((result.x, result.y), (11, 21));
 }
 
 #[test]
@@ -245,34 +263,36 @@ fn singleton_get_lambda() {
     world.set(Position { x: 10, y: 20 });
 
     let mut count = 0i32;
-    world.get::<&Position>(|p| {
+    {
+        let p = WorldSingletonExt::singleton::<Position>(&world).unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         count += 1;
-    });
+    }
 
     assert_eq!(count, 1);
 }
 
 #[test]
 fn singleton_get_write_lambda() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Position { x: 10, y: 20 });
 
     let mut count = 0i32;
-    world.get::<&mut Position>(|p| {
+    {
+        let p = world.singleton_mut::<Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         p.x += 1;
         p.y += 1;
         count += 1;
-    });
+    }
 
     assert_eq!(count, 1);
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
-    assert_eq!(result.unwrap(), (11, 21));
+    let result = WorldSingletonExt::singleton::<Position>(&world).unwrap();
+    assert_eq!((result.x, result.y), (11, 21));
 }
 
 #[test]
@@ -283,11 +303,13 @@ fn singleton_get_set_singleton_pair_r_t() {
 
     world.set_pair::<Position, Tag>(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&(Position, Tag)>(|p| (p.x, p.y));
+    let result = world
+        .entity_from_id(Position::entity_id(&world))
+        .get_ref::<&(Position, Tag)>();
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
@@ -423,9 +445,9 @@ fn singleton_singleton_enum() {
     assert!(world.has(SColor::id()));
 
     {
-        let result = world.try_get::<&SColor>(|c| *c);
+        let result = WorldSingletonExt::singleton::<SColor>(&world);
         assert!(result.is_some());
-        assert_eq!(result.unwrap(), SColor::Blue);
+        assert_eq!(*result.unwrap(), SColor::Blue);
     }
 
     // Replace with Green
@@ -433,9 +455,9 @@ fn singleton_singleton_enum() {
     assert!(world.has(SColor::id()));
 
     {
-        let result = world.try_get::<&SColor>(|c| *c);
+        let result = WorldSingletonExt::singleton::<SColor>(&world);
         assert!(result.is_some());
-        assert_eq!(result.unwrap(), SColor::Green);
+        assert_eq!(*result.unwrap(), SColor::Green);
     }
 
     world.remove(SColor::id());
@@ -450,11 +472,11 @@ fn singleton_get_w_id() {
 
     world.set(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
@@ -464,10 +486,11 @@ fn singleton_get_t() {
 
     world.set(Position { x: 10, y: 20 });
 
-    world.get::<&Position>(|p| {
+    {
+        let p = WorldSingletonExt::singleton::<Position>(&world).unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-    });
+    }
 }
 
 #[test]
@@ -515,58 +538,72 @@ fn singleton_get_r_t_pair_types() {
 
     world.set_pair::<Position, Tgt>(Position { x: 10, y: 20 });
 
-    world.get::<&(Position, Tgt)>(|p| {
+    {
+        let p = world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&(Position, Tgt)>()
+            .unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-    });
+    }
 }
 
-// ── "not found" tests — must panic (C++ calls test_expect_abort) ─────────────
+// ── "not found" tests — singleton returns None (C++ called test_expect_abort) ─
 
 #[test]
-#[should_panic]
 fn singleton_get_w_id_not_found() {
     let world = World::new();
-    // No Position set — must panic
-    world.get::<&Position>(|_p| {});
+    // No Position set — singleton returns None
+    assert!(WorldSingletonExt::singleton::<Position>(&world).is_none());
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_t_not_found() {
     let world = World::new();
-    world.get::<&Position>(|_p| {});
+    assert!(WorldSingletonExt::singleton::<Position>(&world).is_none());
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_r_t_not_found() {
     #[derive(Component)]
     struct Tgt2;
 
     let world = World::new();
-    // No pair set — must panic
-    world.get::<&(Position, Tgt2)>(|_p| {});
+    // No pair set — pair singleton read returns None
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&(Position, Tgt2)>()
+            .is_none()
+    );
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_r_t_pair_types_not_found() {
     #[derive(Component)]
     struct Tgt3;
 
     let world = World::new();
-    world.get::<&(Position, Tgt3)>(|_p| {});
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&(Position, Tgt3)>()
+            .is_none()
+    );
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_r_t_both_typed_not_found() {
     #[derive(Component)]
     struct TgtBoth;
 
     let world = World::new();
-    world.get::<&(Position, TgtBoth)>(|_p| {});
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&(Position, TgtBoth)>()
+            .is_none()
+    );
 }
 
 // ── try_get variants (return None when not found) ────────────────────────────
@@ -576,33 +613,31 @@ fn singleton_try_get_w_id() {
     let world = World::new();
 
     // Before set: None
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
-    assert!(result.is_none());
+    assert!(WorldSingletonExt::singleton::<Position>(&world).is_none());
 
     world.set(Position { x: 10, y: 20 });
 
     // After set: Some
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
 fn singleton_try_get_t() {
     let world = World::new();
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
-    assert!(result.is_none());
+    assert!(WorldSingletonExt::singleton::<Position>(&world).is_none());
 
     world.set(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
@@ -660,44 +695,52 @@ fn singleton_try_get_r_t_pair_types() {
 
     let world = World::new();
 
-    let result = world.try_get::<&(Position, Tgt4)>(|p| (p.x, p.y));
-    assert!(result.is_none());
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&(Position, Tgt4)>()
+            .is_none()
+    );
 
     world.set_pair::<Position, Tgt4>(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&(Position, Tgt4)>(|p| (p.x, p.y));
+    let result = world
+        .entity_from_id(Position::entity_id(&world))
+        .get_ref::<&(Position, Tgt4)>();
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 // ── get_mut variants ─────────────────────────────────────────────────────────
 // C++ get_mut returns mutable ref and panics when missing.
-// Rust: world.get::<&mut T>(cb) panics when missing.
+// Rust: singleton_mut / pair get_ref return None when missing.
 
 #[test]
 fn singleton_get_mut_w_id() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Position { x: 10, y: 20 });
 
-    world.get::<&mut Position>(|p| {
+    {
+        let p = world.singleton_mut::<Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-    });
+    }
 }
 
 #[test]
 fn singleton_get_mut_t() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Position { x: 10, y: 20 });
 
-    world.get::<&mut Position>(|p| {
+    {
+        let p = world.singleton_mut::<Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-    });
+    }
 }
 
 #[test]
@@ -744,56 +787,70 @@ fn singleton_get_mut_r_t_pair_types() {
     let world = World::new();
     world.set_pair::<Position, Tgt5>(Position { x: 10, y: 20 });
 
-    world.get::<&mut (Position, Tgt5)>(|p| {
+    {
+        let p = world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&mut (Position, Tgt5)>()
+            .unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-    });
+    }
 }
 
-// ── get_mut "not found" — must panic ─────────────────────────────────────────
+// ── get_mut "not found" — returns None ───────────────────────────────────────
 
 #[test]
-#[should_panic]
 fn singleton_get_mut_w_id_not_found() {
-    let world = World::new();
-    world.get::<&mut Position>(|_p| {});
+    let mut world = World::new();
+    assert!(world.singleton_mut::<Position>().is_none());
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_mut_t_not_found() {
-    let world = World::new();
-    world.get::<&mut Position>(|_p| {});
+    let mut world = World::new();
+    assert!(world.singleton_mut::<Position>().is_none());
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_mut_r_t_not_found() {
     #[derive(Component)]
     struct Tgt6;
 
     let world = World::new();
-    world.get::<&mut (Position, Tgt6)>(|_p| {});
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&mut (Position, Tgt6)>()
+            .is_none()
+    );
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_mut_r_t_typed_not_found() {
     #[derive(Component)]
     struct Tgt7;
 
     let world = World::new();
-    world.get::<&mut (Position, Tgt7)>(|_p| {});
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&mut (Position, Tgt7)>()
+            .is_none()
+    );
 }
 
 #[test]
-#[should_panic]
 fn singleton_get_mut_r_t_pair_types_not_found() {
     #[derive(Component)]
     struct Tgt8;
 
     let world = World::new();
-    world.get::<&mut (Position, Tgt8)>(|_p| {});
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&mut (Position, Tgt8)>()
+            .is_none()
+    );
 }
 
 // ── try_get_mut variants (return None when not found) ────────────────────────
@@ -803,33 +860,31 @@ fn singleton_try_get_mut_w_id() {
     let world = World::new();
 
     // Before set: None
-    let result = world.try_get::<&mut Position>(|p| (p.x, p.y));
-    assert!(result.is_none());
+    assert!(WorldSingletonExt::singleton::<Position>(&world).is_none());
 
     world.set(Position { x: 10, y: 20 });
 
     // After set: Some
-    let result = world.try_get::<&mut Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
 fn singleton_try_get_mut_t() {
     let world = World::new();
 
-    let result = world.try_get::<&mut Position>(|p| (p.x, p.y));
-    assert!(result.is_none());
+    assert!(WorldSingletonExt::singleton::<Position>(&world).is_none());
 
     world.set(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&mut Position>(|p| (p.x, p.y));
+    let result = WorldSingletonExt::singleton::<Position>(&world);
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
 
 #[test]
@@ -884,14 +939,20 @@ fn singleton_try_get_mut_r_t_pair_types() {
 
     let world = World::new();
 
-    let result = world.try_get::<&mut (Position, Tgt9)>(|p| (p.x, p.y));
-    assert!(result.is_none());
+    assert!(
+        world
+            .entity_from_id(Position::entity_id(&world))
+            .get_ref::<&mut (Position, Tgt9)>()
+            .is_none()
+    );
 
     world.set_pair::<Position, Tgt9>(Position { x: 10, y: 20 });
 
-    let result = world.try_get::<&mut (Position, Tgt9)>(|p| (p.x, p.y));
+    let result = world
+        .entity_from_id(Position::entity_id(&world))
+        .get_ref::<&mut (Position, Tgt9)>();
     assert!(result.is_some());
-    let (x, y) = result.unwrap();
-    assert_eq!(x, 10);
-    assert_eq!(y, 20);
+    let p = result.unwrap();
+    assert_eq!(p.x, 10);
+    assert_eq!(p.y, 20);
 }
