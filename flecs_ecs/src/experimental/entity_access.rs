@@ -5,11 +5,14 @@
 //! the borrow is registered in the stage lock map on acquire and released when
 //! the guard drops, so borrow lifetimes follow ordinary Rust scoping / NLL.
 //!
-//! Only non-optional, present components are supported by the guard form: a
-//! missing component yields `None` / [`AccessError::MissingComponent`] rather
-//! than an `Option<Ref<_>>` element. Owned copy-out of optional/absent
-//! components stays on [`EntityView::try_cloned`], surfaced here as
-//! [`EntityGuardExt::cloned_owned`].
+//! Tuple requests may mix required and optional elements: `&T` / `&mut T` gate
+//! the whole acquire (a missing one yields `None` /
+//! [`AccessError::MissingComponent`]), while `Option<&T>` / `Option<&mut T>`
+//! yield an `Option<Ref<_>>` / `Option<Mut<_>>` element that is `None` when the
+//! component is absent. An absent optional takes no lock and no defer level and
+//! cannot conflict; only present elements register borrows and hold levels.
+//! Owned copy-out of optional/absent components stays on
+//! [`EntityView::try_cloned`], surfaced here as [`EntityGuardExt::cloned_owned`].
 
 use core::ffi::c_void;
 use core::ptr::NonNull;
@@ -93,20 +96,32 @@ unsafe fn resolve_and_lock<'w, G: GetTuple>(
     // the level on unwind.
     let data = unsafe { G::create_ptrs::<false>(world, id, record) };
 
+    // A missing required element leaves has_all_components false; absent
+    // optionals keep it true (they are allowed to be absent).
     if !data.has_all_components() {
         return Err(AccessError::MissingComponent);
     }
-    let k = data.component_ptrs().len();
-    // Guards do not model optional/absent components: any null pointer is a
-    // missing component for guard purposes.
-    for &p in data.component_ptrs() {
-        if p.is_null() {
-            return Err(AccessError::MissingComponent);
-        }
+    let ptrs = data.component_ptrs();
+    let k = ptrs.len();
+    // Present (non-null) elements each take one borrow and one defer level;
+    // absent optionals (null pointer) take neither and cannot conflict.
+    let n_present = ptrs.iter().filter(|p| !p.is_null()).count();
+
+    if n_present == 0 {
+        // Every requested element is an absent optional: the acquire holds no
+        // borrow and no defer level. `pending` closes the one level scope_begin
+        // opened as it drops on this return.
+        let locks = stage_locks_dyn(&world);
+        return Ok(Resolved {
+            world: unsafe { NonNull::new_unchecked(wptr) },
+            locks,
+            data,
+        });
     }
 
-    // One defer level per guard: scope_begin gave the first, open k-1 more.
-    for _ in 1..k {
+    // One defer level per present element: scope_begin gave the first, open the
+    // remaining present-1.
+    for _ in 1..n_present {
         // SAFETY: wptr is a live world pointer.
         unsafe { sys::ecs_defer_begin(wptr) };
         pending.count += 1;
@@ -115,6 +130,10 @@ unsafe fn resolve_and_lock<'w, G: GetTuple>(
     let locks = stage_locks_dyn(&world);
     let safety = data.safety_info();
     for i in 0..k {
+        // Absent optional: no borrow to take, so nothing can conflict here.
+        if ptrs[i].is_null() {
+            continue;
+        }
         let conflict = match &safety[i] {
             SafetyInfo::Read(li) => {
                 // SAFETY: stage map is owned by this thread.
@@ -133,9 +152,13 @@ unsafe fn resolve_and_lock<'w, G: GetTuple>(
             }
         };
         if let Some((component, write)) = conflict {
-            // Roll back the borrows already taken this call.
-            for prev in &safety[..i] {
-                match prev {
+            // Roll back only the borrows actually taken this call: present
+            // elements before i. Absent optionals took none.
+            for j in 0..i {
+                if ptrs[j].is_null() {
+                    continue;
+                }
+                match &safety[j] {
                     SafetyInfo::Read(li) => unsafe { (*locks.as_ptr()).read_end(li.key) },
                     SafetyInfo::Write(li) => unsafe { (*locks.as_ptr()).write_end(li.key) },
                 }
@@ -195,6 +218,42 @@ where
     #[inline(always)]
     unsafe fn wrap(p: GuardParts) -> Self::Guard {
         unsafe { Mut::from_parts(NonNull::new_unchecked(p.ptr.cast()), p.world, p.locks, p.key) }
+    }
+}
+
+impl<'w, T> GuardElement<'w> for Option<&T>
+where
+    T: ComponentOrPairId + DataComponent,
+{
+    type Guard = Option<Ref<'w, <T as ComponentOrPairId>::CastType>>;
+
+    #[inline(always)]
+    unsafe fn wrap(p: GuardParts) -> Self::Guard {
+        if p.ptr.is_null() {
+            None
+        } else {
+            Some(unsafe {
+                Ref::from_parts(NonNull::new_unchecked(p.ptr.cast()), p.world, p.locks, p.key)
+            })
+        }
+    }
+}
+
+impl<'w, T> GuardElement<'w> for Option<&mut T>
+where
+    T: ComponentOrPairId + DataComponent,
+{
+    type Guard = Option<Mut<'w, <T as ComponentOrPairId>::CastType>>;
+
+    #[inline(always)]
+    unsafe fn wrap(p: GuardParts) -> Self::Guard {
+        if p.ptr.is_null() {
+            None
+        } else {
+            Some(unsafe {
+                Mut::from_parts(NonNull::new_unchecked(p.ptr.cast()), p.world, p.locks, p.key)
+            })
+        }
     }
 }
 
