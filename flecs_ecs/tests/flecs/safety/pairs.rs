@@ -1,4 +1,5 @@
 use super::*;
+use flecs_ecs::experimental::QuerySharedExt;
 
 mod wildcard_into_id {
     use super::*;
@@ -90,8 +91,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &(Foo, Bar)).build();
-                q0.run(|iter| {
-                    q1.run(|iter| {
+                q0.run_shared(&world, |iter| {
+                    q1.run_shared(&world, |iter| {
                         iter.fini();
                     });
                     iter.fini();
@@ -105,8 +106,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &(Foo, Bar)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -117,8 +118,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &(Foo, Bar)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -146,10 +147,10 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &mut (Foo, Bar)).build();
-                q0.run(|mut iter| {
+                q0.run_shared(&world, |mut iter| {
                     while iter.next() {
                         let _x = iter.field::<Foo>(0);
-                        q1.run(|mut iter| {
+                        q1.run_shared(&world, |mut iter| {
                             while iter.next() {
                                 let _y = iter.field_mut::<Foo>(0);
                             }
@@ -166,8 +167,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &mut (Foo, Bar)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -179,8 +180,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &mut (Foo, Bar)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -209,10 +210,10 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &(Foo, Bar)).build();
-                q0.run(|mut iter| {
+                q0.run_shared(&world, |mut iter| {
                     while iter.next() {
                         let _x = iter.field_mut::<Foo>(0);
-                        q1.run(|mut iter| {
+                        q1.run_shared(&world, |mut iter| {
                             while iter.next() {
                                 let _y = iter.field::<Foo>(0);
                             }
@@ -229,8 +230,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &(Foo, Bar)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -242,8 +243,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &(Foo, Bar)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -272,10 +273,10 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &mut (Foo, Bar)).build();
-                q0.run(|mut iter| {
+                q0.run_shared(&world, |mut iter| {
                     while iter.next() {
                         let _x = iter.field_mut::<Foo>(0);
-                        q1.run(|mut iter| {
+                        q1.run_shared(&world, |mut iter| {
                             while iter.next() {
                                 let _y = iter.field_mut::<Foo>(0);
                             }
@@ -292,8 +293,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &mut (Foo, Bar)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -305,8 +306,8 @@ mod wildcard_into_id {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, flecs::Wildcard)).build();
                 let q1 = query!(world, &mut (Foo, Bar)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -335,7 +336,7 @@ mod wildcard_into_id {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &(Foo, flecs::Wildcard))
                 .build()
-                .each_entity(|entity, _| {
+                .each_entity_shared(&world, |entity, _| {
                     entity.get::<&(Foo, Bar)>(|_| {});
                 });
         }
@@ -348,7 +349,7 @@ mod wildcard_into_id {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &(Foo, flecs::Wildcard))
                 .build()
-                .each_entity(|entity, _| {
+                .each_entity_shared(&world, |entity, _| {
                     entity.get::<&mut (Foo, Bar)>(|_| {});
                 });
         }
@@ -361,7 +362,7 @@ mod wildcard_into_id {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &mut (Foo, flecs::Wildcard))
                 .build()
-                .each_entity(|entity, _| {
+                .each_entity_shared(&world, |entity, _| {
                     entity.get::<&(Foo, Bar)>(|_| {});
                 });
         }
@@ -374,7 +375,7 @@ mod wildcard_into_id {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &mut (Foo, flecs::Wildcard))
                 .build()
-                .each_entity(|entity, _| {
+                .each_entity_shared(&world, |entity, _| {
                     entity.get::<&mut (Foo, Bar)>(|_| {});
                 });
         }
@@ -446,10 +447,10 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, Bar)).build();
                 let q1 = query!(world, &(Foo, flecs::Wildcard)).build();
-                q0.run(|mut iter| {
+                q0.run_shared(&world, |mut iter| {
                     while iter.next() {
                         let _x = iter.field::<Foo>(0);
-                        q1.run(|mut iter| {
+                        q1.run_shared(&world, |mut iter| {
                             while iter.next() {
                                 let _y = iter.field::<Foo>(0);
                             }
@@ -465,8 +466,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, Bar)).build();
                 let q1 = query!(world, &(Foo, flecs::Wildcard)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -477,8 +478,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, Bar)).build();
                 let q1 = query!(world, &(Foo, flecs::Wildcard)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -506,10 +507,10 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, Bar)).build();
                 let q1 = query!(world, &mut (Foo, flecs::Wildcard)).build();
-                q0.run(|mut iter| {
+                q0.run_shared(&world, |mut iter| {
                     while iter.next() {
                         let _x = iter.field::<Foo>(0);
-                        q1.run(|mut iter| {
+                        q1.run_shared(&world, |mut iter| {
                             while iter.next() {
                                 let _y = iter.field_mut::<Foo>(0);
                             }
@@ -526,8 +527,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, Bar)).build();
                 let q1 = query!(world, &mut (Foo, flecs::Wildcard)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -539,8 +540,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &(Foo, Bar)).build();
                 let q1 = query!(world, &mut (Foo, flecs::Wildcard)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -569,10 +570,10 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, Bar)).build();
                 let q1 = query!(world, &(Foo, flecs::Wildcard)).build();
-                q0.run(|mut iter| {
+                q0.run_shared(&world, |mut iter| {
                     while iter.next() {
                         let _x = iter.field_mut::<Foo>(0);
-                        q1.run(|mut iter| {
+                        q1.run_shared(&world, |mut iter| {
                             while iter.next() {
                                 let _y = iter.field::<Foo>(0);
                             }
@@ -589,8 +590,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, Bar)).build();
                 let q1 = query!(world, &(Foo, flecs::Wildcard)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -602,8 +603,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, Bar)).build();
                 let q1 = query!(world, &(Foo, flecs::Wildcard)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -632,10 +633,10 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, Bar)).build();
                 let q1 = query!(world, &mut (Foo, flecs::Wildcard)).build();
-                q0.run(|mut iter| {
+                q0.run_shared(&world, |mut iter| {
                     while iter.next() {
                         let _x = iter.field_mut::<Foo>(0);
-                        q1.run(|mut iter| {
+                        q1.run_shared(&world, |mut iter| {
                             while iter.next() {
                                 let _y = iter.field_mut::<Foo>(0);
                             }
@@ -652,8 +653,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, Bar)).build();
                 let q1 = query!(world, &mut (Foo, flecs::Wildcard)).build();
-                q0.each(|_| {
-                    q1.each(|_| {});
+                q0.each_shared(&world, |_| {
+                    q1.each_shared(&world, |_| {});
                 });
             }
 
@@ -665,8 +666,8 @@ mod id_into_wildcard {
                 world.entity().set_first(Foo(0), bar_id);
                 let q0 = query!(world, &mut (Foo, Bar)).build();
                 let q1 = query!(world, &mut (Foo, flecs::Wildcard)).build();
-                q0.each_entity(|_, _| {
-                    q1.each_entity(|_, _| {});
+                q0.each_entity_shared(&world, |_, _| {
+                    q1.each_entity_shared(&world, |_, _| {});
                 });
             }
 
@@ -693,7 +694,7 @@ mod id_into_wildcard {
             let world = World::new();
             let bar_id = world.component::<Bar>().id();
             world.entity().set_first(Foo(0), bar_id);
-            query!(world, &(Foo, Bar)).build().each_entity(|entity, _| {
+            query!(world, &(Foo, Bar)).build().each_entity_shared(&world, |entity, _| {
                 entity.get::<&(Foo, flecs::Wildcard)>(|_| {});
             });
         }
@@ -704,7 +705,7 @@ mod id_into_wildcard {
             let world = World::new();
             let bar_id = world.component::<Bar>().id();
             world.entity().set_first(Foo(0), bar_id);
-            query!(world, &(Foo, Bar)).build().each_entity(|entity, _| {
+            query!(world, &(Foo, Bar)).build().each_entity_shared(&world, |entity, _| {
                 entity.get::<&mut (Foo, flecs::Wildcard)>(|_| {});
             });
         }
@@ -717,7 +718,7 @@ mod id_into_wildcard {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &mut (Foo, Bar))
                 .build()
-                .each_entity(|entity, _| {
+                .each_entity_shared(&world, |entity, _| {
                     entity.get::<&(Foo, flecs::Wildcard)>(|_| {});
                 });
         }
@@ -730,7 +731,7 @@ mod id_into_wildcard {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &mut (Foo, Bar))
                 .build()
-                .each_entity(|entity, _| {
+                .each_entity_shared(&world, |entity, _| {
                     entity.get::<&mut (Foo, flecs::Wildcard)>(|_| {});
                 });
         }

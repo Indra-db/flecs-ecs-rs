@@ -3,6 +3,7 @@ use core::cell::Cell;
 use core::ffi::c_void;
 
 use crate::common_test::*;
+use flecs_ecs::experimental::{QueryExclusiveExt, QuerySharedExt};
 use flecs_ecs::sys;
 
 #[test]
@@ -21,7 +22,7 @@ fn builder_assign_same_type() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, (_p, _v)| {
+    q.each_entity_shared(&world, |e, (_p, _v)| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -45,7 +46,7 @@ fn builder_assign_to_empty() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -71,7 +72,7 @@ fn builder_assign_from_empty() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -95,7 +96,7 @@ fn builder_build() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, (_p, _v)| {
+    q.each_entity_shared(&world, |e, (_p, _v)| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -119,7 +120,7 @@ fn builder_build_to_let() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -144,7 +145,7 @@ fn builder_build_n_statements() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -165,7 +166,7 @@ fn n1_type() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -190,7 +191,7 @@ fn n2_types() {
         .build();
 
     let mut count = 0;
-    r.each_entity(|e, (p, v)| {
+    r.each_entity_shared(&world, |e, (p, v)| {
         count += 1;
         assert_eq!(e, e1);
         assert_eq!(p.x, 10);
@@ -220,7 +221,7 @@ fn id_term() {
         .build();
 
     let mut count = 0;
-    r.each_entity(|e, _| {
+    r.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -243,7 +244,7 @@ fn type_term() {
         .build();
 
     let mut count = 0;
-    r.each_entity(|e, _| {
+    r.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -270,7 +271,7 @@ fn id_pair_term() {
         .build();
 
     let mut count = 0;
-    r.each_entity(|e, _| {
+    r.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -297,7 +298,7 @@ fn id_pair_wildcard_term() {
         .build();
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         let world = it.world();
         while it.next() {
             for i in it.iter() {
@@ -331,7 +332,7 @@ fn type_pair_term() {
         .build();
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         let world = it.world();
         while it.next() {
             for i in it.iter() {
@@ -369,7 +370,7 @@ fn pair_term_w_var() {
     let foo_d_var = r.find_var("Food").unwrap();
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         let world = it.world();
         while it.next() {
             for i in it.iter() {
@@ -420,7 +421,7 @@ fn n2_pair_terms_w_var() {
     let person_var = r.find_var("Person").unwrap();
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         let world = it.world();
         while it.next() {
             for i in it.iter() {
@@ -471,7 +472,7 @@ fn set_var() {
     let foo_d_var = r.find_var("Food").unwrap();
 
     let mut count = 0;
-    r.iterable().set_var(foo_d_var, pears).run(|mut it| {
+    r.iterable().set_var(foo_d_var, pears).run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 assert_eq!(it.entity_id(i), e2);
@@ -520,7 +521,7 @@ fn set_2_vars() {
     r.iterable()
         .set_var(foo_d_var, pears)
         .set_var(person_var, bob)
-        .run(|mut it| {
+        .run_shared(&world, |mut it| {
             while it.next() {
                 for i in it.iter() {
                     assert_eq!(it.entity_id(i), alice);
@@ -558,7 +559,7 @@ fn set_var_by_name() {
         .build();
 
     let mut count = 0;
-    r.iterable().set_var_expr("Food", pears).run(|mut it| {
+    r.iterable().set_var_expr("Food", pears).run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 assert_eq!(it.entity_id(i), e2);
@@ -604,7 +605,7 @@ fn set_2_vars_by_name() {
     r.iterable()
         .set_var_expr("Food", pears)
         .set_var_expr("Person", bob)
-        .run(|mut it| {
+        .run_shared(&world, |mut it| {
             while it.next() {
                 for i in it.iter() {
                     assert_eq!(it.entity_id(i), alice);
@@ -640,7 +641,7 @@ fn expr_w_var() {
     assert_ne!(x_var, -1);
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 assert_eq!(it.get_entity(i).unwrap(), e);
@@ -667,7 +668,7 @@ fn add_1_type() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -693,7 +694,7 @@ fn add_2_types() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -718,7 +719,7 @@ fn add_1_type_w_1_type() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -745,7 +746,7 @@ fn add_2_types_w_1_type() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -771,7 +772,7 @@ fn add_pair() {
     world.entity().add((likes, alice));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -797,7 +798,7 @@ fn add_not() {
         .set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -822,7 +823,7 @@ fn add_or() {
     world.entity().set(Mass { value: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert!((e == e1 || e == e2));
     });
@@ -853,7 +854,7 @@ fn add_optional() {
         .set(Mass { value: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert!((e == e1 || e == e2));
     });
@@ -881,7 +882,7 @@ fn option_type() {
         .set(Mass { value: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert!((e == e1 || e == e2));
     });
@@ -902,7 +903,7 @@ fn const_type() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -927,7 +928,7 @@ fn string_term() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -937,7 +938,7 @@ fn string_term() {
 
 #[test]
 fn singleton_term() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.component::<Other>().add_trait::<flecs::Singleton>();
 
@@ -959,7 +960,7 @@ fn singleton_term() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let o = &it.field::<Other>(1)[0];
             assert!(!it.is_self(1));
@@ -977,7 +978,7 @@ fn singleton_term() {
 
 #[test]
 fn isa_superset_term() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Other>()
@@ -1003,7 +1004,7 @@ fn isa_superset_term() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let o = &it.field::<Other>(1)[0];
             assert!(!it.is_self(1));
@@ -1021,7 +1022,7 @@ fn isa_superset_term() {
 
 #[test]
 fn isa_self_superset_term() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Other>()
@@ -1053,7 +1054,7 @@ fn isa_self_superset_term() {
     let mut count = 0;
     let mut owned_count = 0;
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let o = &it.field::<Other>(1);
 
@@ -1079,7 +1080,7 @@ fn isa_self_superset_term() {
 
 #[test]
 fn childof_superset_term() {
-    let world = World::new();
+    let mut world = World::new();
 
     let q = world
         .query::<&SelfRef>()
@@ -1101,7 +1102,7 @@ fn childof_superset_term() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let o = &it.field::<Other>(1)[0];
             assert!(!it.is_self(1));
@@ -1119,7 +1120,7 @@ fn childof_superset_term() {
 
 #[test]
 fn childof_self_superset_term() {
-    let world = World::new();
+    let mut world = World::new();
 
     let q = world
         .query::<&SelfRef>()
@@ -1147,7 +1148,7 @@ fn childof_self_superset_term() {
     let mut count = 0;
     let mut owned_count = 0;
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let o = &it.field::<Other>(1);
 
@@ -1173,7 +1174,7 @@ fn childof_self_superset_term() {
 
 #[test]
 fn isa_superset_term_w_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Other>()
@@ -1198,7 +1199,7 @@ fn isa_superset_term_w_each() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1209,7 +1210,7 @@ fn isa_superset_term_w_each() {
 
 #[test]
 fn isa_self_superset_term_w_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Other>()
@@ -1239,7 +1240,7 @@ fn isa_self_superset_term_w_each() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1250,7 +1251,7 @@ fn isa_self_superset_term_w_each() {
 
 #[test]
 fn childof_superset_term_w_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     let q = world
         .query::<(&SelfRef, &Other)>()
@@ -1271,7 +1272,7 @@ fn childof_superset_term_w_each() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1282,7 +1283,7 @@ fn childof_superset_term_w_each() {
 
 #[test]
 fn childof_self_superset_term_w_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     let q = world
         .query::<(&SelfRef, &Other)>()
@@ -1308,7 +1309,7 @@ fn childof_self_superset_term_w_each() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1319,7 +1320,7 @@ fn childof_self_superset_term_w_each() {
 
 #[test]
 fn isa_superset_shortcut() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Other>()
@@ -1343,7 +1344,7 @@ fn isa_superset_shortcut() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1354,7 +1355,7 @@ fn isa_superset_shortcut() {
 
 #[test]
 fn isa_superset_shortcut_w_self() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Other>()
@@ -1383,7 +1384,7 @@ fn isa_superset_shortcut_w_self() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1394,7 +1395,7 @@ fn isa_superset_shortcut_w_self() {
 
 #[test]
 fn childof_superset_shortcut() {
-    let world = World::new();
+    let mut world = World::new();
 
     let q = world
         .query::<(&SelfRef, &Other)>()
@@ -1414,7 +1415,7 @@ fn childof_superset_shortcut() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1425,7 +1426,7 @@ fn childof_superset_shortcut() {
 
 #[test]
 fn childof_superset_shortcut_w_self() {
-    let world = World::new();
+    let mut world = World::new();
 
     let q = world
         .query::<(&SelfRef, &Other)>()
@@ -1450,7 +1451,7 @@ fn childof_superset_shortcut_w_self() {
 
     let mut count = 0;
 
-    q.each_entity(|e, (s, o)| {
+    q.each_entity_exclusive(&mut world, |e, (s, o)| {
         assert_eq!(e, s.value);
         assert_eq!(o.value, 10);
         count += 1;
@@ -1461,7 +1462,7 @@ fn childof_superset_shortcut_w_self() {
 
 #[test]
 fn relation() {
-    let world = World::new();
+    let mut world = World::new();
 
     let likes = world.entity();
     let bob = world.entity();
@@ -1485,7 +1486,7 @@ fn relation() {
 
     let mut count = 0;
 
-    q.each_entity(|e, s| {
+    q.each_entity_exclusive(&mut world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -1495,7 +1496,7 @@ fn relation() {
 
 #[test]
 fn relation_w_object_wildcard() {
-    let world = World::new();
+    let mut world = World::new();
 
     let likes = world.entity();
     let bob = world.entity();
@@ -1524,7 +1525,7 @@ fn relation_w_object_wildcard() {
 
     let mut count = 0;
 
-    q.each_entity(|e, s| {
+    q.each_entity_exclusive(&mut world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -1534,7 +1535,7 @@ fn relation_w_object_wildcard() {
 
 #[test]
 fn relation_w_predicate_wildcard() {
-    let world = World::new();
+    let mut world = World::new();
 
     let likes = world.entity();
     let dislikes = world.entity();
@@ -1559,7 +1560,7 @@ fn relation_w_predicate_wildcard() {
 
     let mut count = 0;
 
-    q.each_entity(|e, s| {
+    q.each_entity_exclusive(&mut world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -1569,7 +1570,7 @@ fn relation_w_predicate_wildcard() {
 
 #[test]
 fn add_pair_w_rel_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     let dislikes = world.entity();
     let bob = world.entity();
@@ -1593,7 +1594,7 @@ fn add_pair_w_rel_type() {
 
     let mut count = 0;
 
-    q.each_entity(|e, s| {
+    q.each_entity_exclusive(&mut world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -1618,7 +1619,7 @@ fn template_term() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -1708,7 +1709,7 @@ fn explicit_subject_w_id() {
     world.entity().set(Velocity { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -1730,7 +1731,7 @@ fn explicit_subject_w_type() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, p| {
+    q.each_entity_shared(&world, |e, p| {
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         count += 1;
@@ -1759,7 +1760,7 @@ fn explicit_object_w_id() {
     world.entity().add((likes, bob));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -1787,7 +1788,7 @@ fn explicit_object_w_type() {
     world.entity().add((likes, bob));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -1977,7 +1978,7 @@ fn optional_tag_is_set() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
 
@@ -2032,7 +2033,7 @@ fn n10_terms() {
         .add(TagJ::id());
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.field_count(), 10);
             assert_eq!(it.get_entity(0usize).unwrap(), e);
@@ -2095,7 +2096,7 @@ fn n16_terms() {
         .add(TagT::id());
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             assert_eq!(it.get_entity(0usize).unwrap(), e);
@@ -2157,7 +2158,7 @@ fn group_by_raw() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2175,7 +2176,7 @@ fn group_by_raw() {
     assert_eq!(count, 3);
 
     count = 0;
-    q_reverse.run(|mut it| {
+    q_reverse.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2220,7 +2221,7 @@ fn group_by_template() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2238,7 +2239,7 @@ fn group_by_template() {
     assert_eq!(count, 3);
 
     count = 0;
-    q_reverse.run(|mut it| {
+    q_reverse.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2285,7 +2286,7 @@ fn group_by_raw_ordered() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2303,7 +2304,7 @@ fn group_by_raw_ordered() {
     assert_eq!(count, 3);
 
     count = 0;
-    q_reverse.run(|mut it| {
+    q_reverse.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2350,7 +2351,7 @@ fn group_by_template_ordered() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2368,7 +2369,7 @@ fn group_by_template_ordered() {
     assert_eq!(count, 3);
 
     count = 0;
-    q_reverse.run(|mut it| {
+    q_reverse.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if count == 0 {
@@ -2431,7 +2432,7 @@ fn group_by_iter_one() {
     let mut e5_found = false;
     let mut count = 0;
 
-    q.iterable().set_group(tgt_b).run(|mut it| {
+    q.iterable().set_group(tgt_b).run_shared(&world, |mut it| {
         while it.next() {
             for i in 0..it.count() {
                 let e = it.get_entity(i).unwrap();
@@ -2475,7 +2476,7 @@ fn group_by_iter_one_template() {
     let mut e5_found = false;
     let mut count = 0;
 
-    q.iterable().set_group(TagB::id()).run(|mut it| {
+    q.iterable().set_group(TagB::id()).run_shared(&world, |mut it| {
         while it.next() {
             for i in 0..it.count() {
                 let e = it.get_entity(i).unwrap();
@@ -2560,20 +2561,20 @@ fn group_by_iter_one_all_groups() {
     };
 
     group_id.set(*tgt_b.id());
-    q.iterable().set_group(tgt_b).run(func);
+    q.iterable().set_group(tgt_b).run_shared(&world, func);
 
     assert_eq!(2, count.get());
     assert!(e2_found.get());
     assert!(e5_found.get());
 
     group_id.set(*tgt_a.id());
-    q.iterable().set_group(tgt_a).run(func);
+    q.iterable().set_group(tgt_a).run_shared(&world, func);
     assert_eq!(4, count.get());
     assert!(e1_found.get());
     assert!(e4_found.get());
 
     group_id.set(*tgt_c.id());
-    q.iterable().set_group(tgt_c).run(func);
+    q.iterable().set_group(tgt_c).run_shared(&world, func);
     assert_eq!(6, count.get());
     assert!(e3_found.get());
     assert!(e6_found.get());
@@ -2603,7 +2604,7 @@ fn group_by_default_func_w_id() {
     let mut e3_found = false;
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 let e = it.get_entity(i).unwrap();
@@ -2664,7 +2665,7 @@ fn group_by_default_func_w_id_ordered() {
     let mut e3_found = false;
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 let e = it.get_entity(i).unwrap();
@@ -2723,7 +2724,7 @@ fn group_by_default_func_w_type() {
     let mut e3_found = false;
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 let e = it.get_entity(i).unwrap();
@@ -2783,7 +2784,7 @@ fn group_by_default_func_w_type_ordered() {
     let mut e3_found = false;
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 let e = it.get_entity(i).unwrap();
@@ -2878,7 +2879,7 @@ fn group_by_callbacks() {
     let mut e3_found = false;
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             for i in 0..it.count() {
                 let e = it.get_entity(i).unwrap();
@@ -2949,7 +2950,7 @@ fn group_by_callbacks_ordered() {
     let mut e3_found = false;
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             for i in 0..it.count() {
                 let e = it.get_entity(i).unwrap();
@@ -3010,7 +3011,7 @@ fn iterate_groups() {
         .group_by_fn(rel, Some(group_by_rel))
         .build();
 
-    q.run(|mut it| while it.next() {});
+    q.run_shared(&world, |mut it| while it.next() {});
 
     let mut a_found = false;
     let mut b_found = false;
@@ -3069,7 +3070,7 @@ fn iterate_groups_w_isa() {
 
     let q = world.query::<&Position>().group_by(*flecs::IsA).build();
 
-    q.run(|mut it| while it.next() {});
+    q.run_shared(&world, |mut it| while it.next() {});
 
     let mut a_found = false;
     let mut b_found = false;
@@ -3103,7 +3104,7 @@ fn create_w_no_template_args() {
     let e1 = world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -3128,7 +3129,7 @@ fn any_wildcard() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -3167,7 +3168,7 @@ fn cascade() {
     let mut e3_found = false;
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
 
         if e == e1 {
@@ -3228,7 +3229,7 @@ fn cascade_desc() {
     let mut e3_found = false;
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
 
         if e == e1 {
@@ -3285,7 +3286,7 @@ fn cascade_w_relationship() {
     let mut e3_found = false;
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
 
         if e == e1 {
@@ -3316,7 +3317,7 @@ fn cascade_w_relationship() {
 
 #[test]
 fn up_w_type() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.component::<Rel>().add(*flecs::Traversable);
 
@@ -3340,7 +3341,7 @@ fn up_w_type() {
 
     let mut count = 0;
 
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let o = &it.field::<Other>(1)[0];
             let s = it.field::<SelfRef2>(0);
@@ -3387,7 +3388,7 @@ fn cascade_w_type() {
     let mut e3_found = false;
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
 
         if e == e1 {
@@ -3430,7 +3431,7 @@ fn named_query() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert!((e == e1 || e == e2));
         count += 1;
     });
@@ -3498,7 +3499,7 @@ fn iter_w_stage() {
     let mut count = 0;
     // iter_stage() runs the query using stage as the world context,
     // so it.world() inside the callback returns the stage WorldRef.
-    q.iter_stage(stage).each_entity(|e, _pos| {
+    q.iter_stage(stage).each_entity_shared(&world, |e, _pos| {
         assert_eq!(e.world().world_ptr(), stage.world_ptr());
         assert_eq!(e.id(), e1_id);
         count += 1;
@@ -3531,7 +3532,7 @@ fn builder_force_assign_operator() {
     let mut count = 0;
     f.get::<&QueryWrapper>(|wrapper| {
         let query = world.query_from(wrapper.query_entity);
-        query.each_entity(|e, _| {
+        query.each_entity_shared(&world, |e, _| {
             assert_eq!(e, e1);
             count += 1;
         });
@@ -3542,10 +3543,10 @@ fn builder_force_assign_operator() {
 
 #[test]
 fn query_as_arg() {
-    fn query_arg(f: &Query<&SelfRef>) -> i32 {
+    fn query_arg(world: &mut World, f: &Query<&SelfRef>) -> i32 {
         let mut count = 0;
 
-        f.each_entity(|e, s| {
+        f.each_entity_exclusive(world, |e, s| {
             assert_eq!(e, s.value);
             count += 1;
         });
@@ -3553,7 +3554,7 @@ fn query_as_arg() {
         count
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
     let f = world
         .query::<&SelfRef>()
@@ -3569,22 +3570,22 @@ fn query_as_arg() {
     let e = world.entity();
     e.set(SelfRef { value: e.id() });
 
-    assert_eq!(query_arg(&f), 3);
+    assert_eq!(query_arg(&mut world, &f), 3);
 }
 
 #[test]
 fn query_default_as_move_arg() {
-    fn query_move(f: Query<&SelfRef>) -> i32 {
+    fn query_move(world: &mut World, f: Query<&SelfRef>) -> i32 {
         let mut count = 0;
 
-        f.each_entity(|e, s| {
+        f.each_entity_exclusive(world, |e, s| {
             assert_eq!(e, s.value);
             count += 1;
         });
 
         count
     }
-    let world = World::new();
+    let mut world = World::new();
 
     let _f = world.query::<&SelfRef>();
 
@@ -3597,7 +3598,8 @@ fn query_default_as_move_arg() {
     let e = world.entity();
     e.set(SelfRef { value: e.id() });
 
-    assert_eq!(query_move(world.new_query::<&SelfRef>()), 3);
+    let qm = world.new_query::<&SelfRef>();
+    assert_eq!(query_move(&mut world, qm), 3);
 }
 
 #[test]
@@ -3621,7 +3623,7 @@ fn query_as_return() {
 
     let mut count = 0;
 
-    f.each_entity(|e, s| {
+    f.each_entity_shared(&world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -3631,7 +3633,7 @@ fn query_as_return() {
 
 #[test]
 fn query_copy() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e = world.entity();
     e.set(SelfRef { value: e.id() });
@@ -3651,7 +3653,7 @@ fn query_copy() {
 
     let mut count = 0;
 
-    f_2.each_entity(|e, s| {
+    f_2.each_entity_exclusive(&mut world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -3793,7 +3795,7 @@ fn term_after_arg() {
     assert_eq!(f.field_count(), 3);
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 assert_eq!(it.get_entity(i).unwrap(), e_1);
@@ -3821,7 +3823,7 @@ fn name_arg() {
 
     let mut count = 0;
 
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             let p = it.field::<Position>(0);
             assert_eq!(p[0].x, 10);
@@ -3836,7 +3838,7 @@ fn name_arg() {
 
 #[test]
 fn const_in_term() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.entity().set(Position { x: 10, y: 20 });
 
@@ -3847,7 +3849,7 @@ fn const_in_term() {
         .build();
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = it.field::<Position>(0);
             assert!(it.is_readonly(0));
@@ -3864,7 +3866,7 @@ fn const_in_term() {
 
 #[test]
 fn const_optional() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .entity()
@@ -3879,7 +3881,7 @@ fn const_optional() {
 
     let mut count = 0;
     let mut set_count = 0;
-    f.run(|mut it| {
+    f.run_exclusive(&mut world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             if it.is_set(1) {
@@ -3916,7 +3918,7 @@ fn n2_terms_w_expr() {
     assert_eq!(f.field_count(), 2);
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             for i in it.iter() {
                 if it.get_entity(i).unwrap() == e1 {
@@ -4071,7 +4073,7 @@ fn iter_column_w_const_as_array() {
     let e2 = world.entity().set(Position { x: 20, y: 30 });
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             let mut p = it.field_mut::<Position>(0);
             for i in it.iter() {
@@ -4098,7 +4100,7 @@ fn iter_column_w_const_as_array() {
 
 #[test]
 fn iter_column_w_const_as_ptr() {
-    let world = World::new();
+    let mut world = World::new();
 
     let f = world
         .query::<&Position>()
@@ -4110,7 +4112,7 @@ fn iter_column_w_const_as_ptr() {
     world.entity().is_a(base);
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = &it.field::<Position>(0)[0];
             for _i in it.iter() {
@@ -4142,7 +4144,7 @@ fn with() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4170,7 +4172,7 @@ fn with_name() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4196,7 +4198,7 @@ fn with_component() {
     world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4229,7 +4231,7 @@ fn with_pair_id() {
         .add((likes, pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4262,7 +4264,7 @@ fn with_pair_name() {
         .add((likes, pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4291,7 +4293,7 @@ fn with_pair_components() {
         .add((Likes::id(), Pears::id()));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4323,7 +4325,7 @@ fn with_pair_component_id() {
         .add((Likes::id(), pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4356,7 +4358,7 @@ fn with_pair_name_component_id() {
         .add((likes, pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4388,7 +4390,7 @@ fn with_pair_component_name() {
         .add((Likes::id(), pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4425,7 +4427,7 @@ fn with_enum() {
         .add_enum(Color::Red);
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -4451,7 +4453,7 @@ fn without() {
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4479,7 +4481,7 @@ fn without_name() {
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4505,7 +4507,7 @@ fn without_component() {
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4538,7 +4540,7 @@ fn without_pair_id() {
         .add((likes, pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4571,7 +4573,7 @@ fn without_pair_name() {
         .add((likes, pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4600,7 +4602,7 @@ fn without_pair_components() {
         .add((Likes::id(), Pears::id()));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4632,7 +4634,7 @@ fn without_pair_component_id() {
         .add((Likes::id(), pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4664,7 +4666,7 @@ fn without_pair_component_name() {
         .add((Likes::id(), pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4697,7 +4699,7 @@ fn without_pair_name_component_id() {
         .add((likes, pears));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -4734,7 +4736,7 @@ fn without_enum() {
         .add_enum(Color::Red);
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -5101,7 +5103,7 @@ fn assign_after_init() {
     let e1 = world.entity().set(Position { x: 10, y: 20 });
 
     let mut count = 0;
-    f.each_entity(|e, _| {
+    f.each_entity_shared(&world, |e, _| {
         assert_eq!(e, e1);
         count += 1;
     });
@@ -5179,17 +5181,17 @@ fn with_r_t_inout() {
 
 #[test]
 fn query_as_move_arg() {
-    fn query_move(f: Query<&SelfRef>) -> i32 {
+    fn query_move(world: &mut World, f: Query<&SelfRef>) -> i32 {
         let mut count = 0;
 
-        f.each_entity(|e, s| {
+        f.each_entity_exclusive(world, |e, s| {
             assert_eq!(e, s.value);
             count += 1;
         });
 
         count
     }
-    let world = World::new();
+    let mut world = World::new();
 
     let f = world
         .query::<&SelfRef>()
@@ -5205,7 +5207,7 @@ fn query_as_move_arg() {
     let e = world.entity();
     e.set(SelfRef { value: e.id() });
 
-    assert_eq!(query_move(f), 3);
+    assert_eq!(query_move(&mut world, f), 3);
 }
 
 #[test]
@@ -5232,7 +5234,7 @@ fn filter_as_return() {
 
     let mut count = 0;
 
-    f.each_entity(|e, s| {
+    f.each_entity_shared(&world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -5242,7 +5244,7 @@ fn filter_as_return() {
 
 #[test]
 fn filter_copy() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e = world.entity();
     e.set(SelfRef { value: e.id() });
@@ -5262,7 +5264,7 @@ fn filter_copy() {
 
     let mut count = 0;
 
-    f_2.each_entity(|e, s| {
+    f_2.each_entity_exclusive(&mut world, |e, s| {
         assert_eq!(e, s.value);
         count += 1;
     });
@@ -5395,7 +5397,7 @@ fn var_src_w_prefixed_name() {
     let e = world.entity().add(Foo::id());
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.get_var_by_name("Var"), e);
             count += 1;
@@ -5420,7 +5422,7 @@ fn var_first_w_prefixed_name() {
     let e = world.entity().add(Foo::id());
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             assert_eq!(it.get_entity(0usize).unwrap(), e);
@@ -5447,7 +5449,7 @@ fn var_second_w_prefixed_name() {
     let e = world.entity().add((Foo::id(), t));
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             assert_eq!(it.get_entity(0usize).unwrap(), e);
@@ -5475,7 +5477,7 @@ fn term_w_second_var_string() {
     let e = world.entity().add((foo_, t));
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             assert_eq!(it.get_entity(0usize).unwrap(), e);
@@ -5501,7 +5503,7 @@ fn term_type_w_second_var_string() {
     let e = world.entity().add((Foo::id(), t));
 
     let mut count = 0;
-    r.run(|mut it| {
+    r.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             assert_eq!(it.get_entity(0usize).unwrap(), e);
@@ -5526,7 +5528,7 @@ fn named_rule() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         assert!((e == e1 || e == e2));
         count += 1;
     });
@@ -5550,7 +5552,7 @@ fn named_scoped_rule() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         assert!((e == e1 || e == e2));
         count += 1;
     });
@@ -5629,7 +5631,7 @@ fn scope() {
         .build();
 
     let mut count = 0;
-    r.each_entity(|e, _| {
+    r.each_entity_shared(&world, |e, _| {
         assert_ne!(e, e2);
         count += 1;
     });
@@ -5656,7 +5658,7 @@ void QueryBuilder_each_w_field_w_fixed_src(void) {
         .build();
 
     int32_t count = 0;
-    q.each([&](flecs::iter& it, size_t row) {
+    q.each_exclusive(&mut world, [&](flecs::iter& it, size_t row) {
         auto e = it.entity(row);
         auto p = it.field_at<Position>(0, row);
         auto v = it.field<const Velocity>(1);
@@ -5697,7 +5699,7 @@ void QueryBuilder_each_w_field_at_w_fixed_src(void) {
         .build();
 
     int32_t count = 0;
-    q.each([&](flecs::iter& it, size_t row) {
+    q.each_exclusive(&mut world, [&](flecs::iter& it, size_t row) {
         auto e = it.entity(row);
         auto p = it.field_at<Position>(0, row);
         auto v = it.field_at<const Velocity>(1, 0);
@@ -5738,7 +5740,7 @@ void QueryBuilder_each_w_const_field_w_fixed_src(void) {
         .build();
 
     int32_t count = 0;
-    q.each([&](flecs::iter& it, size_t row) {
+    q.each_exclusive(&mut world, [&](flecs::iter& it, size_t row) {
         auto e = it.entity(row);
         auto p = it.field_at<Position>(0, row);
         auto v = it.field<const Velocity>(1);
@@ -5779,7 +5781,7 @@ void QueryBuilder_each_w_const_field_at_w_fixed_src(void) {
         .build();
 
     int32_t count = 0;
-    q.each([&](flecs::iter& it, size_t row) {
+    q.each_exclusive(&mut world, [&](flecs::iter& it, size_t row) {
         auto e = it.entity(row);
         auto p = it.field_at<Position>(0, row);
         auto v = it.field_at<const Velocity>(1, 0);
@@ -5820,7 +5822,7 @@ void QueryBuilder_each_w_untyped_field_w_fixed_src(void) {
         .build();
 
     int32_t count = 0;
-    q.each([&](flecs::iter& it, size_t row) {
+    q.each_exclusive(&mut world, [&](flecs::iter& it, size_t row) {
         auto e = it.entity(row);
         auto p = it.field_at<Position>(0, row);
         flecs::untyped_field vf = it.field(1);
@@ -5862,7 +5864,7 @@ void QueryBuilder_each_w_untyped_field_at_w_fixed_src(void) {
         .build();
 
     int32_t count = 0;
-    q.each([&](flecs::iter& it, size_t row) {
+    q.each_exclusive(&mut world, [&](flecs::iter& it, size_t row) {
         auto e = it.entity(row);
         auto p = it.field_at<Position>(0, row);
         void *vptr = it.field_at(1, 0);
@@ -5902,7 +5904,7 @@ void QueryBuilder_singleton_pair(void) {
         .cache_kind(cache_kind)
         .build();
 
-    q.each([&](flecs::iter& it, size_t, const Position& p) {
+    q.each_exclusive(&mut world, [&](flecs::iter& it, size_t, const Position& p) {
         test_assert(it.src(0) == rel);
         test_assert(it.pair(0) == ecs.pair<Position>(tgt));
         test_int(p.x, 10);
@@ -5926,7 +5928,7 @@ void QueryBuilder_query_w_this_second(void) {
     e1.add(rel, e1);
 
     int32_t count = 0;
-    q.each([&](flecs::entity e) {
+    q.each_exclusive(&mut world, [&](flecs::entity e) {
         test_assert(e == e1);
         count ++;
     });
@@ -5960,7 +5962,7 @@ fn query_builder_ptr_type() {
         .set(Mass { value: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, (_p, _v)| {
+    q.each_entity_shared(&world, |e, (_p, _v)| {
         count += 1;
         assert!(e == e1 || e == e2);
     });
@@ -5982,7 +5984,7 @@ fn query_builder_named_scoped_query() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         assert!(e == e1 || e == e2);
         count += 1;
     });
@@ -6008,7 +6010,7 @@ fn query_builder_cascade_w_set_var() {
         .build();
 
     let mut count = 0;
-    q.with_var(0, earth).each_entity(|e, p| {
+    q.with_var(0, earth).each_entity_shared(&world, |e, p| {
         count += 1;
         assert_eq!(e, earth);
         assert!(p.is_some());
@@ -6066,7 +6068,7 @@ fn query_builder_pred_eq() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, foo);
         count += 1;
     });
@@ -6089,7 +6091,7 @@ fn query_builder_pred_eq_name() {
     let foo = world.entity_named("Foo");
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, foo);
         count += 1;
     });
@@ -6112,7 +6114,7 @@ fn query_builder_pred_match() {
     let foo = world.entity_named("FooBar");
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, foo);
         count += 1;
     });
@@ -6205,7 +6207,7 @@ fn query_builder_builder_build_to_auto() {
     world.entity().add(Position::id());
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -6358,7 +6360,7 @@ fn query_builder_32_terms() {
         .add(T31::id());
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             assert_eq!(it.get_entity(0_usize).unwrap(), e);
@@ -6391,7 +6393,7 @@ fn query_builder_with_id() {
     world.entity().add(Position::id());
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -6416,7 +6418,7 @@ fn query_builder_without_id() {
     let e2 = world.entity().add(Position::id());
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -6619,10 +6621,10 @@ fn query_builder_set_table_var_chained() {
 
     let mut count = 0;
 
-    q1.run(|mut it| {
+    q1.run_shared(&world, |mut it| {
         while it.next() {
             q2.with_var_table_expr("this", it.table().unwrap())
-                .each_entity(|e, _| {
+                .each_entity_shared(&world, |e, _| {
                     assert_eq!(e, e3);
                     count += 1;
                 });
@@ -6648,10 +6650,10 @@ fn query_builder_set_range_var_chained() {
 
     let mut count = 0;
 
-    q1.run(|mut it| {
+    q1.run_shared(&world, |mut it| {
         while it.next() {
             q2.with_var_table_expr("this", it.range().unwrap())
-                .each_entity(|e, _| {
+                .each_entity_shared(&world, |e, _| {
                     assert_eq!(e, e3);
                     count += 1;
                 });
@@ -6771,7 +6773,7 @@ fn query_builder_set_group_type_on_query() {
 
 #[test]
 fn query_builder_iter_column_w_const_deref() {
-    let world = World::new();
+    let mut world = World::new();
 
     let f = world.new_query::<&Position>();
 
@@ -6780,7 +6782,7 @@ fn query_builder_iter_column_w_const_deref() {
     world.entity().is_a(base);
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = it.field::<Position>(0);
             // In Rust there's no pointer deref syntax; we index p[0] for the shared component
@@ -6800,7 +6802,7 @@ fn query_builder_iter_column_w_const_deref() {
 
 #[test]
 fn query_builder_filter_as_move_arg() {
-    let world = World::new();
+    let mut world = World::new();
 
     let f = world
         .query::<&SelfRef>()
@@ -6815,16 +6817,16 @@ fn query_builder_filter_as_move_arg() {
     e.set(SelfRef { value: e.id() });
 
     // Pass query by value to a helper — mirrors C++ "move arg" semantics
-    fn count_query(f: Query<&SelfRef>) -> i32 {
+    fn count_query(world: &mut World, f: Query<&SelfRef>) -> i32 {
         let mut count = 0;
-        f.each_entity(|e, s| {
+        f.each_entity_exclusive(world, |e, s| {
             assert_eq!(e, s.value);
             count += 1;
         });
         count
     }
 
-    assert_eq!(count_query(f), 3);
+    assert_eq!(count_query(&mut world, f), 3);
 }
 
 // ─── world_each_entity ────────────────────────────────────────────────────────
@@ -6855,7 +6857,7 @@ fn query_builder_world_each_entity() {
         .query::<()>()
         .with(flecs::Any::ID)
         .build()
-        .each_entity(|e, ()| {
+        .each_entity_shared(&world, |e, ()| {
             if e == e1 {
                 found_e1 = true;
             }
@@ -6896,7 +6898,7 @@ fn query_builder_query_w_this_second() {
     e1.add((rel, e1));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, e1);
         count += 1;
     });
@@ -7111,7 +7113,7 @@ fn query_builder_each_w_untyped_field_w_fixed_src() {
         .build();
 
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             // field_untyped gives FieldUntyped; .at(0) returns a *const c_void pointer.
             // Field 1 (Velocity) has a fixed src so it's the same value for all rows.
@@ -7169,7 +7171,7 @@ fn query_builder_each_w_untyped_field_at_w_fixed_src() {
         .build();
 
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             // field_at_untyped(field_index, row) returns a raw *const c_void pointer.
             // Field 1 (Velocity) has a fixed src so row=0 gives the shared component.
@@ -7225,7 +7227,7 @@ fn ptr_type() {
         .set(Mass { value: 0 });
 
     let mut count = 0;
-    q.each_entity(|e, (_p, _v)| {
+    q.each_entity_shared(&world, |e, (_p, _v)| {
         count += 1;
         assert!(e == e1 || e == e2);
     });
@@ -7247,7 +7249,7 @@ fn named_scoped_query() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _p| {
+    q.each_entity_shared(&world, |e, _p| {
         assert!(e == e1 || e == e2);
         count += 1;
     });
@@ -7273,7 +7275,7 @@ fn cascade_w_set_var() {
         .build();
 
     let mut count = 0;
-    q.with_var(0, earth).each_entity(|e, p| {
+    q.with_var(0, earth).each_entity_shared(&world, |e, p| {
         count += 1;
         assert_eq!(e, earth);
         assert!(p.is_some());
@@ -7332,7 +7334,7 @@ fn pred_eq() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, foo);
         count += 1;
     });
@@ -7355,7 +7357,7 @@ fn pred_eq_name() {
         .build();
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, foo);
         count += 1;
     });
@@ -7379,7 +7381,7 @@ fn pred_match() {
     let foo = world.entity_named("Foo");
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, foo);
         count += 1;
     });
@@ -7472,7 +7474,7 @@ fn builder_build_to_auto() {
     world.entity().add(Position::id());
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -7625,7 +7627,7 @@ fn n32_terms() {
         .add(T31::id());
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_shared(&world, |mut it| {
         while it.next() {
             assert_eq!(it.count(), 1);
             assert_eq!(it.get_entity(0_usize).unwrap(), e);
@@ -7658,7 +7660,7 @@ fn with_id() {
     world.entity().add(Position::id());
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e1);
     });
@@ -7683,7 +7685,7 @@ fn without_id() {
     let e2 = world.entity().add(Position::id());
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         count += 1;
         assert_eq!(e, e2);
     });
@@ -7886,10 +7888,10 @@ fn set_table_var_chained() {
 
     let mut count = 0;
 
-    q1.run(|mut it| {
+    q1.run_shared(&world, |mut it| {
         while it.next() {
             q2.with_var_table_expr("this", it.table().unwrap())
-                .each_entity(|e, _| {
+                .each_entity_shared(&world, |e, _| {
                     assert_eq!(e, e3);
                     count += 1;
                 });
@@ -7915,10 +7917,10 @@ fn set_range_var_chained() {
 
     let mut count = 0;
 
-    q1.run(|mut it| {
+    q1.run_shared(&world, |mut it| {
         while it.next() {
             q2.with_var_table_expr("this", it.range().unwrap())
-                .each_entity(|e, _| {
+                .each_entity_shared(&world, |e, _| {
                     assert_eq!(e, e3);
                     count += 1;
                 });
@@ -8038,7 +8040,7 @@ fn set_group_type_on_query() {
 
 #[test]
 fn iter_column_w_const_deref() {
-    let world = World::new();
+    let mut world = World::new();
 
     let f = world.new_query::<&Position>();
 
@@ -8047,7 +8049,7 @@ fn iter_column_w_const_deref() {
     world.entity().is_a(base);
 
     let mut count = 0;
-    f.run(|mut it| {
+    f.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let p = it.field::<Position>(0);
             // In Rust there's no pointer deref syntax; we index p[0] for the shared component
@@ -8067,7 +8069,7 @@ fn iter_column_w_const_deref() {
 
 #[test]
 fn filter_as_move_arg() {
-    let world = World::new();
+    let mut world = World::new();
 
     let f = world
         .query::<&SelfRef>()
@@ -8082,16 +8084,16 @@ fn filter_as_move_arg() {
     e.set(SelfRef { value: e.id() });
 
     // Pass query by value to a helper — mirrors C++ "move arg" semantics
-    fn count_query(f: Query<&SelfRef>) -> i32 {
+    fn count_query(world: &mut World, f: Query<&SelfRef>) -> i32 {
         let mut count = 0;
-        f.each_entity(|e, s| {
+        f.each_entity_exclusive(world, |e, s| {
             assert_eq!(e, s.value);
             count += 1;
         });
         count
     }
 
-    assert_eq!(count_query(f), 3);
+    assert_eq!(count_query(&mut world, f), 3);
 }
 
 // ─── world_each_entity ────────────────────────────────────────────────────────
@@ -8130,7 +8132,7 @@ fn query_w_this_second() {
     e1.add((rel, e1));
 
     let mut count = 0;
-    q.each_entity(|e, _| {
+    q.each_entity_shared(&world, |e, _| {
         assert_eq!(e, e1);
         count += 1;
     });
@@ -8162,7 +8164,7 @@ fn each_w_field_w_fixed_src() {
     // Use run() because each_iter restricts field() for $this sources and field_at() for non-sparse.
     // Fixed-src components must be accessed via run()+field().
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             let p_field = it.field::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -8213,7 +8215,7 @@ fn each_w_field_at_w_fixed_src() {
     // Use run() — same as each_w_field_w_fixed_src but uses field_at semantics:
     // Velocity[0] is always the fixed entity (row 0), Position uses per-entity row.
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             let p_field = it.field::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -8263,7 +8265,7 @@ fn each_w_const_field_w_fixed_src() {
         .build();
 
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             let p_field = it.field::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -8312,7 +8314,7 @@ fn each_w_const_field_at_w_fixed_src() {
         .build();
 
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             let p_field = it.field::<Position>(0);
             let v = it.field::<Velocity>(1);
@@ -8367,7 +8369,7 @@ fn each_w_untyped_field_w_fixed_src() {
         .build();
 
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             // field_untyped gives FieldUntyped; .at(0) returns a *const c_void pointer.
             // Field 1 (Velocity) has a fixed src so it's the same value for all rows.
@@ -8425,7 +8427,7 @@ fn each_w_untyped_field_at_w_fixed_src() {
         .build();
 
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_shared(&world, |mut it| {
         while it.next() {
             // field_at_untyped(field_index, row) returns a raw *const c_void pointer.
             // Field 1 (Velocity) has a fixed src so row=0 gives the shared component.
@@ -8495,7 +8497,7 @@ fn world_each_entity() {
 /// query must simply succeed.
 #[test]
 fn typed_query_build_is_infallible() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Convenience constructor returns `Query<D>` directly.
     let q1: Query<(&Position, &Velocity)> = world.new_query::<(&Position, &Velocity)>();
@@ -8508,9 +8510,9 @@ fn typed_query_build_is_infallible() {
         .set(Velocity { x: 3, y: 4 });
 
     let mut c1 = 0;
-    q1.each(|(_p, _v)| c1 += 1);
+    q1.each_exclusive(&mut world, |(_p, _v)| c1 += 1);
     let mut c2 = 0;
-    q2.each(|(_p, _v)| c2 += 1);
+    q2.each_exclusive(&mut world, |(_p, _v)| c2 += 1);
     assert_eq!(c1, 1);
     assert_eq!(c2, 1);
 }
@@ -8520,7 +8522,7 @@ fn typed_query_build_is_infallible() {
 /// iterates, and no closure/leak is involved on the query path).
 #[test]
 fn expr_invalid_returns_invalid_expr_with_string() {
-    let world = World::new();
+    let mut world = World::new();
 
     let err = world
         .query::<()>()
@@ -8537,14 +8539,14 @@ fn expr_invalid_returns_invalid_expr_with_string() {
     world.entity().set(Position { x: 5, y: 6 });
     let q = world.new_query::<&Position>();
     let mut count = 0;
-    q.each(|_p| count += 1);
+    q.each_exclusive(&mut world, |_p| count += 1);
     assert_eq!(count, 1);
 }
 
 /// A valid `expr()` builds through the fallible typestate and iterates normally.
 #[test]
 fn expr_valid_builds_and_iterates() {
-    let world = World::new();
+    let mut world = World::new();
     world.component::<Position>();
 
     let q = world
@@ -8557,7 +8559,7 @@ fn expr_valid_builds_and_iterates() {
     world.entity().set(Position { x: 9, y: 10 });
 
     let mut count = 0;
-    q.run(|mut it| {
+    q.run_exclusive(&mut world, |mut it| {
         while it.next() {
             count += it.count();
         }

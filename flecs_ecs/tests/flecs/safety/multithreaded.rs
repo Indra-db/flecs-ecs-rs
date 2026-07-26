@@ -6,6 +6,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
+use flecs_ecs::experimental::QuerySharedExt;
 
 #[derive(Component)]
 struct SparseCounter(u64);
@@ -214,7 +215,7 @@ fn par_each_with_stage_deferred_structural_ops_apply_after_sync() {
         .query::<()>()
         .with(Marked::id())
         .build()
-        .each(|_| marked += 1);
+        .each_shared(&world, |_| marked += 1);
     assert_eq!(marked, ENTITY_COUNT);
 }
 
@@ -241,7 +242,7 @@ fn par_each_with_stage_deferred_set_applies_after_sync() {
 
     let mut sum = 0u64;
     let mut count = 0u64;
-    world.new_query::<&Bumped>().each(|b| {
+    world.new_query::<&Bumped>().each_shared(&world, |b| {
         sum += b.0;
         count += 1;
     });

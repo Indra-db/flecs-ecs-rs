@@ -191,12 +191,15 @@ where
 {
     // Cached world identity (spec §4.7): the query stores its real world, so
     // the per-call check is one field read plus one pointer compare against
-    // the &mut World's pointer (always a real, unstaged world). No FFI.
+    // the &mut World's pointer (always a real, unstaged world). No FFI. A null
+    // query pointer means the iterator was already consumed: skip the identity
+    // check and let the consuming operation raise its own typed panic.
+    let query_ptr = query.query_ptr();
+    if query_ptr.is_null() {
+        return;
+    }
     assert!(
-        core::ptr::eq(
-            unsafe { (*query.query_ptr()).real_world },
-            world.world_ptr()
-        ),
+        core::ptr::eq(unsafe { (*query_ptr).real_world }, world.world_ptr()),
         "{terminal} requires the query's own world: the &mut World passed in belongs to a \
          different world and cannot prove exclusive access to this query's storage"
     );
