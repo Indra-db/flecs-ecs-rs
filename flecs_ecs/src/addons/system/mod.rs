@@ -21,6 +21,46 @@ pub struct System<'a> {
     pub(crate) entity: EntityView<'a>,
 }
 
+/// A worker subdivision for [`System::run_with`] (spec §5.7): the arguments of
+/// the C `ecs_run_worker`, splitting the matched entities across `stage_count`
+/// stages and running only partition `stage_current`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorkerSpan {
+    /// The id of the current stage.
+    pub stage_current: i32,
+    /// The total number of stages.
+    pub stage_count: i32,
+}
+
+/// Options for [`System::run_with`] (spec §5.7).
+///
+/// The fields are exactly the knobs the vendored C `ecs_run` / `ecs_run_worker`
+/// actually accept: a `delta_time`, an opaque `param` passed through to the
+/// system (`TableIter::param`), and an optional worker subdivision. The
+/// `SystemRunnerFluent`'s `set_offset` / `set_limit` were dead fields that
+/// `ecs_run` never reads, so they are intentionally absent.
+pub struct RunArgs {
+    /// Time delta passed to the system; `0.0` measures automatically.
+    pub delta_time: FTime,
+    /// A user-defined parameter passed to the system, reachable through
+    /// `TableIter::param`. Null when unused.
+    pub param: *mut c_void,
+    /// When `Some`, run only this worker partition via `ecs_run_worker` instead
+    /// of the whole system via `ecs_run`.
+    pub worker: Option<WorkerSpan>,
+}
+
+impl Default for RunArgs {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            delta_time: 0.0,
+            param: core::ptr::null_mut(),
+            worker: None,
+        }
+    }
+}
+
 impl core::fmt::Debug for System<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         core::fmt::Debug::fmt(&self.entity, f)
@@ -239,6 +279,45 @@ impl<'a> System<'a> {
     #[inline]
     pub fn run(&self) -> SystemRunnerFluent<'_> {
         self.run_dt_param(0.0, core::ptr::null_mut())
+    }
+
+    /// Run the system once on the world with explicit [`RunArgs`] (spec §5.7).
+    ///
+    /// Takes `&mut World`: running a system is an exclusive-register frame step,
+    /// exactly like [`World::progress`](crate::core::World::progress), so it
+    /// serialises on the world borrow and mixes freely with `progress`.
+    /// Dispatches to `ecs_run_worker` when [`RunArgs::worker`] is set, otherwise
+    /// `ecs_run`; returns the entity the system was interrupted by (0 when it ran
+    /// to completion).
+    ///
+    /// This is the explicit, exclusive-register replacement for the `Drop`-driven
+    /// [`SystemRunnerFluent`] and the enabler for its SW-15 deletion. The
+    /// interim [`SystemRunnerFluent`]-returning [`run`](System::run) keeps the
+    /// bare `run` name until then, so the exclusive terminal is spelled
+    /// `run_with`; `run_with(world, RunArgs::default())` is the no-options form.
+    ///
+    /// Because today's [`System`] still carries the `&World` borrow of the world
+    /// it was built from, calling `run_with` on a handle stored from the same
+    /// world binding conflicts with the `&mut World` argument; the ergonomic
+    /// same-world call lands once the handle is decoupled from the world borrow
+    /// in a later sub-wave.
+    pub fn run_with(&self, world: &mut World, args: RunArgs) -> Entity {
+        let world_ptr = world.raw_world.as_ptr();
+        let id = *self.id();
+        let interrupted = match args.worker {
+            Some(w) => unsafe {
+                sys::ecs_run_worker(
+                    world_ptr,
+                    id,
+                    w.stage_current,
+                    w.stage_count,
+                    args.delta_time,
+                    args.param,
+                )
+            },
+            None => unsafe { sys::ecs_run(world_ptr, id, args.delta_time, args.param) },
+        };
+        Entity(interrupted)
     }
 
     /// Run the system worker

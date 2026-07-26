@@ -21,6 +21,7 @@ mod bypass_paths;
 #[cfg(feature = "flecs_safety_locks")]
 mod singleton;
 mod exclusive;
+mod system_run;
 mod system_with;
 mod typed_ctx;
 

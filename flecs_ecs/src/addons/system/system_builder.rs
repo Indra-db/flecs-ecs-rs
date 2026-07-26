@@ -121,6 +121,14 @@ where
         self
     }
 
+    /// Mark the system multithreaded (spec §6): flecs partitions its matched
+    /// tables across worker stages. Pairs with the `par_*` terminals, which set
+    /// this too; calling it explicitly is idempotent.
+    pub fn multi_threaded(&mut self) -> &mut Self {
+        self.desc.multi_threaded = true;
+        self
+    }
+
     /// Set a runtime query expression, transitioning to the fallible-build typestate.
     ///
     /// A purely-typed system builder is infallible: its terminals (`each` / `run` /
