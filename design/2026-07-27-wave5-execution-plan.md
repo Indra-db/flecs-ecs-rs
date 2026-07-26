@@ -48,3 +48,7 @@ Enablers first (EntityMut, Stage, builder terminals), semantic migration second 
 
 - ScriptBuilder::build_from_file/build_from_code on a caller-supplied entity is the one pin-bypass path left open in release (debug net covers it); close or refuse during SW-17's addon sweep.
 - §14.9 IntoId dispatch refactor deferred past SW-18 (ruling 8).
+
+## Execution log
+
+SW-1..SW-12 complete and merged (2026-07-27), suite 2553 passed / 0 failed. ~1,700 test sites + full examples tree migrated; four surface defects found and fixed by the migrations (consumed-iterator abort, enum revalidation false-panic, bare Option GuardTuple gap, latent enum-to_expr UAF now correctly rejected); all three WORSE examples re-landed (2 BETTER, 1 neutral-MIXED); zero safety tests routed onto Tier-0. Kept-legacy sites are flagged per flip: each_iter (SW-14), SystemRunnerFluent/set_context-identity/register_twice/OnAdd-runtime-guard (SW-15), meta enum-target read (SW-17).
