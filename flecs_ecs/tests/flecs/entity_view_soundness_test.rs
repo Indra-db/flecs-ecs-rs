@@ -1,4 +1,5 @@
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[repr(u8)]
 #[derive(Component, Debug, PartialEq)]
@@ -49,30 +50,28 @@ fn entity_try_get_on_deleted_entity_returns_none() {
     let e = world.entity().set(Position { x: 1, y: 2 });
     e.destruct();
 
-    assert!(e.try_get::<&Position>(|_| ()).is_none());
-    assert!(e.try_cloned::<&Position>().is_none());
+    assert!(e.get_ref::<&Position>().is_none());
+    assert!(e.cloned_owned::<&Position>().is_none());
 }
 
 #[test]
-#[should_panic(expected = "does not exist in the world")]
-fn entity_get_on_deleted_entity_panics() {
+fn entity_get_ref_on_deleted_entity_returns_none() {
     let world = World::new();
 
     let e = world.entity().set(Position { x: 1, y: 2 });
     e.destruct();
 
-    e.get::<&Position>(|_| ());
+    assert!(e.get_ref::<&Position>().is_none());
 }
 
 #[test]
-#[should_panic(expected = "does not exist in the world")]
-fn entity_cloned_on_deleted_entity_panics() {
+fn entity_cloned_owned_on_deleted_entity_returns_none() {
     let world = World::new();
 
     let e = world.entity().set(Position { x: 1, y: 2 });
     e.destruct();
 
-    let _ = e.cloned::<&Position>();
+    assert!(e.cloned_owned::<&Position>().is_none());
 }
 
 #[test]

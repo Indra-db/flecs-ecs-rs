@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldSingletonExt};
 
 #[test]
 fn temp_test_hook() {
@@ -38,33 +39,35 @@ fn temp_test_hook() {
         assert_eq!(unsafe { COUNT_ADD_POS }, 1);
         assert_eq!(unsafe { COUNT_SET_POS }, 1);
 
-        entity.get::<&Position>(|pos| {
+        {
+            let pos = entity.get_ref::<&Position>().unwrap();
             assert_eq!(pos.x, 10);
             assert_eq!(pos.y, 20);
-        });
+        }
 
         entity.set(Position { x: 0, y: 0 });
         assert_eq!(unsafe { COUNT_ADD_POS }, 1);
         assert_eq!(unsafe { COUNT_SET_POS }, 2);
 
-        entity.get::<&Position>(|pos| {
+        {
+            let pos = entity.get_ref::<&Position>().unwrap();
             assert_eq!(pos.x, 10);
             assert_eq!(pos.y, 20);
-        });
+        }
 
         let entity2 = world.entity().set(Position { x: 0, y: 0 });
         assert_eq!(unsafe { COUNT_ADD_POS }, 2);
         assert_eq!(unsafe { COUNT_SET_POS }, 3);
 
-        entity2.get::<&Position>(|pos_e2| {
+        {
+            let pos_e2 = entity2.get_ref::<&Position>().unwrap();
             assert_eq!(pos_e2.x, 10);
             assert_eq!(pos_e2.y, 20);
 
-            entity.get::<&Position>(|pos_e1| {
-                assert_eq!(pos_e1.x, 10);
-                assert_eq!(pos_e1.y, 20);
-            });
-        });
+            let pos_e1 = entity.get_ref::<&Position>().unwrap();
+            assert_eq!(pos_e1.x, 10);
+            assert_eq!(pos_e1.y, 20);
+        }
 
         entity.remove(Position::id());
         assert_eq!(unsafe { COUNT_ADD_POS }, 1);
@@ -72,10 +75,11 @@ fn temp_test_hook() {
 
         entity2.set(Velocity { x: 3, y: 5 });
 
-        entity2.get::<&Velocity>(|vel_e2| {
+        {
+            let vel_e2 = entity2.get_ref::<&Velocity>().unwrap();
             assert_eq!(vel_e2.x, 30);
             assert_eq!(vel_e2.y, 50);
-        });
+        }
 
         assert_eq!(unsafe { COUNT_SET_VEL }, 1);
 
@@ -98,9 +102,11 @@ fn on_component_registration() {
 
     impl OnComponentRegistration for OnRegistration {
         fn on_component_registration(world: WorldRef, component_id: Entity) {
-            world.get::<&mut Count>(|count| {
-                count.0 += 1;
-            });
+            world
+                .entity_from_id(Count::entity_id(world))
+                .get_ref::<&mut Count>()
+                .unwrap()
+                .0 += 1;
 
             world
                 .component_untyped_from(component_id)
@@ -116,9 +122,11 @@ fn on_component_registration() {
 
     impl OnComponentRegistration for OnRegistrationTag {
         fn on_component_registration(world: WorldRef, _component_id: Entity) {
-            world.get::<&mut Count>(|count| {
-                count.0 += 1;
-            });
+            world
+                .entity_from_id(Count::entity_id(world))
+                .get_ref::<&mut Count>()
+                .unwrap()
+                .0 += 1;
         }
     }
 
@@ -133,9 +141,7 @@ fn on_component_registration() {
 
     world.component::<OnRegistration>();
 
-    world.get::<&Count>(|count| {
-        assert_eq!(count.0, 1);
-    });
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
 
     assert!(
         world
@@ -145,15 +151,11 @@ fn on_component_registration() {
 
     world.component::<OnRegistrationTag>();
 
-    world.get::<&Count>(|count| {
-        assert_eq!(count.0, 2);
-    });
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
 
     world.component::<NoOnRegistration>();
 
-    world.get::<&Count>(|count| {
-        assert_eq!(count.0, 2);
-    });
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
 }
 
 #[test]
@@ -166,9 +168,11 @@ fn on_component_registration_named() {
 
     impl OnComponentRegistration for OnRegistration {
         fn on_component_registration(world: WorldRef, component_id: Entity) {
-            world.get::<&mut Count>(|count| {
-                count.0 += 1;
-            });
+            world
+                .entity_from_id(Count::entity_id(world))
+                .get_ref::<&mut Count>()
+                .unwrap()
+                .0 += 1;
 
             world
                 .component_untyped_from(component_id)
@@ -184,9 +188,11 @@ fn on_component_registration_named() {
 
     impl OnComponentRegistration for OnRegistrationTag {
         fn on_component_registration(world: WorldRef, _component_id: Entity) {
-            world.get::<&mut Count>(|count| {
-                count.0 += 1;
-            });
+            world
+                .entity_from_id(Count::entity_id(world))
+                .get_ref::<&mut Count>()
+                .unwrap()
+                .0 += 1;
         }
     }
 
@@ -201,9 +207,7 @@ fn on_component_registration_named() {
 
     world.component_named::<OnRegistration>("OnRegistration");
 
-    world.get::<&Count>(|count| {
-        assert_eq!(count.0, 1);
-    });
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
 
     assert!(
         world
@@ -213,13 +217,9 @@ fn on_component_registration_named() {
 
     world.component::<OnRegistrationTag>();
 
-    world.get::<&Count>(|count| {
-        assert_eq!(count.0, 2);
-    });
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
 
     world.component::<NoOnRegistration>();
 
-    world.get::<&Count>(|count| {
-        assert_eq!(count.0, 2);
-    });
+    assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
 }

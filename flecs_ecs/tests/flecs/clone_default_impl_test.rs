@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use crate::common_test::FlecsPanicAbortGuard;
-use flecs_ecs::core::{ComponentInfo, EntityViewGet, World};
+use flecs_ecs::core::{ComponentInfo, World};
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs_derive::Component;
 
 // normal structs
@@ -50,11 +51,9 @@ fn copy_hook_implemented_for_drop_types() {
 
     let entity_cloned = e_orig.duplicate(true);
 
-    e_orig.get::<&CloneDefaultDrop>(|cd| {
-        entity_cloned.get::<&CloneDefaultDrop>(|cd_cloned| {
-            assert!(cd.data == cd_cloned.data);
-        });
-    });
+    let cd = e_orig.get_ref::<&CloneDefaultDrop>().unwrap();
+    let cd_cloned = entity_cloned.get_ref::<&CloneDefaultDrop>().unwrap();
+    assert!(cd.data == cd_cloned.data);
 }
 
 #[test]
