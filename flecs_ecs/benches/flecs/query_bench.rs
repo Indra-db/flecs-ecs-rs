@@ -446,6 +446,21 @@ pub fn query_experimental(criterion: &mut Criterion) {
         });
     });
 
+    // Same workload as exp_each_locked_4, but through the shared-register locked
+    // batch cursor (Tier-1 locks per batch, dense column slices).
+    group.bench_function("exp_batches_4", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            let mut cursor = q4.batches(&world);
+            while let Some((a, b_, c, d)) = cursor.next() {
+                for (((a, b_), c), d) in a.iter().zip(b_).zip(c).zip(d) {
+                    sum += (a.0 + b_.0 + c.0 + d.0) as u64;
+                }
+            }
+            black_box(sum)
+        });
+    });
+
     group.bench_function("exp_each_4_terms_raw_c", |b| {
         b.iter(|| {
             let mut sum = 0u64;
