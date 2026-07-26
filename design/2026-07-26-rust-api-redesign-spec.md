@@ -796,7 +796,11 @@ unsafe impl<D> Send for QueryHandle<D>
 where for<'w> D::Item<'w>: Send {}
 
 unsafe impl<D> Sync for QueryHandle<D>
-where D: ReadOnlyTerms {}   // NARROWED: Sync only when ALL terms are read-only
+where D: ReadOnlyTerms,
+      for<'w> D::Item<'w>: Send {}   // NARROWED: read-only terms AND Send items.
+// The item-Send clause is load-bearing: ComponentId does not require Sync, so
+// without it a shared handle would let two threads concurrently read a !Sync
+// component (&C: Send iff C: Sync). ReadOnlyTerms alone would be unsound.
 ```
 
 This narrows today's impl (`query.rs:555`), which grants `Sync` under the same
