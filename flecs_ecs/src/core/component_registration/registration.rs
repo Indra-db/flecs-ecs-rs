@@ -248,10 +248,17 @@ where
     let worldref = world;
     let world = worldref.world_ptr_mut();
 
-    let arr = worldref.components_array();
-    let index = T::index() as usize;
-
-    let c = if index < arr.len() { arr[index] } else { 0 };
+    // The `index()` fast path is only sound for non-generic types: statics
+    // declared inside a generic fn are shared across every monomorphization, so
+    // `Container<A>` and `Container<B>` collide on the same array slot. Generic
+    // types are resolved by their (unique per monomorphization) symbol below.
+    let c = if !T::IS_GENERIC {
+        let arr = worldref.components_array();
+        let index = T::index() as usize;
+        if index < arr.len() { arr[index] } else { 0 }
+    } else {
+        0
+    };
 
     if c != 0 && unsafe { sys::ecs_is_alive(world, c) } {
         return c;

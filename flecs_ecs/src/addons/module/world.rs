@@ -48,25 +48,31 @@ impl World {
                 core::ptr::null(),
             ));
             let id_u64 = *id.id();
-            let index = T::index() as usize;
-            let components_array = self.components_array();
-            if index >= components_array.len() {
-                components_array.reserve(index + 1 - components_array.len());
-                let capacity = components_array.capacity();
-                unsafe {
-                    core::ptr::write_bytes(
-                        components_array.as_mut_ptr().add(components_array.len()),
-                        0,
-                        capacity - components_array.len(),
-                    );
-                    components_array.set_len(capacity);
+            // `T::index()` is a per-type static that is shared across every
+            // monomorphization of a generic type, so two instantiations of one
+            // generic module would alias the same array slot. Only non-generic
+            // modules may use the array; generic modules are keyed by `TypeId`.
+            if !T::IS_GENERIC {
+                let index = T::index() as usize;
+                let components_array = self.components_array();
+                if index >= components_array.len() {
+                    components_array.reserve(index + 1 - components_array.len());
+                    let capacity = components_array.capacity();
+                    unsafe {
+                        core::ptr::write_bytes(
+                            components_array.as_mut_ptr().add(components_array.len()),
+                            0,
+                            capacity - components_array.len(),
+                        );
+                        components_array.set_len(capacity);
+                    }
                 }
+                components_array[index] = id_u64;
             }
-            components_array[index] = id_u64;
             #[cfg(feature = "flecs_meta")]
             {
                 self.components_map()
-                    .insert(core::any::TypeId::of::<Self>(), id_u64);
+                    .insert(core::any::TypeId::of::<T>(), id_u64);
             }
             id
         };

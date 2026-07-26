@@ -884,3 +884,41 @@ fn entity_scopes_do_not_become_modules() {
 
     assert!(current.parent().is_none());
 }
+
+// The derived `index()` is a per-type static that Rust shares across every
+// monomorphization of a generic type, so `GenericModule<MarkerA>` and
+// `GenericModule<MarkerB>` resolve to the same index. `World::import` used that
+// index to write `components_array` unconditionally, aliasing the two modules
+// onto one entity. They must now register as two distinct module entities.
+#[test]
+fn import_distinct_generic_module_instantiations() {
+    #[derive(Component)]
+    struct MarkerA;
+
+    #[derive(Component)]
+    struct MarkerB;
+
+    #[derive(Component)]
+    struct GenericModule<T: ComponentId + Send + Sync>(core::marker::PhantomData<T>);
+
+    impl<T: ComponentId + Send + Sync> Module for GenericModule<T> {
+        fn module(_world: &World) {}
+    }
+
+    let world = World::new();
+
+    let a = world.import::<GenericModule<MarkerA>>();
+    let b = world.import::<GenericModule<MarkerB>>();
+
+    assert_ne!(a.id(), 0);
+    assert_ne!(b.id(), 0);
+    assert_ne!(
+        a.id(),
+        b.id(),
+        "distinct generic module instantiations must yield distinct module entities"
+    );
+
+    // Re-importing each instantiation must return its own stable entity.
+    assert_eq!(a.id(), world.import::<GenericModule<MarkerA>>().id());
+    assert_eq!(b.id(), world.import::<GenericModule<MarkerB>>().id());
+}
