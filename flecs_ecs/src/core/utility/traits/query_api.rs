@@ -1495,7 +1495,7 @@ where
 
         let result = {
             #[cfg(feature = "flecs_safety_locks")]
-            let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
+            let (__locks, __lock_token) = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
                 &world,
                 components_data.safety_table_records(),
             );
@@ -1514,6 +1514,7 @@ where
             release_batch_locks::<ANY_SPARSE_TERMS, T>(
                 &world,
                 __locks,
+                __lock_token,
                 components_data.safety_table_records(),
             );
             ret
@@ -1543,7 +1544,7 @@ where
 
     let result = {
         #[cfg(feature = "flecs_safety_locks")]
-        let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
+        let (__locks, __lock_token) = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
             &world,
             components_data.safety_table_records(),
         );
@@ -1562,6 +1563,7 @@ where
         release_batch_locks::<ANY_SPARSE_TERMS, T>(
             &world,
             __locks,
+            __lock_token,
             components_data.safety_table_records(),
         );
         ret
@@ -1587,7 +1589,7 @@ fn __internal_find_entity_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     let iter_count = iter.count as usize;
 
     #[cfg(feature = "flecs_safety_locks")]
-    let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
+    let (__locks, __lock_token) = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
         components_data.safety_table_records(),
     );
@@ -1632,6 +1634,7 @@ fn __internal_find_entity_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     release_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
         __locks,
+        __lock_token,
         components_data.safety_table_records(),
     );
 }
@@ -1650,7 +1653,7 @@ fn __internal_find_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     let iter_count = iter.count as usize;
 
     #[cfg(feature = "flecs_safety_locks")]
-    let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
+    let (__locks, __lock_token) = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
         components_data.safety_table_records(),
     );
@@ -1691,6 +1694,7 @@ fn __internal_find_impl<'a, T, const ANY_SPARSE_TERMS: bool>(
     release_batch_locks::<ANY_SPARSE_TERMS, T>(
         world,
         __locks,
+        __lock_token,
         components_data.safety_table_records(),
     );
 }

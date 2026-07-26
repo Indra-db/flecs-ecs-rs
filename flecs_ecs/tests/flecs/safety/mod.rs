@@ -2,6 +2,7 @@
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
 
+mod batch_locks;
 mod cached_ref;
 mod get_scope;
 mod multithreaded;

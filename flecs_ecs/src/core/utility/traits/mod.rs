@@ -572,7 +572,7 @@ pub(crate) fn internal_each_generic<
     );
 
     #[cfg(feature = "flecs_safety_locks")]
-    let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
+    let (__locks, __lock_token) = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
         _world,
         components_data.safety_table_records(),
     );
@@ -594,6 +594,7 @@ pub(crate) fn internal_each_generic<
     release_batch_locks::<ANY_SPARSE_TERMS, T>(
         _world,
         __locks,
+        __lock_token,
         components_data.safety_table_records(),
     );
 }
@@ -664,7 +665,7 @@ pub(crate) fn internal_each_iter<
         };
 
         #[cfg(feature = "flecs_safety_locks")]
-        let __locks = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
+        let (__locks, __lock_token) = acquire_batch_locks::<ANY_SPARSE_TERMS, T>(
             world,
             components_data.safety_table_records(),
         );
@@ -698,6 +699,7 @@ pub(crate) fn internal_each_iter<
         release_batch_locks::<ANY_SPARSE_TERMS, T>(
             world,
             __locks,
+            __lock_token,
             components_data.safety_table_records(),
         );
     }

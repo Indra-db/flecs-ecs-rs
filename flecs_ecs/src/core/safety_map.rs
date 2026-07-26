@@ -143,6 +143,43 @@ impl StageLocks {
             }
         }
     }
+
+    /// Drop one borrow from each of the batch entries at `[0..k)` without a
+    /// per-key lookup: the entries were pushed by [`acquire_batch_locks`] onto
+    /// an empty map, so they occupy the front of the vec and the region is
+    /// never reordered while the callback runs (callback borrows land above `k`
+    /// and their own `swap_remove` only ever moves slots at or above `k`).
+    ///
+    /// A write slot clears its flag, a read slot loses one count; a slot that
+    /// hits zero is removed. A slot that is still non-zero was also borrowed by
+    /// the callback and held across the batch, so it is kept. Entries above `k`
+    /// (borrows the callback is still holding) are shifted down to stay
+    /// contiguous.
+    #[inline(always)]
+    pub(crate) fn release_batch_range(&mut self, k: usize) {
+        let mut write = 0usize;
+        for read in 0..k {
+            let (key, count) = self.entries[read];
+            let new = if count & WRITE_FLAG != 0 {
+                count & !WRITE_FLAG
+            } else {
+                count - 1
+            };
+            if new != 0 {
+                self.entries[write] = (key, new);
+                write += 1;
+            }
+        }
+        let len = self.entries.len();
+        if len == k {
+            // No borrow was taken past this batch, the common case: drop the
+            // whole range in one shot.
+            self.entries.truncate(write);
+        } else if write != k {
+            self.entries.copy_within(k..len, write);
+            self.entries.truncate(len - (k - write));
+        }
+    }
 }
 
 /// Per-world container of one [`StageLocks`] per stage, stored in
@@ -417,34 +454,164 @@ pub(crate) fn table_column_lock_write_end(
     unsafe { (*locks.as_ptr()).write_end(dense_lock_key(table, column)) }
 }
 
-/// Take the term borrows for one table batch, returning the stage map they
-/// were registered in so the matching release does not have to resolve it
-/// again: that resolve is a thread-local lookup and, at two per batch, was
-/// the bulk of the per-batch cost.
-#[inline]
+/// Marks the [`acquire_batch_locks`] result whose borrows must be released with
+/// the per-key slow path rather than by range (the map was non-empty on entry,
+/// so entries may share keys with pre-existing borrows).
+#[cfg(feature = "flecs_safety_locks")]
+const BATCH_SLOW_RELEASE: usize = usize::MAX;
+
+/// Take the term borrows for one table batch, returning the stage map they were
+/// registered in (so the matching release skips re-resolving it) and a token
+/// the release uses to reclaim them.
+///
+/// Fast path: when the query has more than one term and the stage map is empty
+/// on entry, no held borrow can conflict (intra-batch mutable aliasing is
+/// rejected earlier, when the field pointers are populated), so each term key is
+/// pushed without a lookup and the token is the number of entries pushed. The
+/// keys still land in the map individually, so an entity `get`/`get_mut` guard
+/// taken inside the callback continues to detect a conflict against them. A
+/// single-term query already costs only one map op per acquire, less than the
+/// range machinery, so it keeps the per-term path. When the map is non-empty on
+/// entry (a borrow held across the whole iteration) the per-term path also runs
+/// so conflicts against those borrows are still reported; in both per-term cases
+/// the token is [`BATCH_SLOW_RELEASE`].
+#[inline(always)]
 #[cfg(feature = "flecs_safety_locks")]
 pub(crate) fn acquire_batch_locks<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
     world: &WorldRef,
     table_records: &[super::TableColumnSafety],
-) -> NonNull<StageLocks> {
+) -> (NonNull<StageLocks>, usize) {
     let locks = if world.is_currently_multithreaded() {
         stage_locks::<true>(world)
     } else {
         stage_locks::<false>(world)
     };
-    __internal_do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(world, locks, table_records);
-    locks
+    // SAFETY: the stage map is owned by the calling thread.
+    let map = unsafe { &mut *locks.as_ptr() };
+    if const { T::COUNT > 1 } && map.entries.is_empty() {
+        push_batch_locks::<ANY_SPARSE_TERMS, T>(world, map, table_records);
+        (locks, map.entries.len())
+    } else {
+        __internal_do_read_write_locks::<INCREMENT, ANY_SPARSE_TERMS, T>(
+            world,
+            locks,
+            table_records,
+        );
+        (locks, BATCH_SLOW_RELEASE)
+    }
 }
 
 /// Release borrows taken by [`acquire_batch_locks`] into the same stage map.
-#[inline]
+/// `token` is the value the acquire returned.
+#[inline(always)]
 #[cfg(feature = "flecs_safety_locks")]
 pub(crate) fn release_batch_locks<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
     world: &WorldRef,
     locks: NonNull<StageLocks>,
+    token: usize,
     table_records: &[super::TableColumnSafety],
 ) {
-    __internal_do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(world, locks, table_records);
+    if token == BATCH_SLOW_RELEASE {
+        __internal_do_read_write_locks::<DECREMENT, ANY_SPARSE_TERMS, T>(
+            world,
+            locks,
+            table_records,
+        );
+        return;
+    }
+    // SAFETY: the stage map is owned by the calling thread.
+    let map = unsafe { &mut *locks.as_ptr() };
+    map.release_batch_range(token);
+}
+
+/// Resolve the lock key for a single term, or `None` when the term names no
+/// storage in this table (a tag, or an absent optional field). The dense and
+/// sparse encodings match the keys produced by the entity `get`/`get_mut`
+/// guards, so borrows taken here and there are compared against the same key.
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(always)]
+fn batch_term_key(
+    world: &WorldRef<'_>,
+    info: &super::TableColumnSafety,
+    any_sparse_terms: bool,
+) -> Option<LockKey> {
+    if any_sparse_terms && info.component_id != 0 {
+        // flecs_components_get requires the real world, not a stage.
+        let cr = unsafe {
+            let real_world = sys::ecs_get_world(world.raw_world.as_ptr() as *const _);
+            sys::flecs_components_get(real_world, info.component_id)
+        };
+        return Some(sparse_lock_key(cr));
+    }
+    if info.table.is_null() {
+        return None;
+    }
+    Some(dense_lock_key(info.table, info.column))
+}
+
+/// Push every term borrow of one batch onto an empty stage map with no lookup
+/// or conflict check (see [`acquire_batch_locks`] for why that is sound). Reads
+/// are the immutable and optional-immutable terms, writes the mutable and
+/// optional-mutable terms, matching the term grouping produced when the field
+/// pointers are populated.
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(always)]
+fn push_batch_locks<const ANY_SPARSE_TERMS: bool, T: QueryTuple>(
+    world: &WorldRef<'_>,
+    map: &mut StageLocks,
+    table_records: &[super::TableColumnSafety],
+) {
+    let end_immutable: usize = const { T::COUNT_IMMUTABLE };
+    let start_mutable: usize = const { T::COUNT_IMMUTABLE };
+    let end_mutable: usize = const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE };
+    let start_optional_immutable: usize = const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE };
+    let end_optional_immutable: usize =
+        const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE + T::COUNT_OPTIONAL_IMMUTABLE };
+    let start_optional_mutable: usize =
+        const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE + T::COUNT_OPTIONAL_IMMUTABLE };
+    let end_optional_mutable: usize = const {
+        T::COUNT_IMMUTABLE
+            + T::COUNT_MUTABLE
+            + T::COUNT_OPTIONAL_IMMUTABLE
+            + T::COUNT_OPTIONAL_MUTABLE
+    };
+
+    #[inline(always)]
+    fn push_read(map: &mut StageLocks, key: LockKey) {
+        map.entries.push((key, 1));
+    }
+
+    #[inline(always)]
+    fn push_write(map: &mut StageLocks, key: LockKey) {
+        map.entries.push((key, WRITE_FLAG));
+    }
+
+    unsafe {
+        for i in 0..end_immutable {
+            if let Some(key) = batch_term_key(world, table_records.get_unchecked(i), ANY_SPARSE_TERMS)
+            {
+                push_read(map, key);
+            }
+        }
+        for i in start_mutable..end_mutable {
+            if let Some(key) = batch_term_key(world, table_records.get_unchecked(i), ANY_SPARSE_TERMS)
+            {
+                push_write(map, key);
+            }
+        }
+        for i in start_optional_immutable..end_optional_immutable {
+            if let Some(key) = batch_term_key(world, table_records.get_unchecked(i), ANY_SPARSE_TERMS)
+            {
+                push_read(map, key);
+            }
+        }
+        for i in start_optional_mutable..end_optional_mutable {
+            if let Some(key) = batch_term_key(world, table_records.get_unchecked(i), ANY_SPARSE_TERMS)
+            {
+                push_write(map, key);
+            }
+        }
+    }
 }
 
 #[cfg(feature = "flecs_safety_locks")]
