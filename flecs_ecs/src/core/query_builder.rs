@@ -405,6 +405,34 @@ use flecs_ecs_derive::extern_abi;
 /// - [`order_by()`](QueryBuilder::order_by) - Sort results
 /// - [`group_by()`](QueryBuilder::group_by) - Group results
 ///
+/// # Single-use terminal
+///
+/// [`build()`](Builder::build) consumes the builder by value, so building twice
+/// or configuring a builder after it has been built is a compile error rather
+/// than a silent logic bug.
+///
+/// Building the same builder twice does not compile:
+///
+/// ```compile_fail
+/// use flecs_ecs::prelude::*;
+/// let world = World::new();
+/// let builder = world.query::<()>();
+/// let _first = builder.build();
+/// let _second = builder.build(); // error: `builder` was already consumed
+/// ```
+///
+/// Configuring a builder after building it does not compile:
+///
+/// ```compile_fail
+/// use flecs_ecs::prelude::*;
+/// #[derive(Component)]
+/// struct Position;
+/// let world = World::new();
+/// let builder = world.query::<()>();
+/// let _query = builder.build();
+/// let _late = builder.with(Position::id()); // error: `builder` was already consumed
+/// ```
+///
 /// # See Also
 ///
 /// - [Module documentation](crate::core::query_builder) for detailed examples

@@ -9,6 +9,20 @@ extern crate alloc;
 use alloc::string::{String, ToString};
 
 /// `SystemBuilder` is a builder pattern for creating systems.
+///
+/// # Single-use terminal
+///
+/// The iteration terminals (`each` / `run` / ...) consume the builder by value,
+/// so invoking a terminal twice on one builder is a compile error rather than a
+/// silent logic bug:
+///
+/// ```compile_fail
+/// use flecs_ecs::prelude::*;
+/// let world = World::new();
+/// let builder = world.system::<()>();
+/// let _first = builder.each(|_| {});
+/// let _second = builder.each(|_| {}); // error: `builder` was already consumed
+/// ```
 pub struct SystemBuilder<'a, T>
 where
     T: QueryTuple,
