@@ -2267,7 +2267,7 @@ fn query_inspect_terms() {
 
     let t = q.term(0);
     assert_eq!(
-        *t.id().entity_view(&world).id(),
+        *unsafe { t.id().entity_view(&world) }.id(),
         Position::entity_id(&world)
     );
     assert_eq!(t.oper(), OperKind::And);
@@ -2276,7 +2276,7 @@ fn query_inspect_terms() {
 
     let t = q.term(1);
     assert_eq!(
-        *t.id().entity_view(&world).id(),
+        *unsafe { t.id().entity_view(&world) }.id(),
         Velocity::entity_id(&world)
     );
     assert_eq!(t.oper(), OperKind::And);
@@ -2309,14 +2309,14 @@ fn query_inspect_terms_w_each() {
     q.each_term(|t| {
         if count == 0 {
             assert_eq!(
-                *t.id().entity_view(&world).id(),
+                *unsafe { t.id().entity_view(&world) }.id(),
                 Position::entity_id(&world)
             );
             // &Position = read-only ref → In inout
             assert_eq!(t.inout(), InOutKind::In);
         } else if count == 1 {
             assert_eq!(
-                *t.id().entity_view(&world).id(),
+                *unsafe { t.id().entity_view(&world) }.id(),
                 Velocity::entity_id(&world)
             );
             // &Velocity::id() = explicit read ref → In inout

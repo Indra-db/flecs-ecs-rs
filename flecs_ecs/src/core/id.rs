@@ -20,18 +20,38 @@ impl Id {
         Self(id)
     }
 
-    /// Convert the entity id to an entity with the given world.
+    /// Convert the id to an [`EntityView`] with the given world.
     ///
     /// # Safety
     ///
-    /// This entity is safe to do operations on if the entity belongs to the world
+    /// The caller must ensure this id was produced by `world`. Ids are only
+    /// meaningful in the world that minted them: the same recycled `u64` can
+    /// name a different entity in another world, so binding an id to the wrong
+    /// world causes type confusion reachable from otherwise-safe code. Use
+    /// [`Id::entity_view_checked`] for a validated conversion.
     ///
     /// # Arguments
     ///
     /// * `world` - The world the entity belongs to
     #[inline]
-    pub fn entity_view<'a>(&self, world: impl WorldProvider<'a>) -> EntityView<'a> {
+    pub unsafe fn entity_view<'a>(&self, world: impl WorldProvider<'a>) -> EntityView<'a> {
         EntityView::new_from(world, self.0)
+    }
+
+    /// Convert the id to an [`EntityView`], validating that it is a live entity
+    /// in `world` first. Returns `None` when the id is null or not valid in
+    /// `world`.
+    #[inline]
+    pub fn entity_view_checked<'a>(
+        &self,
+        world: impl WorldProvider<'a>,
+    ) -> Option<EntityView<'a>> {
+        let world = world.world();
+        if self.0 != 0 && unsafe { crate::sys::ecs_is_valid(world.world_ptr(), self.0) } {
+            Some(EntityView::new_from(world, self.0))
+        } else {
+            None
+        }
     }
 }
 

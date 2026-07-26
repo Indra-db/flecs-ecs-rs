@@ -813,11 +813,11 @@ fn module_module_has_singleton() {
 fn component_scopes_do_not_become_modules() {
     let world = World::new();
 
-    let current = world
+    let current = unsafe { world
         .component_named::<namespace_lvl1::namespace_lvl2::struct_lvl1::StructLvl2_1>(
             "NamespaceLvl1::NamespaceLvl2::StructLvl1::StructLvl2_1",
         )
-        .entity_view(&world);
+        .entity_view(&world) };
     assert!(current.id() != 0);
     assert!(!current.has(flecs::Module::ID));
     assert!(current.has(id::<flecs::Component>()));
@@ -851,11 +851,11 @@ fn component_scopes_do_not_become_modules() {
 fn entity_scopes_do_not_become_modules() {
     let world = World::new();
 
-    let current = world
+    let current = unsafe { world
         .component_named::<namespace_lvl1::namespace_lvl2::struct_lvl1::StructLvl2_2>(
             "NamespaceLvl1::NamespaceLvl2::StructLvl1::StructLvl2_2",
         )
-        .entity_view(&world);
+        .entity_view(&world) };
     assert!(current.id() != 0);
     assert!(!current.has(flecs::Module::ID));
     assert!(current.has(id::<flecs::Component>()));

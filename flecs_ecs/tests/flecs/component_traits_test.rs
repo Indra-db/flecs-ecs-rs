@@ -70,7 +70,7 @@ fn dont_fragment_explicit() {
     let world = World::new();
 
     let c = world.component::<TraitDontFragment>();
-    let c = c.entity_view(&world);
+    let c = unsafe { c.entity_view(&world) };
     assert!(c.has(flecs::DontFragment::ID));
     assert!(!c.has((flecs::OnInstantiate::ID, flecs::Wildcard::ID)));
 }
@@ -92,7 +92,7 @@ fn on_instantiate_override_explicit() {
     let world = World::new();
 
     let c = world.component::<TraitOnInstantiateOverride>();
-    let c = c.entity_view(&world);
+    let c = unsafe { c.entity_view(&world) };
     assert!(c.has((flecs::OnInstantiate::ID, flecs::Override::ID)));
     assert!(!c.has(flecs::DontFragment::ID));
 }
@@ -116,7 +116,7 @@ fn on_instantiate_inherit_explicit() {
     let world = World::new();
 
     let c = world.component::<TraitOnInstantiateInherit>();
-    let c = c.entity_view(&world);
+    let c = unsafe { c.entity_view(&world) };
     assert!(c.has((flecs::OnInstantiate::ID, flecs::Inherit::ID)));
     assert!(!c.has(flecs::DontFragment::ID));
 }
@@ -140,7 +140,7 @@ fn on_instantiate_dont_inherit_explicit() {
     let world = World::new();
 
     let c = world.component::<TraitOnInstantiateDontInherit>();
-    let c = c.entity_view(&world);
+    let c = unsafe { c.entity_view(&world) };
     assert!(c.has((flecs::OnInstantiate::ID, flecs::DontInherit::ID)));
     assert!(!c.has(flecs::DontFragment::ID));
 }
@@ -168,7 +168,7 @@ fn dont_fragment_dont_inherit_explicit() {
     let world = World::new();
 
     let c = world.component::<TraitDontFragmentDontInherit>();
-    let c = c.entity_view(&world);
+    let c = unsafe { c.entity_view(&world) };
     assert!(c.has(flecs::DontFragment::ID));
     assert!(c.has((flecs::OnInstantiate::ID, flecs::DontInherit::ID)));
 }
@@ -192,7 +192,7 @@ fn no_traits_explicit() {
     let world = World::new();
 
     let c = world.component::<TraitNone>();
-    let c = c.entity_view(&world);
+    let c = unsafe { c.entity_view(&world) };
     assert!(!c.has(flecs::DontFragment::ID));
     assert!(!c.has((flecs::OnInstantiate::ID, flecs::Wildcard::ID)));
 }
@@ -214,7 +214,7 @@ fn sparse_explicit() {
     let world = World::new();
 
     let c = world.component::<TraitSparse>();
-    let c = c.entity_view(&world);
+    let c = unsafe { c.entity_view(&world) };
     assert!(c.has(flecs::Sparse::ID));
     assert!(!c.has(flecs::DontFragment::ID));
     assert!(!c.has((flecs::OnInstantiate::ID, flecs::Wildcard::ID)));
@@ -449,7 +449,7 @@ fn static_inherit_dense_owned() {
 
     let c = world.component::<TraitOnInstantiateInherit>();
     assert!(
-        c.entity_view(&world)
+        unsafe { c.entity_view(&world) }
             .has((flecs::OnInstantiate::ID, flecs::Inherit::ID))
     );
 
@@ -496,7 +496,7 @@ fn static_inherit_sparse_owned() {
     let world = World::new();
 
     let c = world.component::<TraitSparseInherit>();
-    let cv = c.entity_view(&world);
+    let cv = unsafe { c.entity_view(&world) };
     assert!(cv.has(flecs::Sparse::ID));
     assert!(cv.has((flecs::OnInstantiate::ID, flecs::Inherit::ID)));
 
@@ -536,7 +536,7 @@ fn static_inherit_dont_fragment_owned() {
     let world = World::new();
 
     let c = world.component::<TraitDontFragmentInherit>();
-    let cv = c.entity_view(&world);
+    let cv = unsafe { c.entity_view(&world) };
     assert!(cv.has(flecs::DontFragment::ID));
     assert!(cv.has((flecs::OnInstantiate::ID, flecs::Inherit::ID)));
 

@@ -1197,7 +1197,7 @@ fn query_singleton_enum_constant_or() {
 
     world.add_enum(StandardEnum::Blue);
 
-    let std_enum_component = world.component::<StandardEnum>().entity_view(&world);
+    let std_enum_component = unsafe { world.component::<StandardEnum>().entity_view(&world) };
     q.each_iter(|it, _index, ()| {
         assert_eq!(it.src(0), std_enum_component);
         count += 1;

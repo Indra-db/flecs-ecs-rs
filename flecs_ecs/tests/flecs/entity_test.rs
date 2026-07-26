@@ -1506,7 +1506,7 @@ fn entityview_to_entity_to_entity_view() {
 
     let entity_id = entity.id();
 
-    let entity_view = entity_id.entity_view(&world);
+    let entity_view = unsafe { entity_id.entity_view(&world) };
     assert!(entity_view.is_valid());
     assert_eq!(entity, entity_view);
 
@@ -1523,7 +1523,7 @@ fn entity_view_to_entity_world() {
     assert!(entity.is_valid());
     let entity_id = entity.id();
 
-    let entity_view = entity_id.entity_view(&world);
+    let entity_view = unsafe { entity_id.entity_view(&world) };
     assert!(entity_view.is_valid());
     assert_eq!(entity, entity_view);
 
@@ -6904,7 +6904,7 @@ fn to_view() {
     let e = world.entity();
     // In Rust, world.entity() returns EntityView directly
     let entity_id = Entity::from(e);
-    let ev = entity_id.entity_view(&world);
+    let ev = unsafe { entity_id.entity_view(&world) };
     assert_eq!(e, ev);
 }
 
@@ -6915,7 +6915,7 @@ fn to_view_from_stage() {
     let stage = world.stage(0);
     let e = stage.entity();
     let entity_id = Entity::from(e);
-    let ev = entity_id.entity_view(&world);
+    let ev = unsafe { entity_id.entity_view(&world) };
     assert_eq!(e, ev);
 }
 

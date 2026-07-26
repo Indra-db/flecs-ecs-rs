@@ -201,6 +201,35 @@ fn component_hook_closure_dropped_exactly_once() {
     );
 }
 
+/// `Entity::entity_view`/`Id::entity_view` are now `unsafe` because binding an
+/// id to the wrong world is type confusion. The safe `*_checked` variants
+/// validate the id against the target world via `ecs_is_valid` and return
+/// `None` for null, stale, or foreign ids.
+#[test]
+fn entity_view_checked_rejects_invalid_ids() {
+    let world = World::new();
+
+    let e = world.entity();
+    let id: Entity = e.id();
+    assert!(id.entity_view_checked(&world).is_some());
+
+    assert!(Entity::null().entity_view_checked(&world).is_none());
+
+    e.destruct();
+    assert!(
+        id.entity_view_checked(&world).is_none(),
+        "a destroyed id must not validate against the world"
+    );
+
+    let other = World::new();
+    let live = world.entity();
+    let live_id: Entity = live.id();
+    assert!(
+        live_id.entity_view_checked(&other).is_none(),
+        "an id from another world must not validate"
+    );
+}
+
 #[derive(Component)]
 struct ArcPayload {
     tracker: Arc<()>,

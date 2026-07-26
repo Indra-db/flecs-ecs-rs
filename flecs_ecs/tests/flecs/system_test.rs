@@ -2051,7 +2051,7 @@ fn default_ctor() {
 
     world.entity().set(Position { x: 10, y: 20 });
 
-    let sys_var = world.system_from(sys.entity_view(&world));
+    let sys_var = world.system_from(unsafe { sys.entity_view(&world) });
 
     sys_var.run();
 
@@ -2075,7 +2075,7 @@ fn entity_ctor() {
         }
     });
 
-    let sys_from_id = world.system_from(sys.entity_view(&world));
+    let sys_from_id = world.system_from(unsafe { sys.entity_view(&world) });
 
     sys_from_id.run();
     world.get::<&Count>(|c| {
@@ -3178,8 +3178,8 @@ fn kind_on_shared_builder() {
 
     assert!(s1.id() != s2.id());
 
-    let s1 = s1.entity_view(&world);
-    let s2 = s2.entity_view(&world);
+    let s1 = unsafe { s1.entity_view(&world) };
+    let s2 = unsafe { s2.entity_view(&world) };
 
     assert!(s1.has((flecs::DependsOn::ID, flecs::pipeline::OnUpdate::ID)));
     assert!(s1.has(flecs::pipeline::OnUpdate::ID));
@@ -3202,8 +3202,8 @@ fn custom_pipeline_w_name() {
         .with(tag)
         .build();
 
-    assert_eq!(pip.entity_view(&world).name(), "MyPipeline");
-    assert_eq!(world.lookup("MyPipeline"), pip.entity_view(&world));
+    assert_eq!(unsafe { pip.entity_view(&world) }.name(), "MyPipeline");
+    assert_eq!(world.lookup("MyPipeline"), unsafe { pip.entity_view(&world) });
 
     let count = std::rc::Rc::new(core::cell::Cell::new(0));
     let count_c = count.clone();
@@ -3216,7 +3216,7 @@ fn custom_pipeline_w_name() {
 
     assert_eq!(count.get(), 0);
 
-    world.set_pipeline(pip.entity_view(&world));
+    world.set_pipeline(unsafe { pip.entity_view(&world) });
 
     world.progress();
 
