@@ -153,6 +153,11 @@ where
     /// * `row` - Row being iterated over
     pub fn entity(&self, row: impl Into<usize>) -> EntityView<'a> {
         let row = row.into();
+        assert!(
+            row < self.count,
+            "row {row} out of bounds for iterator count {}",
+            self.count
+        );
         let ptr = unsafe { self.iter.entities.add(row) };
         if ptr.is_null() {
             panic!("no entity at row {row}");
@@ -166,7 +171,11 @@ where
     ///
     /// * `row` - Row being iterated over
     pub fn get_entity(&self, row: impl Into<usize>) -> Option<EntityView<'a>> {
-        let ptr = unsafe { self.iter.entities.add(row.into()) };
+        let row = row.into();
+        if row >= self.count {
+            return None;
+        }
+        let ptr = unsafe { self.iter.entities.add(row) };
         if ptr.is_null() {
             return None;
         }
@@ -180,7 +189,13 @@ where
     /// * `row` - Row being iterated over
     #[inline(always)]
     pub fn entity_id(&self, row: impl Into<usize>) -> Entity {
-        let ptr = unsafe { self.iter.entities.add(row.into()) };
+        let row = row.into();
+        assert!(
+            row < self.count,
+            "row {row} out of bounds for iterator count {}",
+            self.count
+        );
+        let ptr = unsafe { self.iter.entities.add(row) };
 
         if ptr.is_null() {
             return Entity::null();

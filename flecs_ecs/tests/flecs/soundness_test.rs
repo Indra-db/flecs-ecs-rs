@@ -204,6 +204,54 @@ fn iter_entities_readonly_slice() {
     assert_eq!(total, 2);
 }
 
+/// `entity(row)` used to compute `entities.add(row)` before any bounds check,
+/// which is out-of-bounds pointer arithmetic (UB) for a row past the count. It
+/// now asserts the row is in range.
+#[test]
+#[should_panic(expected = "out of bounds")]
+fn iter_entity_out_of_range_row_panics() {
+    let world = World::new();
+
+    world.entity().set(Position { x: 1, y: 0 });
+
+    world.query::<&Position>().build().run(|mut it| {
+        while it.next() {
+            let _ = it.entity(it.count() + 5);
+        }
+    });
+}
+
+/// `entity_id(row)` had the same out-of-bounds pointer arithmetic.
+#[test]
+#[should_panic(expected = "out of bounds")]
+fn iter_entity_id_out_of_range_row_panics() {
+    let world = World::new();
+
+    world.entity().set(Position { x: 1, y: 0 });
+
+    world.query::<&Position>().build().run(|mut it| {
+        while it.next() {
+            let _ = it.entity_id(it.count() + 5);
+        }
+    });
+}
+
+/// `get_entity(row)` returns `None` for an out-of-range row instead of doing
+/// out-of-bounds pointer arithmetic.
+#[test]
+fn iter_get_entity_out_of_range_row_is_none() {
+    let world = World::new();
+
+    world.entity().set(Position { x: 1, y: 0 });
+
+    world.query::<&Position>().build().run(|mut it| {
+        while it.next() {
+            let oob = it.count() + 5;
+            assert!(it.get_entity(oob).is_none());
+        }
+    });
+}
+
 /// `is_self(index)` used to sign-extend a negative `i8` into a huge `usize`
 /// offset and read out of bounds. It now asserts the index is in range.
 #[test]
