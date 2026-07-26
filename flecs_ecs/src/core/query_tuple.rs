@@ -59,38 +59,52 @@ pub trait ComponentPointers<T: QueryTuple> {
 }
 
 impl<T: QueryTuple, const LEN: usize> ComponentPointers<T> for ComponentsData<T, LEN> {
+    #[inline(always)]
     fn new(iter: &sys::ecs_iter_t) -> (IsAnyArray, Self) {
         let mut array_components = [core::ptr::null::<u8>() as *mut u8; LEN];
-        let mut is_ref_array_components = [false; LEN];
-        let mut is_row_array_components = [false; LEN];
-        let mut index_array_components = [0; LEN];
         #[cfg(feature = "flecs_safety_locks")]
         let mut safety_table_records = [TableColumnSafety::default(); LEN];
 
-        let is_any_array = if (iter.ref_fields | iter.up_fields) != 0 {
-            T::populate_array_ptrs(
-                iter,
-                &mut array_components[..],
-                &mut is_ref_array_components[..],
-                &mut is_row_array_components[..],
-                &mut index_array_components[..],
-                #[cfg(feature = "flecs_safety_locks")]
-                &mut safety_table_records[..],
-            )
-        } else {
-            // TODO since we know there is no is_ref and this always return false, we could mitigate a branch if we
-            // split up the functions
+        // Fast path: every field is a plain dense column of `it.table`. Only
+        // `array_components` (and the lock records) are read downstream, so the
+        // is_ref/is_row/index arrays are left dead here; inlining lets the
+        // caller DCE them once the plain dispatch is selected.
+        if (iter.ref_fields | iter.up_fields) == 0 {
             T::populate_self_array_ptrs(
                 iter,
                 &mut array_components[..],
                 #[cfg(feature = "flecs_safety_locks")]
                 &mut safety_table_records[..],
             );
-            IsAnyArray {
-                a_ref: false,
-                a_row: false,
-            }
-        };
+            return (
+                IsAnyArray {
+                    a_ref: false,
+                    a_row: false,
+                },
+                Self {
+                    array_components,
+                    is_ref_array_components: [false; LEN],
+                    is_row_array_components: [false; LEN],
+                    index_array_components: [0; LEN],
+                    #[cfg(feature = "flecs_safety_locks")]
+                    safety_table_records,
+                    _marker: PhantomData::<T>,
+                },
+            );
+        }
+
+        let mut is_ref_array_components = [false; LEN];
+        let mut is_row_array_components = [false; LEN];
+        let mut index_array_components = [0; LEN];
+        let is_any_array = T::populate_array_ptrs(
+            iter,
+            &mut array_components[..],
+            &mut is_ref_array_components[..],
+            &mut is_row_array_components[..],
+            &mut index_array_components[..],
+            #[cfg(feature = "flecs_safety_locks")]
+            &mut safety_table_records[..],
+        );
 
         (
             is_any_array,
@@ -345,6 +359,7 @@ pub trait QueryTuple: Sized {
     const COUNT_OPTIONAL_IMMUTABLE: usize;
     const COUNT_OPTIONAL_MUTABLE: usize;
 
+    #[inline(always)]
     fn create_ptrs(iter: &sys::ecs_iter_t) -> (IsAnyArray, Self::Pointers) {
         Self::Pointers::new(iter)
     }
@@ -505,7 +520,7 @@ where
         #[cfg(feature = "flecs_safety_locks")]
         {
             let tr = unsafe { table_records.get_unchecked_mut(0) };
-            let (table, column) = unsafe { flecs_field_table_column(it, 0) };
+            let (table, column) = unsafe { flecs_self_field_table_column(it, 0) };
             tr.table = table;
             tr.column = column;
         }
@@ -782,7 +797,7 @@ macro_rules! impl_iterable {
                         };
 
                         let tr = unsafe { table_records.get_unchecked_mut(*idx) };
-                        let (table, column) = unsafe { flecs_field_table_column(it, index) };
+                        let (table, column) = unsafe { flecs_self_field_table_column(it, index) };
                         tr.table = table;
                         tr.column = column;
                         *idx += 1;

@@ -1378,6 +1378,27 @@ pub(crate) fn flecs_field<T>(it: &sys::ecs_iter_t, index: i8) -> *mut T {
     p as *mut T
 }
 
+/// Resolve the storage location `(table, column)` of a field known to be a
+/// plain `self` field of `it.table` (the caller is on the all-dense path where
+/// `it.ref_fields | it.up_fields == 0`, so `it.columns` is the only source of
+/// truth and no `trs` / `sources` fallback can apply).
+///
+/// Returns `(null, -1)` when the field has no column in `it.table` (an unset
+/// optional self field).
+#[cfg(feature = "flecs_safety_locks")]
+#[inline(always)]
+pub(crate) unsafe fn flecs_self_field_table_column(
+    it: &sys::ecs_iter_t,
+    index: usize,
+) -> (*mut sys::ecs_table_t, i16) {
+    let column = unsafe { *it.columns.add(index) };
+    if column >= 0 {
+        (it.table, column)
+    } else {
+        (core::ptr::null_mut(), -1)
+    }
+}
+
 /// Resolve the storage location `(table, column)` of a field under the
 /// current flecs iterator contract.
 ///

@@ -105,7 +105,7 @@ mod multi_src_get;
 
 use core::{ffi::CStr, ffi::c_void, ptr::NonNull};
 #[cfg(feature = "flecs_safety_locks")]
-pub(crate) use field::flecs_field_table_column;
+pub(crate) use field::{flecs_field_table_column, flecs_self_field_table_column};
 pub use field::{Field, FieldAt, FieldAtMut, FieldIndex, FieldMut, FieldUntyped, FieldUntypedMut};
 pub(crate) use field::{flecs_field, flecs_field_with_size};
 pub use multi_src_get::*;
