@@ -24,13 +24,21 @@
 //! borrow is never released and its pin is never decremented. This leaks, it
 //! does not corrupt (spec §7.2): the stuck borrow makes every later conflicting
 //! access to that storage panic (or `try_*`-error) forever, and the stuck pin
-//! keeps shared-register writes on the deferred path forever. A leaked *read*
-//! guard with no write issued leaks only the Rust pin (no C defer level). A
-//! guard leaked while a write episode's level is open leaks that one level,
-//! which delays the queued writes and their observers until the next world sync
-//! point (a `progress()` pipeline merge drains the world queue); it never
-//! aliases, grants access, or aborts at world destruction. Every leaked resource
-//! is a monotonic denial, never a grant.
+//! keeps shared-register writes on the deferred path forever. Every leaked
+//! resource is a monotonic denial (a stuck lock denies, a stuck pin keeps
+//! writes deferred), never a grant, so no use-after-free is reachable.
+//!
+//! A leaked *read* guard with no write issued leaks only the Rust pin, no C
+//! defer level, so `progress()` and world destruction still run normally. A
+//! guard leaked while a write episode's level is open also leaks that one open
+//! level, which delays its queued writes and their observers: **world
+//! destruction drains the leaked episode** (the writes flush and their observers
+//! fire at teardown) so `ecs_fini` does not abort. Because a live pin cannot be
+//! distinguished from a leaked one, the episode is *not* drained at a frame
+//! boundary — calling [`World::progress`](crate::core::World::progress) while a
+//! write episode is open aborts, exactly as holding any flecs defer scope across
+//! a frame does. A leaked write episode therefore reaches the delay-until-close
+//! drain at world teardown, not at the next `progress()`.
 
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};

@@ -117,6 +117,12 @@ impl Drop for World {
                 // then makes all later handle drops no-ops (see `QueryHandle`).
                 ctx.mark_world_dead();
 
+                // Balance any write-episode defer level leaked by a forgotten
+                // guard so a `mem::forget` fails safe instead of aborting
+                // `ecs_fini` (spec §7.2).
+                #[cfg(feature = "flecs_safety_locks")]
+                ctx.safety_locks.drain_episodes(world_ptr);
+
                 unsafe {
                     // before we call ecs_fini(), we increment the reference count back to 1
                     // otherwise, copies of this object created during ecs_fini (e.g. a component on_remove hook)

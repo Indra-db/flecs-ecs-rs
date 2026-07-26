@@ -271,6 +271,31 @@ impl SafetyLocks {
         stages.resize_with(count, UnsafeCell::default);
     }
 
+    /// Balance any leaked write-episode defer level before world teardown.
+    ///
+    /// A `mem::forget`ten guard leaves its pin stuck above zero; if a write had
+    /// opened the episode level, that level never closes and would abort
+    /// `ecs_fini` (flecs requires a balanced defer stack). Called off the hot
+    /// path from `World`'s drop before `ecs_fini`: it closes each still-open
+    /// episode (flushing its queued writes at teardown, spec §7.2) so a leaked
+    /// guard fails safe instead of aborting. Must run single-threaded, with all
+    /// worker stages joined.
+    pub(crate) fn drain_episodes(&self, world: *mut sys::ecs_world_t) {
+        // SAFETY: single-threaded at teardown; no `stage()` pointer is alive.
+        let stages = unsafe { &*self.stages.get() };
+        for (i, cell) in stages.iter().enumerate() {
+            // SAFETY: single-threaded, exclusive access to each stage map.
+            let map = unsafe { &mut *cell.get() };
+            if map.episode_open {
+                map.episode_open = false;
+                map.pin = 0;
+                // SAFETY: `world` is live pre-fini; stage `i` exists until fini.
+                let stage = unsafe { sys::ecs_get_stage(world, i as i32) };
+                unsafe { sys::ecs_defer_end(stage) };
+            }
+        }
+    }
+
     #[inline(always)]
     pub(crate) fn stage(&self, index: i32) -> NonNull<StageLocks> {
         // SAFETY: the vec is only resized single-threaded; concurrent readers
