@@ -1,98 +1,80 @@
 error[E0277]: `NonNull<ecs_world_t>` cannot be sent between threads safely
-  --> tests/compile_fail/world_not_send.rs:9:24
+  --> tests/compile_fail/world_not_send.rs:8:24
    |
- 9 |       std::thread::spawn(move || {
+ 8 |       std::thread::spawn(move || {
    |       ------------------ ^------
    |       |                  |
-   |  _____|__________________within this `{closure@$DIR/tests/compile_fail/world_not_send.rs:9:24: 9:31}`
+   |  _____|__________________within this `{closure@$DIR/tests/compile_fail/world_not_send.rs:8:24: 8:31}`
    | |     |
    | |     required by a bound introduced by this call
-10 | |         world_clone.entity();
-11 | |     });
+ 9 | |         world.entity();
+10 | |     });
    | |_____^ `NonNull<ecs_world_t>` cannot be sent between threads safely
    |
-   = help: within `{closure@$DIR/tests/compile_fail/world_not_send.rs:9:24: 9:31}`, the trait `Send` is not implemented for `NonNull<ecs_world_t>`
+   = help: within `{closure@$DIR/tests/compile_fail/world_not_send.rs:8:24: 8:31}`, the trait `Send` is not implemented for `NonNull<ecs_world_t>`
 note: required because it appears within the type `flecs_ecs::core::World`
   --> src/core/world/world.rs
    |
    | pub struct World {
    |            ^^^^^
 note: required because it's used within this closure
-  --> tests/compile_fail/world_not_send.rs:9:24
+  --> tests/compile_fail/world_not_send.rs:8:24
    |
- 9 |     std::thread::spawn(move || {
+ 8 |     std::thread::spawn(move || {
    |                        ^^^^^^^
-note: required by a bound in `spawn`
+note: required by a bound in `std::thread::spawn`
   --> $RUST/std/src/thread/functions.rs
-   |
-   | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
-   |        ----- required by a bound in this function
-...
-   |     F: Send + 'static,
-   |        ^^^^ required by this bound in `spawn`
 
 error[E0277]: `NonNull<hashbrown::map::HashMap<TypeId, u64, utility::id_map::NoOpHash>>` cannot be sent between threads safely
-  --> tests/compile_fail/world_not_send.rs:9:24
+  --> tests/compile_fail/world_not_send.rs:8:24
    |
- 9 |       std::thread::spawn(move || {
+ 8 |       std::thread::spawn(move || {
    |       ------------------ ^------
    |       |                  |
-   |  _____|__________________within this `{closure@$DIR/tests/compile_fail/world_not_send.rs:9:24: 9:31}`
+   |  _____|__________________within this `{closure@$DIR/tests/compile_fail/world_not_send.rs:8:24: 8:31}`
    | |     |
    | |     required by a bound introduced by this call
-10 | |         world_clone.entity();
-11 | |     });
+ 9 | |         world.entity();
+10 | |     });
    | |_____^ `NonNull<hashbrown::map::HashMap<TypeId, u64, utility::id_map::NoOpHash>>` cannot be sent between threads safely
    |
-   = help: within `{closure@$DIR/tests/compile_fail/world_not_send.rs:9:24: 9:31}`, the trait `Send` is not implemented for `NonNull<hashbrown::map::HashMap<TypeId, u64, utility::id_map::NoOpHash>>`
+   = help: within `{closure@$DIR/tests/compile_fail/world_not_send.rs:8:24: 8:31}`, the trait `Send` is not implemented for `NonNull<hashbrown::map::HashMap<TypeId, u64, utility::id_map::NoOpHash>>`
 note: required because it appears within the type `flecs_ecs::core::World`
   --> src/core/world/world.rs
    |
    | pub struct World {
    |            ^^^^^
 note: required because it's used within this closure
-  --> tests/compile_fail/world_not_send.rs:9:24
+  --> tests/compile_fail/world_not_send.rs:8:24
    |
- 9 |     std::thread::spawn(move || {
+ 8 |     std::thread::spawn(move || {
    |                        ^^^^^^^
-note: required by a bound in `spawn`
+note: required by a bound in `std::thread::spawn`
   --> $RUST/std/src/thread/functions.rs
-   |
-   | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
-   |        ----- required by a bound in this function
-...
-   |     F: Send + 'static,
-   |        ^^^^ required by this bound in `spawn`
 
 error[E0277]: `NonNull<Vec<u64>>` cannot be sent between threads safely
-  --> tests/compile_fail/world_not_send.rs:9:24
+  --> tests/compile_fail/world_not_send.rs:8:24
    |
- 9 |       std::thread::spawn(move || {
+ 8 |       std::thread::spawn(move || {
    |       ------------------ ^------
    |       |                  |
-   |  _____|__________________within this `{closure@$DIR/tests/compile_fail/world_not_send.rs:9:24: 9:31}`
+   |  _____|__________________within this `{closure@$DIR/tests/compile_fail/world_not_send.rs:8:24: 8:31}`
    | |     |
    | |     required by a bound introduced by this call
-10 | |         world_clone.entity();
-11 | |     });
+ 9 | |         world.entity();
+10 | |     });
    | |_____^ `NonNull<Vec<u64>>` cannot be sent between threads safely
    |
-   = help: within `{closure@$DIR/tests/compile_fail/world_not_send.rs:9:24: 9:31}`, the trait `Send` is not implemented for `NonNull<Vec<u64>>`
+   = help: within `{closure@$DIR/tests/compile_fail/world_not_send.rs:8:24: 8:31}`, the trait `Send` is not implemented for `NonNull<Vec<u64>>`
 note: required because it appears within the type `flecs_ecs::core::World`
   --> src/core/world/world.rs
    |
    | pub struct World {
    |            ^^^^^
 note: required because it's used within this closure
-  --> tests/compile_fail/world_not_send.rs:9:24
+  --> tests/compile_fail/world_not_send.rs:8:24
    |
- 9 |     std::thread::spawn(move || {
+ 8 |     std::thread::spawn(move || {
    |                        ^^^^^^^
-note: required by a bound in `spawn`
+note: required by a bound in `std::thread::spawn`
   --> $RUST/std/src/thread/functions.rs
-   |
-   | pub fn spawn<F, T>(f: F) -> JoinHandle<T>
-   |        ----- required by a bound in this function
-...
-   |     F: Send + 'static,
-   |        ^^^^ required by this bound in `spawn`

@@ -545,8 +545,11 @@ impl QueryDisjointCache {
 /// read-only and mutations are deferred to per-stage command queues.
 ///
 /// The handle keeps the underlying query alive, like a [`Query`] clone. It is
-/// `Send`/`Sync` only when every component reference the query can hand out
-/// is `Send`.
+/// `Send` when every component reference the query hands out is `Send`, and
+/// `Sync` only when every term is read-only ([`ReadOnlyTerms`]): a shared
+/// handle must never let two threads iterate a `&mut` term, which the per-stage
+/// lock maps cannot detect across stages. Cross-thread mutation goes through a
+/// partitioned `par_*` system or an `unsafe` twin.
 ///
 /// # Example
 ///
@@ -566,6 +569,26 @@ impl QueryDisjointCache {
 /// });
 ///
 /// world.progress();
+/// ```
+///
+/// A handle whose terms include a `&mut` term is **not** `Sync`, so it cannot be
+/// shared across threads (capturing `&handle` in another thread requires
+/// `QueryHandle: Sync`):
+///
+/// ```compile_fail
+/// # use flecs_ecs::prelude::*;
+/// # #[derive(Component)] struct Position { x: f32 }
+/// # #[derive(Component)] struct Velocity { x: f32 }
+/// let mut world = World::new();
+/// let handle = world.new_query::<(&mut Position, &Velocity)>().handle();
+/// let handle_ref = &handle;
+/// std::thread::scope(|s| {
+///     s.spawn(move || {
+///         // `QueryHandle<(&mut Position, &Velocity)>` is not `Sync`, so
+///         // capturing `&handle` in this thread fails to compile.
+///         core::hint::black_box(handle_ref);
+///     });
+/// });
 /// ```
 pub struct QueryHandle<T>
 where
@@ -591,10 +614,20 @@ where
 {
 }
 
-// SAFETY: `&QueryHandle` only offers `iter_stage`; see the `Send` impl above.
+// SAFETY: sharing `&QueryHandle` lets another thread call `iter_stage` and
+// iterate the query. The per-stage safety-lock maps are structurally blind
+// across stages: a lock taken on one stage does not conflict-detect against a
+// concurrent iteration on a different stage, so two threads iterating a `&mut`
+// term through two stages would alias the same component data undetected — a
+// data race. Restricting `Sync` to `ReadOnlyTerms` (every term `&T` /
+// `Option<&T>` / tag, never `&mut T` / `Option<&mut T>`) removes that hazard:
+// read-only terms hand out only shared references, which cannot alias mutably.
+// The `TupleType: Send` bound additionally requires each read-only component to
+// be `Sync` (`&C: Send` iff `C: Sync`), so the concurrent shared reads are
+// themselves sound for `!Sync` components.
 unsafe impl<T> Sync for QueryHandle<T>
 where
-    T: QueryTuple,
+    T: QueryTuple + ReadOnlyTerms,
     for<'w> T::TupleType<'w>: Send,
 {
 }
