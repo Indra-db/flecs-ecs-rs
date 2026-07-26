@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 // This example shows how relationships can be combined with components to attach
@@ -33,7 +34,7 @@ struct Expires {
 struct MustHave;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // When one element of a pair is a component and the other element is a tag,
     // the pair assumes the type of the component.
@@ -41,26 +42,22 @@ fn main() {
         .entity()
         .set_pair::<Requires, Gigawatts>(Requires { amount: 1.21 });
 
-    let require = e1.try_get::<Option<&(Requires, Gigawatts)>>(|req| {
-        if let Some((req)) = req {
-            println!("e1: requires: {}", req.amount);
-        } else {
-            println!("e1: does not have a relationship with Requires, Gigawatts");
-        }
-    });
+    // try_get_ref returns the missing-relationship case as an Err instead of
+    // routing it through an Option inside a callback.
+    match e1.try_get_ref::<&(Requires, Gigawatts)>() {
+        Ok(req) => println!("e1: requires: {}", req.amount),
+        Err(_) => println!("e1: does not have a relationship with Requires, Gigawatts"),
+    }
 
     // The component can be either the first or second part of a pair:
     let e2 = world
         .entity()
         .set_pair::<Gigawatts, Requires>(Requires { amount: 1.5 });
 
-    let require = e2.try_get::<Option<&(Gigawatts, Requires)>>(|req| {
-        if let Some((req)) = req {
-            println!("e2: requires: {}", req.amount);
-        } else {
-            println!("e2: does not have a relationship with Gigawatts, Requires");
-        }
-    });
+    match e2.try_get_ref::<&(Gigawatts, Requires)>() {
+        Ok(req) => println!("e2: requires: {}", req.amount),
+        Err(_) => println!("e2: does not have a relationship with Gigawatts, Requires"),
+    }
 
     // Note that <Requires, Gigawatts> and <Gigawatts, Requires> are two
     // different pairs, and can be added to an entity at the same time.
@@ -71,9 +68,9 @@ fn main() {
         .entity()
         .set_pair::<Expires, Position>(Expires { timeout: 0.5 });
 
-    let expires = e3.try_get::<&(Expires, Position)>(|expires| {
+    if let Ok(expires) = e3.try_get_ref::<&(Expires, Position)>() {
         println!("expires: {}", expires.timeout);
-    });
+    }
 
     println!(
         "{}",
@@ -104,7 +101,7 @@ fn main() {
     // argument to the builder:
     let query = world.query::<&(Requires, Gigawatts)>().build();
 
-    query.each_entity(|entity, requires| {
+    query.each_entity_exclusive(&mut world, |entity, requires| {
         println!("requires: {} gigawatts", requires.amount);
     });
 

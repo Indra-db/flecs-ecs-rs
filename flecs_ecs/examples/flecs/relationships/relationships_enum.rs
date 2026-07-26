@@ -1,5 +1,9 @@
 use crate::z_ignore_test_common::*;
 
+// Import only the guard extension: the legacy each_iter used below stays on the
+// stable QueryAPI (per the migration plan), so QueryIterCtxExt is kept out of
+// scope to avoid a same-name ambiguity.
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::prelude::*;
 // When an enumeration constant is added to an entity, it is added as a relationship
 // pair where the relationship is the enum type, and the target is the constant. For
@@ -62,9 +66,9 @@ fn main() {
     ); // true
 
     // Get the current value of the enum
-    tile.try_get::<&Tile>(|tile| {
+    if let Ok(tile) = tile.try_get_ref::<&Tile>() {
         println!("is tile stone: {}", *tile == Tile::Stone); // true
-    });
+    }
 
     // Create a few more entities that we can query
     world
