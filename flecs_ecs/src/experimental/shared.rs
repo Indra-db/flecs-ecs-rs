@@ -54,12 +54,15 @@ where
     T: QueryTuple,
 {
     // Cached world identity (spec §4.7): read the query's real world and
-    // pointer-compare against the &World. No FFI.
+    // pointer-compare against the &World. No FFI. A null query pointer means
+    // the iterator was already consumed: skip the identity check and let the
+    // consuming operation raise its own typed panic.
+    let query_ptr = query.query_ptr();
+    if query_ptr.is_null() {
+        return;
+    }
     assert!(
-        core::ptr::eq(
-            unsafe { (*query.query_ptr()).real_world },
-            world.world_ptr()
-        ),
+        core::ptr::eq(unsafe { (*query_ptr).real_world }, world.world_ptr()),
         "{terminal} requires the query's own world: the &World passed in belongs to a different \
          world than this query's storage"
     );

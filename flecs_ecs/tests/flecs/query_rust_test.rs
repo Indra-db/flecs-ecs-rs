@@ -3659,25 +3659,25 @@ fn query_iter_transfer_through_with_var_releases_resources() {
 #[test]
 #[should_panic(expected = "QueryIter already consumed")]
 fn query_iter_reuse_panics() {
-    let world = World::new();
+    let mut world = World::new();
     world.entity().set(Position { x: 1, y: 2 });
     let q = world.new_query::<&Position>();
 
     let iter = q.iterable();
-    iter.each(|_| {});
-    iter.each(|_| {});
+    iter.each_exclusive(&mut world, |_| {});
+    iter.each_exclusive(&mut world, |_| {});
 }
 
 #[test]
 #[should_panic(expected = "ChainedIter already consumed")]
 fn chained_iter_reuse_panics() {
-    let world = World::new();
+    let mut world = World::new();
     world.entity().set(Position { x: 1, y: 2 });
     let q = world.new_query::<&Position>();
 
     let iter = q.iterable().page(0, 1);
-    iter.each(|_| {});
-    iter.each(|_| {});
+    iter.each_exclusive(&mut world, |_| {});
+    iter.each_exclusive(&mut world, |_| {});
 }
 
 // ─── iter_entities ────────────────────────────────────────────────────────────
