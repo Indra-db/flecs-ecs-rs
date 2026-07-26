@@ -9737,6 +9737,15 @@ unsafe extern "C-unwind" {
     ) -> *const ecs_record_t;
 }
 unsafe extern "C-unwind" {
+    #[doc = "Non-defer twin of ecs_rust_ref_get_scope_begin for the experimental\n guard-model CachedRef: resolves the ref pointer and revalidates the storage\n lock key by table id, with NO defer level. A lock_key of 0 means the ref's\n table is unchanged and the caller's cached key is still valid; otherwise\n lock_key carries the recomputed key. Returns a NULL ptr when the component\n is gone."]
+    pub fn ecs_rust_ref_get(
+        world: *mut ecs_world_t,
+        ref_: *mut ecs_ref_t,
+        id: ecs_id_t,
+        cached_key_table_id: u64,
+    ) -> ecs_rust_get_ptr_t;
+}
+unsafe extern "C-unwind" {
     #[doc = "Liveness check + entity-record lookup with no defer level. The entry half of\n the shared-register guard acquire: the guards track a Rust-side pin counter\n and open a defer level lazily on the first write while a guard is live, so\n the read path pays no defer FFI. Returns NULL when the entity is not alive."]
     pub fn ecs_rust_get_record(
         world: *mut ecs_world_t,

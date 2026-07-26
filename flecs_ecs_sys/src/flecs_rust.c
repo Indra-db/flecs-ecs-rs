@@ -695,6 +695,49 @@ ecs_rust_get_ptr_t ecs_rust_ref_get_stage_scope_begin(
         .ptr = ptr, .lock_key = ECS_RUST_DENSE_KEY(table, tr->column) };
 }
 
+ecs_rust_get_ptr_t ecs_rust_ref_get(
+    ecs_world_t *world,
+    ecs_ref_t *ref,
+    ecs_id_t id,
+    uint64_t cached_key_table_id)
+{
+    /* Non-defer twin of ecs_rust_ref_get_scope_begin: the experimental
+     * CachedRef tracks a Rust-side pin counter instead of opening a defer level
+     * per access (the pin model made the per-access defer scope obsolete for
+     * guards), so this resolves the pointer and revalidates the storage key by
+     * table id with NO ecs_defer_begin. */
+    void *ptr = ecs_ref_get_id(world, ref, id);
+    if (!ptr) {
+        return ECS_RUST_GET_PTR_NULL;
+    }
+
+    /* The ref still points into the same table: the caller's cached lock key is
+     * still valid; lock_key 0 signals "reuse cached". */
+    if (ref->table_id == cached_key_table_id) {
+        return (ecs_rust_get_ptr_t){ .ptr = ptr, .lock_key = 0 };
+    }
+
+    /* Table changed (or first access): recompute the storage key. */
+    const ecs_world_t *w = ecs_get_world(world);
+    ecs_component_record_t *cr = flecs_components_get(w, id);
+    ecs_assert(cr != NULL, ECS_INTERNAL_ERROR, NULL);
+
+    if (cr->flags & (EcsIdSparse|EcsIdDontFragment)) {
+        return (ecs_rust_get_ptr_t){
+            .ptr = ptr, .lock_key = ECS_RUST_SPARSE_KEY(cr) };
+    }
+
+    ecs_record_t *r = flecs_entities_get_any(w, ref->entity);
+    ecs_assert(r != NULL, ECS_INTERNAL_ERROR, NULL);
+    ecs_table_t *table = r->table;
+    ecs_assert(table != NULL, ECS_INTERNAL_ERROR, NULL);
+    const ecs_table_record_t *tr = flecs_component_get_table(cr, table);
+    ecs_assert(tr != NULL && tr->column != -1, ECS_INTERNAL_ERROR, NULL);
+
+    return (ecs_rust_get_ptr_t){
+        .ptr = ptr, .lock_key = ECS_RUST_DENSE_KEY(table, tr->column) };
+}
+
 const ecs_record_t* ecs_rust_get_scope_begin(
     ecs_world_t *world,
     ecs_entity_t entity)

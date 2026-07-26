@@ -428,6 +428,17 @@ pub fn query_experimental(criterion: &mut Criterion) {
         });
     });
 
+    // Resolved-once repeated single-entity access (spec §3.7): the warm path
+    // skips liveness + record resolution, only revalidating the table id, so it
+    // should land meaningfully under the uncached guard get.
+    let cached_ref = world.entity_ref::<C1>(e_id).unwrap();
+    group.bench_function("exp_cached_ref_get", |b| {
+        b.iter(|| {
+            let g = cached_ref.get(&world).unwrap();
+            black_box(g.0)
+        });
+    });
+
     // --- iteration: exclusive each vs locked each vs raw C ---
 
     group.bench_function("exp_each_locked_4", |b| {

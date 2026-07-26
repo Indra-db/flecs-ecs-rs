@@ -94,6 +94,19 @@ ecs_rust_get_ptr_t ecs_rust_ref_get_stage_scope_begin(
     ecs_id_t id,
     uint64_t cached_key_table_id);
 
+/* Non-defer twin of ecs_rust_ref_get_scope_begin for the experimental
+ * guard-model CachedRef: resolves the ref pointer and revalidates the storage
+ * lock key by table id, with NO defer level (the pin model tracks liveness
+ * Rust-side). A lock_key of 0 means the ref's table is unchanged and the
+ * caller's cached key is still valid; otherwise lock_key carries the recomputed
+ * key. Returns a NULL ptr when the component is gone. */
+FLECS_API
+ecs_rust_get_ptr_t ecs_rust_ref_get(
+    ecs_world_t *world,
+    ecs_ref_t *ref,
+    ecs_id_t id,
+    uint64_t cached_key_table_id);
+
 /* Combined entity-record lookup + defer_begin, the entry half of a component
  * access scope (ecs_rust_scope_end is the exit half). Returns NULL without
  * starting a defer scope when the entity is not alive. */

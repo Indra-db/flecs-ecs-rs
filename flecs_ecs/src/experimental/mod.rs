@@ -41,10 +41,14 @@
 //!   adversarial cases it rejects.
 
 #[cfg(feature = "flecs_safety_locks")]
+mod cached_ref;
+#[cfg(feature = "flecs_safety_locks")]
 mod entity_access;
 #[cfg(feature = "flecs_safety_locks")]
 mod guard;
 
+#[cfg(feature = "flecs_safety_locks")]
+pub use cached_ref::{CachedRef, WorldEntityRefExt};
 #[cfg(feature = "flecs_safety_locks")]
 pub use entity_access::{EntityGuardExt, GuardElement, GuardTuple};
 #[cfg(feature = "flecs_safety_locks")]
@@ -148,6 +152,8 @@ macro_rules! each {
 
 /// Convenience re-exports for the experimental surface.
 pub mod prelude {
+    #[cfg(feature = "flecs_safety_locks")]
+    pub use super::cached_ref::{CachedRef, WorldEntityRefExt};
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::entity_access::{EntityGuardExt, GuardTuple};
     pub use super::batches::QueryBatchesExt;
