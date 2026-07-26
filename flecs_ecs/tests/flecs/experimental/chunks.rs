@@ -22,8 +22,8 @@ fn chunks_cursor_yields_column_slices() {
     let q = query!(world, &mut Position, &Velocity).build();
 
     let mut rows = 0;
-    let mut cursor = q.chunks(&mut world);
-    while let Some((pos, vel)) = cursor.next() {
+    // `chunks` is a true `Iterator` now, so a plain `for` drives it.
+    for (pos, vel) in q.chunks(&mut world) {
         assert_eq!(pos.len(), vel.len());
         for i in 0..pos.len() {
             pos[i].x += vel[i].x;
@@ -165,6 +165,94 @@ fn each_macro_body_panic_does_not_wedge() {
     let mut count = 0;
     q.each(|(_, _)| count += 1);
     assert_eq!(count, 4);
+}
+
+/// CI contract (spec §4.6): one query iteration visits each `(table, row-range)`
+/// at most once, so the yielded `&mut`/`&` column slices are pairwise
+/// memory-disjoint. Re-verified on every vendored-C bump for plain and sorted
+/// iteration.
+fn assert_ranges_pairwise_disjoint(ranges: &[(usize, usize)]) {
+    for i in 0..ranges.len() {
+        let (a0, a1) = ranges[i];
+        for &(b0, b1) in &ranges[i + 1..] {
+            assert!(
+                a1 <= b0 || b1 <= a0,
+                "chunk memory ranges overlap: [{a0:#x},{a1:#x}) vs [{b0:#x},{b1:#x})"
+            );
+        }
+    }
+}
+
+fn seed_two_tables(world: &World) {
+    // Position-only table.
+    for i in 0..5 {
+        world.entity().set(Position { x: i, y: 0 });
+    }
+    // Position + Velocity table (distinct column storage).
+    for i in 0..4 {
+        world
+            .entity()
+            .set(Position { x: 100 + i, y: 0 })
+            .set(Velocity { x: 1, y: 1 });
+    }
+}
+
+#[test]
+fn chunks_memory_ranges_pairwise_disjoint() {
+    let mut world = World::new();
+    seed_two_tables(&world);
+    let q = query!(world, &Position).build();
+
+    let mut ranges = Vec::new();
+    for chunk in q.chunks(&mut world) {
+        let base = chunk.as_ptr() as usize;
+        ranges.push((base, base + core::mem::size_of_val(chunk)));
+    }
+    assert!(ranges.len() >= 2, "query should span at least two tables");
+    assert_ranges_pairwise_disjoint(&ranges);
+}
+
+#[test]
+fn chunks_order_by_memory_ranges_pairwise_disjoint() {
+    let mut world = World::new();
+    seed_two_tables(&world);
+    // order_by interleaves the two tables' entities in sort order; flecs' sort
+    // merge partitions each table's rows into disjoint contiguous slices, so the
+    // per-slice column ranges must still be pairwise disjoint.
+    let q = query!(world, &Position)
+        .order_by::<Position>(|_e1, a: &Position, _e2, b: &Position| (a.x - b.x).signum())
+        .build();
+
+    let mut ranges = Vec::new();
+    let mut rows = 0;
+    for chunk in q.chunks(&mut world) {
+        let base = chunk.as_ptr() as usize;
+        rows += chunk.len();
+        ranges.push((base, base + core::mem::size_of_val(chunk)));
+    }
+    assert_eq!(rows, 9);
+    assert_ranges_pairwise_disjoint(&ranges);
+}
+
+#[test]
+fn chunks_iterator_adapters_compose() {
+    let mut world = World::new();
+    seed_two_tables(&world);
+    let q = query!(world, &Position).build();
+
+    // zip + enumerate + collect: a real Iterator, so std combinators apply.
+    let per_chunk: Vec<(usize, i32)> = q
+        .chunks(&mut world)
+        .enumerate()
+        .map(|(idx, chunk)| (idx, chunk.iter().map(|p| p.x).sum::<i32>()))
+        .collect();
+    assert!(per_chunk.len() >= 2);
+
+    // sum over the chunk stream equals the flattened per-row sum.
+    let total: i32 = q.chunks(&mut world).map(|c| c.iter().map(|p| p.x).sum::<i32>()).sum();
+    let mut reference = 0;
+    q.each(|p| reference += p.x);
+    assert_eq!(total, reference);
 }
 
 #[test]

@@ -1,16 +1,22 @@
 //! Chunk cursor: per-table-batch column slices for vectorised user code.
 //!
-//! [`QueryChunksExt::chunks`] takes `&mut World` (exclusive register) and yields,
-//! one table batch at a time, whole-column slices such as `(&mut [A], &[B])`, so
-//! the body can iterate or SIMD over a contiguous run. It is a *lending* cursor:
-//! [`ChunkCursor::next`] borrows `&mut self`, so each chunk must be dropped
-//! before the next is pulled (this is why it is a `while let`, not an
-//! [`Iterator`]). The terminal [`ChunkCursor::for_each`] takes `self` by value,
-//! so a consumed cursor cannot be reused (double-consumption is a compile error).
+//! [`QueryChunksExt::chunks`] takes `&mut World` (exclusive register) and returns
+//! a true [`Iterator`] whose `Item` is one table batch's whole-column slice tuple
+//! such as `(&mut [A], &[B])`, so the body can iterate or SIMD over a contiguous
+//! run. The yielded slices borrow the table storage with the cursor's `'w` (the
+//! `&'w mut World`), not the cursor, so an item outlives a `next()` call and the
+//! std combinators (`zip` / `enumerate` / `sum` / `collect`) and rayon's
+//! `par_bridge` compose directly on the chunk stream. [`Iterator::for_each`]
+//! remains the by-value terminal.
 //!
-//! Because the cursor hands out `&mut` column slices with no runtime locks, it
-//! requires a provably-disjoint query (see [`disjoint`](super::disjoint));
-//! `chunks` panics otherwise.
+//! Non-overlap of the yielded `&mut` slices rests on two facts: `chunks` only
+//! accepts a provably-disjoint query (see [`disjoint`](super::disjoint); it
+//! panics otherwise), and flecs visits each `(table, row-range)` at most once per
+//! iteration, so no two chunks alias — this holds for plain, sorted, grouped, and
+//! change-skipped iteration (spec §4.6).
+//!
+//! The [`each!`](crate::each) macro drives the cursor through [`EachCursor`], a
+//! lending shape that also covers the shared-register locked-batches cursor.
 
 use core::marker::PhantomData;
 
@@ -175,10 +181,17 @@ impl_chunk_columns_tuple!(A @ 0, B @ 1, C @ 2);
 impl_chunk_columns_tuple!(A @ 0, B @ 1, C @ 2, D @ 3);
 impl_chunk_columns_tuple!(A @ 0, B @ 1, C @ 2, D @ 3, E @ 4);
 
-/// A lending cursor over a query's table batches, yielding column slices.
+/// A true [`Iterator`] over a query's table batches, yielding whole-column
+/// slices.
 ///
-/// Borrows `&mut World` for its whole life (exclusive register): no locks are
-/// taken and the yielded `&mut` slices cannot alias anything else.
+/// Borrows `&'w mut World` for its whole life (exclusive register): no locks are
+/// taken. The yielded slices borrow the **table storage** with the cursor's
+/// `'w`, not the cursor, so successive chunks do not alias and an item outlives a
+/// [`next`](Iterator::next) call. This is sound because `chunks` only accepts a
+/// proven-disjoint query (spec §4.7) and flecs visits each `(table, row-range)`
+/// at most once per iteration (spec §4.6), so no two yielded slices ever overlap
+/// — even for sorted or grouped queries (the sort merge partitions each table's
+/// rows into disjoint ranges).
 type ChunkMarker<'w, P, T> = PhantomData<(fn() -> (P, T), &'w mut World)>;
 
 pub struct ChunkCursor<'w, P, T> {
@@ -200,37 +213,78 @@ where
         }
     }
 
-    /// Advance to the next table batch, yielding its column slices. Returns
-    /// `None` when iteration is exhausted. Lending: the returned chunk borrows
-    /// `&mut self`, so it must be dropped before calling `next` again.
-    #[inline]
-    #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Option<T::Chunk<'_>> {
-        let next_fn = self.iter_next;
-        if !self.iter.next(|i| unsafe { next_fn(i) }) {
-            return None;
-        }
-        let it: &mut sys::ecs_iter_t = &mut self.iter;
-        it.flags |= sys::EcsIterCppEach;
-        assert!(
-            (it.ref_fields | it.up_fields | it.row_fields) == 0,
-            "chunks() requires plain dense self columns; ref/inherited/sparse terms are not \
-             supported by the chunk cursor"
-        );
-        let (_is_any, data) = T::create_ptrs(it);
-        let count = it.count as usize;
-        // SAFETY: exclusive register + proven-disjoint query, so the column
-        // bases are exclusively owned and non-aliasing for this borrow.
-        Some(unsafe { T::columns(data.column_ptrs(), count) })
-    }
+}
 
-    /// Terminal op: run `f` on every chunk, consuming the cursor. Because it
-    /// takes `self` by value, the cursor cannot be used again afterwards.
+impl<'w, P, T> Iterator for ChunkCursor<'w, P, T>
+where
+    T: QueryTuple + ChunkColumns,
+{
+    type Item = T::Chunk<'w>;
+
+    /// Yield the next dense table batch's whole-column slice tuple, bound to the
+    /// cursor's `'w` (the `&'w mut World`), not to `&mut self`. Singleton-only
+    /// batches (`count == 0 && table.is_null()`) carry no dense self columns and
+    /// are skipped (spec §4.6).
     #[inline]
-    pub fn for_each(mut self, mut f: impl FnMut(T::Chunk<'_>)) {
-        while let Some(chunk) = self.next() {
-            f(chunk);
+    fn next(&mut self) -> Option<T::Chunk<'w>> {
+        loop {
+            let next_fn = self.iter_next;
+            if !self.iter.next(|i| unsafe { next_fn(i) }) {
+                return None;
+            }
+            let it: &mut sys::ecs_iter_t = &mut self.iter;
+            it.flags |= sys::EcsIterCppEach;
+            assert!(
+                (it.ref_fields | it.up_fields | it.row_fields) == 0,
+                "chunks() requires plain dense self columns; ref/inherited/sparse terms are not \
+                 supported by the chunk cursor"
+            );
+            if it.count == 0 && it.table.is_null() {
+                continue;
+            }
+            let count = it.count as usize;
+            let (_is_any, data) = T::create_ptrs(it);
+            // SAFETY: exclusive register + proven-disjoint query + single-visit
+            // iteration, so each batch's column bases are exclusively owned and
+            // pairwise non-aliasing across the whole `'w` iteration. `T::columns`
+            // reads `data`'s pointer array to build slices over the table storage;
+            // the returned slices borrow that storage, not `data`, so binding them
+            // to `'w` is sound.
+            return Some(unsafe { T::columns(data.column_ptrs(), count) });
         }
+    }
+}
+
+/// Cursor shape consumed by the [`each!`](crate::each) macro: a lending
+/// `each_next` that yields one chunk borrowed for the duration of a single loop
+/// body. Both the exclusive [`ChunkCursor`] (a true `Iterator`) and the shared
+/// [`LockedBatches`] (a lending, Tier-1-locked cursor) implement it, so `each!`
+/// drives either with one expansion.
+#[doc(hidden)]
+pub trait EachCursor {
+    type Chunk<'c>
+    where
+        Self: 'c;
+    /// Advance and return the next chunk, borrowed until the returned value is
+    /// dropped. Returns `None` at end of iteration.
+    fn each_next(&mut self) -> Option<Self::Chunk<'_>>;
+}
+
+impl<'w, P, T> EachCursor for ChunkCursor<'w, P, T>
+where
+    T: QueryTuple + ChunkColumns,
+{
+    // The exclusive cursor yields slices bound to the world's `'w`, not to the
+    // per-call `&mut self` borrow, so the macro's chunk (which the body drops
+    // each turn) is simply the `Iterator` item.
+    type Chunk<'c>
+        = T::Chunk<'w>
+    where
+        Self: 'c;
+
+    #[inline]
+    fn each_next(&mut self) -> Option<T::Chunk<'w>> {
+        Iterator::next(self)
     }
 }
 

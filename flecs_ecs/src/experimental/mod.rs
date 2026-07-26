@@ -51,7 +51,7 @@ pub mod chunks;
 pub mod disjoint;
 pub mod exclusive;
 
-pub use chunks::{ChunkCursor, QueryChunksExt};
+pub use chunks::{ChunkCursor, EachCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
 
@@ -87,7 +87,7 @@ macro_rules! each {
     (@tuple ( $($name:ident),+ ) ( $($cur:tt)* ) { $($body:tt)* }) => {{
         let mut __cursor = $($cur)*;
         while let ::core::option::Option::Some(( $(mut $name,)+ )) =
-            $crate::experimental::chunks::ChunkCursor::next(&mut __cursor)
+            $crate::experimental::chunks::EachCursor::each_next(&mut __cursor)
         {
             // Zip the columns' native slice iterators so the row loop is a
             // bounds-check-free pointer walk. The zip nesting and its matching
@@ -105,7 +105,7 @@ macro_rules! each {
     (@single $name:ident ( $($cur:tt)* ) { $($body:tt)* }) => {{
         let mut __cursor = $($cur)*;
         while let ::core::option::Option::Some(mut $name) =
-            $crate::experimental::chunks::ChunkCursor::next(&mut __cursor)
+            $crate::experimental::chunks::EachCursor::each_next(&mut __cursor)
         {
             for $name in $crate::experimental::chunks::RowSlice::rows(&mut $name) {
                 { $($body)* }
