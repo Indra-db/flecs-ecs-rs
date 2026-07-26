@@ -2,6 +2,7 @@
 #![allow(warnings)]
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 // Queries have a builtin mechanism for tracking changes per matched table. This
 // is a cheap way of eliminating redundant work, as many entities can be skipped
@@ -22,7 +23,7 @@ struct Dirty {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Make Dirty inheritable so that queries can match it on prefabs
     world
@@ -89,7 +90,7 @@ fn main() {
     println!();
 
     // The changed state will remain true until we have iterated each table.
-    query_read.run(|mut iter| {
+    query_read.run_exclusive(&mut world, |mut iter| {
         while iter.next() {
             // With the it.changed() function we can check if the table we're
             // currently iterating has changed since last iteration.
@@ -110,7 +111,7 @@ fn main() {
 
     // Iterate the write query. Because the Position term is InOut (default)
     // iterating the query will write to the dirty state of iterated tables.
-    query_write.run(|mut it| {
+    query_write.run_exclusive(&mut world, |mut it| {
         while it.next() {
             let dirty = it.field::<Dirty>(0);
             let mut pos = it.field_mut::<Position>(1);
@@ -145,7 +146,7 @@ fn main() {
     println!();
 
     // When we iterate the read query, we'll see that one table has changed.
-    query_read.run(|mut iter| {
+    query_read.run_exclusive(&mut world, |mut iter| {
         while iter.next() {
             println!(
                 "iter.is_changed() for table [{}]: {}",

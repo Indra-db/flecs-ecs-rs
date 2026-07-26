@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 #[derive(Debug, Component)]
 struct Gravity {
@@ -13,7 +14,7 @@ pub struct Velocity {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Mark Gravity as singleton
     world.component::<Gravity>().add_trait::<flecs::Singleton>();
@@ -29,7 +30,7 @@ fn main() {
     // Create query that matches Gravity as singleton
     let query = world.query::<(&mut Velocity, &Gravity)>().build();
 
-    query.each_entity(|entity, (velocity, gravity)| {
+    query.each_entity_exclusive(&mut world, |entity, (velocity, gravity)| {
         velocity.y += gravity.value;
         println!("Entity {} has {:?}", entity.path().unwrap(), velocity);
     });

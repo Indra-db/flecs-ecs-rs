@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -12,15 +13,15 @@ fn compare_position(_e1: Entity, p1: &Position, _e2: Entity, p2: &Position) -> i
     (p1.x > p2.x) as i32 - (p1.x < p2.x) as i32
 }
 
-fn print_query(query: &Query<&Position>) {
-    query.each_entity(|entity, pos| println!("{pos:?}"));
+fn print_query(query: &Query<&Position>, world: &mut World) {
+    query.each_entity_exclusive(world, |entity, pos| println!("{pos:?}"));
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create entities, set position in random order
-    let entity = world.entity().set(Position { x: 1.0, y: 0.0 });
+    let entity = world.entity().set(Position { x: 1.0, y: 0.0 }).id();
     world.entity().set(Position { x: 6.0, y: 0.0 });
     world.entity().set(Position { x: 2.0, y: 0.0 });
     world.entity().set(Position { x: 5.0, y: 0.0 });
@@ -34,6 +35,21 @@ fn main() {
         })
         .build();
 
+    println!();
+    println!("--- First iteration ---");
+    print_query(&query, &mut world);
+
+    // Change the value of one entity, invalidating the order
+    world.entity_from_id(entity).set(Position { x: 7.0, y: 0.0 });
+
+    // Iterate query again, printed values are still ordered
+    println!();
+    println!("--- Second iteration ---");
+    print_query(&query, &mut world);
+
+    // Create new entity to show that data is also sorted for new entities
+    world.entity().set(Position { x: 3.0, y: 0.0 });
+
     // Create a sorted system
     let sys = world
         .system::<&Position>()
@@ -41,21 +57,6 @@ fn main() {
         .each_entity(|entity, pos| {
             println!("{pos:?}");
         });
-
-    println!();
-    println!("--- First iteration ---");
-    print_query(&query);
-
-    // Change the value of one entity, invalidating the order
-    entity.set(Position { x: 7.0, y: 0.0 });
-
-    // Iterate query again, printed values are still ordered
-    println!();
-    println!("--- Second iteration ---");
-    print_query(&query);
-
-    // Create new entity to show that data is also sorted for new entities
-    world.entity().set(Position { x: 3.0, y: 0.0 });
 
     // Run system, printed values are ordered
     println!();

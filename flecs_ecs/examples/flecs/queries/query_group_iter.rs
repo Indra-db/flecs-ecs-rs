@@ -1,6 +1,7 @@
 #![allow(non_camel_case_types)]
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 // A group iterator iterates over a single group of a grouped query (see the
 // group_by example for more details). This can be useful when an application
@@ -50,7 +51,7 @@ struct Beggar;
 struct Mage;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create npc's in world cell 0_0
     world
@@ -96,8 +97,9 @@ fn main() {
     // Iterate all tables
     println!("All tables");
 
-    query.run(|mut iter| {
+    query.run_exclusive(&mut world, |mut iter| {
         while iter.next() {
+            let world = iter.world();
             let group = world.entity_from_id(iter.group_id());
             println!(
                 "group: {:?} - Table [{}]",
@@ -111,7 +113,7 @@ fn main() {
 
     println!("Tables for cell 1_0:");
 
-    query.with_group(Cell_1_0).run(|mut iter| {
+    query.with_group(Cell_1_0).run_exclusive(&mut world, |mut iter| {
         while iter.next() {
             let world = iter.world();
             let group = world.entity_from_id(iter.group_id());

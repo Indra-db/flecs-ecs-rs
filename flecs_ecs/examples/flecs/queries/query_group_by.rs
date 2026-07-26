@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -24,7 +25,7 @@ pub struct Third;
 pub struct Group;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.component::<First>();
     world.component::<Second>();
@@ -63,8 +64,9 @@ fn main() {
 
     println!();
 
-    query.run(|mut it| {
+    query.run_exclusive(&mut world, |mut it| {
         while it.next() {
+            let world = it.world();
             let group = world.entity_from_id(it.group_id());
             let pos = it.field::<Position>(0);
 
