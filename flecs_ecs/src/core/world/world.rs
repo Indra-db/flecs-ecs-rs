@@ -15,6 +15,36 @@ use crate::core::{
 ///
 /// If the world is deleted, all data in the world will be deleted as well.
 ///
+/// # Ownership and thread-safety contract
+///
+/// `World` is `!Clone`, `!Send`, and `!Sync`. A world is created, borrowed, and
+/// dropped on a single thread; worker threads never receive a `World`, only a
+/// stage handle. `World` is deliberately not `Clone`: a second owning handle
+/// would alias the same raw world and defeat the exclusive register, so
+/// `&mut World` is the genuine proof of exclusive access. These bounds are part
+/// of the public contract and are asserted by the compile-fail tests below.
+///
+/// `World` does not implement `Clone`:
+/// ```compile_fail
+/// # use flecs_ecs::core::World;
+/// fn assert_clone<T: Clone>() {}
+/// assert_clone::<World>();
+/// ```
+///
+/// `World` is not `Send`:
+/// ```compile_fail
+/// # use flecs_ecs::core::World;
+/// fn assert_send<T: Send>() {}
+/// assert_send::<World>();
+/// ```
+///
+/// `World` is not `Sync`:
+/// ```compile_fail
+/// # use flecs_ecs::core::World;
+/// fn assert_sync<T: Sync>() {}
+/// assert_sync::<World>();
+/// ```
+///
 /// # Examples
 ///
 /// ```
@@ -35,17 +65,6 @@ pub struct World {
     pub(crate) raw_world: NonNull<sys::ecs_world_t>,
     pub(crate) components: NonNull<FlecsIdMap>,
     pub(crate) components_array: NonNull<FlecsArray>,
-}
-
-impl Clone for World {
-    fn clone(&self) -> Self {
-        unsafe { sys::flecs_poly_claim_(self.raw_world.as_ptr() as *mut c_void) };
-        Self {
-            raw_world: self.raw_world,
-            components: self.components,
-            components_array: self.components_array,
-        }
-    }
 }
 
 impl Default for World {
@@ -178,21 +197,20 @@ impl World {
         world
     }
 
-    /// Explicitly release this world handle, decrementing the ref count.
-    /// If this is the last handle, the world is finalized (`ecs_fini`).
+    /// Explicitly release this world handle, finalizing the world (`ecs_fini`).
     ///
-    /// Equivalent to C++ `world.release()`. Taking `self` by value ensures the
-    /// caller cannot use the handle after release — the Rust equivalent of
-    /// setting `world_ = nullptr` after `flecs_poly_release`.
+    /// `World` is the sole owning handle (it is `!Clone`), so releasing it
+    /// always finalizes the world. Taking `self` by value ensures the caller
+    /// cannot use the handle after release — the Rust equivalent of setting
+    /// `world_ = nullptr` after `flecs_poly_release`. Equivalent to simply
+    /// dropping the world; provided for parity with C++ `world.release()`.
     ///
     /// # Examples
     /// ```
     /// # use flecs_ecs::core::World;
-    /// let world_a = World::new();
-    /// let world_b = world_a.clone(); // both point to same world
-    /// world_a.release();             // decrements ref; world still alive in world_b
-    /// // world_a is consumed — cannot be used here
-    /// world_b.release();             // last handle → ecs_fini called
+    /// let world = World::new();
+    /// world.release(); // world is finalized → ecs_fini called
+    /// // world is consumed — cannot be used here
     /// ```
     pub fn release(self) {
         drop(self); // Drop impl handles flecs_poly_release / ecs_fini

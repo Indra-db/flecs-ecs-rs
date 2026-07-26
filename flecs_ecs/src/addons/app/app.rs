@@ -118,16 +118,17 @@ unsafe fn default_run_action(
 ///
 /// These are typically constructed via [`World::app()`]
 ///
-/// The app holds its own claimed `World` handle for the duration of its
-/// lifetime; dropping the app without calling [`App::run()`] releases the
-/// handle again.
-pub struct App {
-    pub(crate) world: Option<World>,
+/// The app borrows the [`World`] it was created from for the duration of its
+/// lifetime; it does not hold an owning world handle. The world is finalized
+/// when the borrowed `World` is dropped, whether or not [`App::run()`] was
+/// called.
+pub struct App<'a> {
+    pub(crate) world: Option<WorldRef<'a>>,
     pub(crate) desc: sys::ecs_app_desc_t,
     actions: Option<Box<AppActions>>,
 }
 
-impl App {
+impl<'a> App<'a> {
     /// Create a new application.
     ///
     /// # Arguments
@@ -137,7 +138,7 @@ impl App {
     /// # See also
     ///
     /// * [`World::app()`]
-    pub(crate) fn new(world: World) -> Self {
+    pub(crate) fn new(world: WorldRef<'a>) -> Self {
         let mut obj = Self {
             world: Some(world),
             desc: sys::ecs_app_desc_t::default(),
@@ -157,7 +158,7 @@ impl App {
         self.world
             .as_ref()
             .expect("App::run consumed the world; the App cannot be reused")
-            .ptr_mut()
+            .world_ptr_mut()
     }
 
     fn actions_mut(&mut self) -> &mut AppActions {
@@ -355,11 +356,12 @@ impl App {
     /// If a custom run action is set, it will be invoked by this operation.
     /// The default run action calls the frame action in a loop until it returns a non-zero value.
     ///
-    /// The app's own world handle is released when the app quits; the world is
-    /// finalized once the last remaining [`World`] handle is dropped. If the
-    /// app is used in an environment that takes over the main loop (like
-    /// emscripten), the quit flag is not set and the handle is intentionally
-    /// leaked to keep the world alive.
+    /// The app only borrows the world, so running the app leaves the caller's
+    /// [`World`] handle intact; the world is finalized when that handle is
+    /// dropped. If the app is used in an environment that takes over the main
+    /// loop (like emscripten), the quit flag is not set and the app's actions
+    /// are intentionally leaked, since the C-side descriptor copy keeps
+    /// referencing them after this call returns.
     ///
     /// Concurrent app runs in one process are serialized: the underlying C
     /// addon stores the descriptor in a process-global, so only one app can
@@ -377,18 +379,16 @@ impl App {
             .world
             .take()
             .expect("App::run can only be called once per App");
-        let world_ptr = world.ptr_mut();
+        let world_ptr = world.world_ptr_mut();
         let _run_guard = APP_RUN_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let result = unsafe { sys::ecs_app_run(world_ptr, &mut self.desc) };
-        if unsafe { sys::ecs_should_quit(world_ptr) } {
-            drop(world);
-        } else {
-            // The environment took over the main loop (e.g. emscripten):
-            // the world and the actions (still referenced by the C-side
-            // descriptor copy) must stay alive.
-            core::mem::forget(world);
+        if !unsafe { sys::ecs_should_quit(world_ptr) } {
+            // The environment took over the main loop (e.g. emscripten): the
+            // actions are still referenced by the C-side descriptor copy and
+            // must stay alive for the duration of the takeover. The world is
+            // owned by the caller, which keeps it alive.
             core::mem::forget(self.actions.take());
         }
         result

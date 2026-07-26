@@ -1917,14 +1917,6 @@ fn world_mini() {
 }
 
 #[test]
-fn copy_world() {
-    let world1 = World::new();
-    let world2 = world1.clone();
-
-    assert_eq!(world1.ptr_mut(), world2.ptr_mut());
-}
-
-#[test]
 fn fini_reentrancy() {
     #[derive(Component, Default)]
     struct A {
@@ -1941,14 +1933,6 @@ fn fini_reentrancy() {
 
     world.entity().add(A::id());
     // world drops here; on_remove fires with world reference - should not abort
-}
-
-#[test]
-fn fini_copy_move_assign() {
-    let world1 = World::new();
-    let world2 = world1.clone();
-    // Both world1 and world2 share the same underlying world pointer.
-    assert_eq!(world1.ptr_mut(), world2.ptr_mut());
 }
 
 #[test]

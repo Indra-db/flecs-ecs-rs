@@ -15,7 +15,6 @@ fn world_refcount(world: &World) -> i32 {
 #[test]
 fn app_run_keeps_world_refcount_balanced() {
     let world = World::new();
-    let _extra_handle = world.clone();
 
     let refcount_before = world_refcount(&world);
 
