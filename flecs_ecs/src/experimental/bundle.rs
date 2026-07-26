@@ -99,6 +99,7 @@ pub trait Bundle: private::Sealed + Sized + 'static {
 /// but the unchecked-build contract also removes this refusal).
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
+#[track_caller]
 fn assert_no_live_guards(world: &WorldRef, op: &str) {
     let locks = crate::core::stage_locks_dyn(world);
     // SAFETY: the stage map is owned by the calling thread.
@@ -114,6 +115,7 @@ fn assert_no_live_guards(_world: &WorldRef, _op: &str) {}
 #[cfg(feature = "flecs_safety_locks")]
 #[cold]
 #[inline(never)]
+#[track_caller]
 fn bundle_live_guard_panic(op: &str) -> ! {
     panic!(
         "cannot {op} while component guards are live on this stage: `ecs_bulk_init` \
@@ -125,6 +127,7 @@ fn bundle_live_guard_panic(op: &str) -> ! {
 
 #[cold]
 #[inline(never)]
+#[track_caller]
 fn bundle_deferred_panic(op: &str) -> ! {
     panic!(
         "cannot {op} while the world is deferred: the operation must create and observe \
@@ -392,6 +395,7 @@ pub trait WorldBundleExt {
 }
 
 impl WorldBundleExt for World {
+    #[track_caller]
     fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_> {
         const {
             assert!(
@@ -452,6 +456,7 @@ impl WorldBundleExt for World {
         }
     }
 
+    #[track_caller]
     fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity> {
         const {
             assert!(
@@ -603,6 +608,7 @@ pub trait EntityBundleExt: Sized {
 }
 
 impl<'a> EntityBundleExt for EntityView<'a> {
+    #[track_caller]
     fn insert<B: Bundle>(self, bundle: B) -> Self {
         const {
             assert!(

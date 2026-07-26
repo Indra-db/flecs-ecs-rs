@@ -183,7 +183,12 @@ pub struct GuardParts {
 
 /// One element of a guard tuple: maps `&T` to [`Ref`] and `&mut T` to [`Mut`].
 #[doc(hidden)]
-pub trait GuardElement<'w>: GetTupleTypeOperation {
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a valid guard-tuple element",
+    label = "not a guard element",
+    note = "a guard element must be `&T`, `&mut T`, `Option<&T>`, or `Option<&mut T>` for a component `T`"
+)]
+pub trait GuardElement<'w>: GetTupleTypeOperation + crate::experimental::sealed::Sealed {
     type Guard;
 
     /// # Safety
@@ -254,6 +259,11 @@ where
 
 /// A request shape for [`EntityGuardExt::get_ref`]: `&T`, `&mut T`, or a tuple
 /// of those. Produces the matching guard or tuple of guards.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a valid guard request",
+    label = "not a `get_ref` request",
+    note = "request one component as `&T` / `&mut T` (optional: `Option<&T>` / `Option<&mut T>`), or a tuple of up to five of those"
+)]
 pub trait GuardTuple<'w>: GetTuple {
     type Guards;
 
@@ -338,6 +348,22 @@ pub trait EntityGuardExt<'a> {
     /// Borrow one or more components, returning guards. Panics on a borrow
     /// conflict (like `RefCell::borrow`); returns `None` if the entity is not
     /// alive or a requested component is missing.
+    ///
+    /// The request `G` must be a [`GuardTuple`] — a `&T` / `&mut T` (optionally
+    /// `Option<&T>` / `Option<&mut T>`), or a tuple of up to five of those.
+    /// Requesting anything else (here a bare `i32`) fails to compile with the
+    /// trait's `#[diagnostic::on_unimplemented]` message ("`i32` is not a valid
+    /// guard request"); the message text is not asserted by the doctest, only
+    /// that the misuse is rejected:
+    ///
+    /// ```compile_fail
+    /// use flecs_ecs::prelude::*;
+    /// use flecs_ecs::experimental::prelude::*;
+    ///
+    /// let world = World::new();
+    /// let e = world.entity();
+    /// let _ = e.get_ref::<i32>();
+    /// ```
     fn get_ref<G: GuardTuple<'a>>(self) -> Option<G::Guards>;
 
     /// Fallible [`get_ref`](EntityGuardExt::get_ref): returns the conflict (or
@@ -357,6 +383,7 @@ impl<'a> EntityGuardExt<'a> for EntityView<'a> {
     }
 
     #[inline]
+    #[track_caller]
     fn get_ref<G: GuardTuple<'a>>(self) -> Option<G::Guards> {
         // SAFETY: as try_get_ref.
         match unsafe { G::acquire(self.world, self.id) } {

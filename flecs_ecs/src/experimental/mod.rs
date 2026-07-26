@@ -40,6 +40,15 @@
 //!   [`disjoint::is_proven_disjoint`](crate::experimental::disjoint::is_proven_disjoint) for the (conservative) analysis and the
 //!   adversarial cases it rejects.
 
+/// Seals the experimental `#[doc(hidden)]` kernel traits (spec §9.5) so
+/// downstream crates cannot implement them: each kernel trait names
+/// [`sealed::Sealed`] as a supertrait, and `Sealed` is only implemented for the
+/// crate's own blessed types.
+pub(crate) mod sealed {
+    /// Private supertrait that seals the experimental kernel traits.
+    pub trait Sealed {}
+}
+
 #[cfg(feature = "flecs_safety_locks")]
 mod cached_ref;
 #[cfg(feature = "flecs_safety_locks")]
@@ -67,7 +76,7 @@ pub mod iter_ctx;
 
 pub use batches::{LockedBatches, QueryBatchesExt};
 pub use bundle::{Bundle, EntityBundleExt, WorldBundleExt};
-pub use chunks::{ChunkCursor, EachCursor, QueryChunksExt};
+pub use chunks::{ChunkCursor, EachArity, EachCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
 pub use iter_ctx::{Iter, QueryIterCtxExt};
@@ -89,6 +98,29 @@ pub use iter_ctx::{Iter, QueryIterCtxExt};
 /// The inner row loop iterates the columns' native slice iterators zipped
 /// together (`RowSlice::rows`), so the bounds check is hoisted out of the per-row
 /// path and the loop advances by pointer, matching hand-written slice iteration.
+///
+/// # Binding-count vs column-count mismatch (spec §9.5)
+///
+/// A bound-name count that does not equal the query's column count is a
+/// **named** compile error — `each!: the number of bound names does not equal
+/// the query's column count` — not a raw tuple-destructure mismatch. The query
+/// below has two columns but three bound names, so it fails to compile:
+///
+/// ```compile_fail
+/// use flecs_ecs::prelude::*;
+/// use flecs_ecs::experimental::prelude::*;
+///
+/// #[derive(Component)]
+/// struct A { x: i32 }
+/// #[derive(Component)]
+/// struct B { y: i32 }
+///
+/// let mut world = World::new();
+/// let q = world.new_query::<(&A, &B)>();
+/// each!((a, b, c) in q.chunks(&mut world) {
+///     let _ = (a, b, c);
+/// });
+/// ```
 #[macro_export]
 macro_rules! each {
     ( ( $($name:ident),+ $(,)? ) in $($rest:tt)+ ) => {
@@ -102,7 +134,15 @@ macro_rules! each {
     // the trailing body block remains (an `expr` fragment cannot precede a
     // block, so the cursor cannot be captured as `:expr` directly).
     (@tuple ( $($name:ident),+ ) ( $($cur:tt)* ) { $($body:tt)* }) => {{
+        // Named arity check (spec §9.5): a bound-name count that does not equal
+        // the query's column count is a compile error with an `each!` message,
+        // not a raw tuple-destructure mismatch. The cursor is threaded through a
+        // zero-cost identity that binds its column count `N` at the type level;
+        // the bound fails with the named message when it does not match.
         let mut __cursor = $($cur)*;
+        $crate::experimental::chunks::arity_assert::<_, { $crate::each!(@count $($name),+) }>(
+            &__cursor,
+        );
         while let ::core::option::Option::Some(( $(mut $name,)+ )) =
             $crate::experimental::chunks::EachCursor::each_next(&mut __cursor)
         {
@@ -120,7 +160,10 @@ macro_rules! each {
 
     // Single-binding muncher.
     (@single $name:ident ( $($cur:tt)* ) { $($body:tt)* }) => {{
+        // Named arity check (spec §9.5): one bound name requires a one-column
+        // query, bound via a zero-cost `&`-ref assert.
         let mut __cursor = $($cur)*;
+        $crate::experimental::chunks::arity_assert::<_, 1>(&__cursor);
         while let ::core::option::Option::Some(mut $name) =
             $crate::experimental::chunks::EachCursor::each_next(&mut __cursor)
         {
@@ -154,6 +197,12 @@ macro_rules! each {
         $crate::each!(@pat_acc ( ($($acc)*, $next) ) $($rest),*)
     };
     (@pat_acc ( $($acc:tt)* )) => { $($acc)* };
+
+    // Count bound names into a `usize` for the arity check.
+    (@count $first:ident $(, $rest:ident)*) => {
+        1usize + $crate::each!(@count $($rest),*)
+    };
+    (@count) => { 0usize };
 }
 
 /// Convenience re-exports for the experimental surface.

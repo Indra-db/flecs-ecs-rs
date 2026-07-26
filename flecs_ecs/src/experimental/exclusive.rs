@@ -145,6 +145,7 @@ where
     Q: QueryAPI<'a, P, T>,
     T: QueryTuple,
 {
+    #[track_caller]
     fn each_exclusive(&self, world: &mut World, func: impl FnMut(T::TupleType<'_>)) {
         let world_ref = self.world();
         // Cached world identity (spec §4.7): the query stores its real world, so

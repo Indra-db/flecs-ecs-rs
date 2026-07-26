@@ -165,10 +165,13 @@ where
     }
 }
 
+impl<'w, P, T> super::sealed::Sealed for LockedBatches<'w, P, T> where T: QueryTuple {}
+
 impl<'w, P, T> EachCursor for LockedBatches<'w, P, T>
 where
     T: QueryTuple + ChunkColumns,
 {
+    type ColArity = <T as ChunkColumns>::Arity;
     type Chunk<'c>
         = T::Chunk<'c>
     where
@@ -224,6 +227,7 @@ where
     Q: QueryAPI<'a, P, T>,
     T: QueryTuple + ChunkColumns,
 {
+    #[track_caller]
     fn batches<'w>(&self, world: &'w World) -> LockedBatches<'w, P, T> {
         // Cached world identity (spec §4.7): read the query's real world and
         // pointer-compare against the &World. No FFI.

@@ -26,9 +26,56 @@ use crate::core::{
 };
 use crate::sys;
 
+use super::sealed::Sealed;
+
+impl<T: ComponentOrPairId> Sealed for &T {}
+impl<T: ComponentOrPairId> Sealed for &mut T {}
+impl<T: ComponentOrPairId> Sealed for Option<&T> {}
+impl<T: ComponentOrPairId> Sealed for Option<&mut T> {}
+impl<T> Sealed for &[T] {}
+impl<T> Sealed for &mut [T] {}
+
+/// A column-count marker so [`each!`](crate::each) can turn a binding-count vs
+/// column-count mismatch into a **named** compile error at type-check time (spec
+/// §9.5) instead of a raw tuple-destructure mismatch. A cursor whose query has
+/// `M` columns reports [`Cols<M>`] as its
+/// [`ColArity`](EachCursor::ColArity); the bound [`Cols<M>: EachArity<N>`] holds
+/// only when `M == N`, so a mismatch fails the bound with this message. The
+/// check is lifetime-free and reads no cursor value, so it stays zero-cost.
+#[doc(hidden)]
+#[diagnostic::on_unimplemented(
+    message = "each!: the number of bound names does not equal the query's column count",
+    label = "each! binding-count vs column-count mismatch"
+)]
+pub trait EachArity<const N: usize> {}
+
+/// Type-level column count (see [`EachArity`]).
+#[doc(hidden)]
+pub struct Cols<const N: usize>;
+
+impl<const N: usize> EachArity<N> for Cols<N> {}
+
+/// Binds a cursor's column count `N` at the type level so [`each!`](crate::each)
+/// reports a **named** binding-count vs column-count mismatch (spec §9.5). Takes
+/// the cursor by shared reference and does nothing: it inlines away to nothing,
+/// so the check is zero-cost and never moves or spills the cursor.
+#[doc(hidden)]
+#[inline(always)]
+pub fn arity_assert<C, const N: usize>(_cursor: &C)
+where
+    C: EachCursor,
+    <C as EachCursor>::ColArity: EachArity<N>,
+{
+}
+
 /// One column of a chunk: `&T` yields `&[T]`, `&mut T` yields `&mut [T]`.
 #[doc(hidden)]
-pub trait ChunkElement {
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a valid chunk column",
+    label = "not a chunk column",
+    note = "a chunk column must be `&T`, `&mut T`, `Option<&T>`, or `Option<&mut T>` for a component `T`"
+)]
+pub trait ChunkElement: Sealed {
     type Slice<'c>;
     /// # Safety
     /// `ptr` is the base of a dense column with at least `count` valid elements,
@@ -86,7 +133,7 @@ impl<T: ComponentOrPairId> ChunkElement for Option<&mut T> {
 /// loop advances by pointer without a per-row bounds check. [`row`](RowSlice::row)
 /// / [`row_len`](RowSlice::row_len) are the indexed fallback.
 #[doc(hidden)]
-pub trait RowSlice {
+pub trait RowSlice: Sealed {
     type Row<'r>
     where
         Self: 'r;
@@ -148,8 +195,16 @@ impl<T> RowSlice for &[T] {
 
 /// Maps a query tuple to its per-batch slice tuple.
 #[doc(hidden)]
-pub trait ChunkColumns {
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be iterated as chunk columns",
+    label = "not a chunk-column tuple",
+    note = "`chunks` / `batches` need a query tuple of dense columns (`&T`, `&mut T`, `Option<&T>`, `Option<&mut T>`); ref/inherited/sparse terms route to `each_shared` or `run`"
+)]
+pub trait ChunkColumns: Sealed {
     type Chunk<'c>;
+    /// The lifetime-free column-count marker for this chunk shape (see
+    /// [`EachArity`]).
+    type Arity;
     /// # Safety
     /// `ptrs` are this batch's dense column bases in term order, each valid for
     /// `count` elements and exclusively owned for `'c`.
@@ -158,6 +213,7 @@ pub trait ChunkColumns {
 
 impl<A: ChunkElement> ChunkColumns for A {
     type Chunk<'c> = A::Slice<'c>;
+    type Arity = Cols<1>;
     #[inline(always)]
     unsafe fn columns<'c>(ptrs: &[*mut u8], count: usize) -> Self::Chunk<'c> {
         unsafe { A::make(ptrs[0], count) }
@@ -165,9 +221,11 @@ impl<A: ChunkElement> ChunkColumns for A {
 }
 
 macro_rules! impl_chunk_columns_tuple {
-    ($( $t:ident @ $idx:tt ),+ $(,)?) => {
+    ($n:literal; $( $t:ident @ $idx:tt ),+ $(,)?) => {
+        impl<$($t: ChunkElement),+> Sealed for ($($t,)+) {}
         impl<$($t: ChunkElement),+> ChunkColumns for ($($t,)+) {
             type Chunk<'c> = ($($t::Slice<'c>,)+);
+            type Arity = Cols<$n>;
             #[inline(always)]
             unsafe fn columns<'c>(ptrs: &[*mut u8], count: usize) -> Self::Chunk<'c> {
                 ($( unsafe { $t::make(ptrs[$idx], count) }, )+)
@@ -176,10 +234,10 @@ macro_rules! impl_chunk_columns_tuple {
     };
 }
 
-impl_chunk_columns_tuple!(A @ 0, B @ 1);
-impl_chunk_columns_tuple!(A @ 0, B @ 1, C @ 2);
-impl_chunk_columns_tuple!(A @ 0, B @ 1, C @ 2, D @ 3);
-impl_chunk_columns_tuple!(A @ 0, B @ 1, C @ 2, D @ 3, E @ 4);
+impl_chunk_columns_tuple!(2; A @ 0, B @ 1);
+impl_chunk_columns_tuple!(3; A @ 0, B @ 1, C @ 2);
+impl_chunk_columns_tuple!(4; A @ 0, B @ 1, C @ 2, D @ 3);
+impl_chunk_columns_tuple!(5; A @ 0, B @ 1, C @ 2, D @ 3, E @ 4);
 
 /// A true [`Iterator`] over a query's table batches, yielding whole-column
 /// slices.
@@ -261,7 +319,16 @@ where
 /// [`LockedBatches`] (a lending, Tier-1-locked cursor) implement it, so `each!`
 /// drives either with one expansion.
 #[doc(hidden)]
-pub trait EachCursor {
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not an `each!` cursor",
+    label = "not an `each!` cursor",
+    note = "`each!` drives a `query.chunks(&mut world)` or `query.batches(&world)` cursor; pass one of those as the `in` expression"
+)]
+pub trait EachCursor: Sealed {
+    /// The lifetime-free column-count marker for the cursor's query (see
+    /// [`EachArity`]); [`each!`](crate::each) bounds it to emit a named
+    /// binding-count vs column-count error (spec §9.5).
+    type ColArity;
     type Chunk<'c>
     where
         Self: 'c;
@@ -270,10 +337,13 @@ pub trait EachCursor {
     fn each_next(&mut self) -> Option<Self::Chunk<'_>>;
 }
 
+impl<'w, P, T> Sealed for ChunkCursor<'w, P, T> where T: QueryTuple + ChunkColumns {}
+
 impl<'w, P, T> EachCursor for ChunkCursor<'w, P, T>
 where
     T: QueryTuple + ChunkColumns,
 {
+    type ColArity = <T as ChunkColumns>::Arity;
     // The exclusive cursor yields slices bound to the world's `'w`, not to the
     // per-call `&mut self` borrow, so the macro's chunk (which the body drops
     // each turn) is simply the `Iterator` item.
@@ -308,6 +378,7 @@ where
     Q: QueryAPI<'a, P, T>,
     T: QueryTuple + ChunkColumns,
 {
+    #[track_caller]
     fn chunks<'w>(&self, world: &'w mut World) -> ChunkCursor<'w, P, T> {
         let world_ref = self.world();
         // Cached world identity (spec §4.7): read the query's real world and

@@ -43,6 +43,7 @@ pub trait WorldSingletonExt {
 
 impl WorldSingletonExt for World {
     #[inline]
+    #[track_caller]
     fn singleton<T>(&self) -> Option<Ref<'_, <T as ComponentOrPairId>::CastType>>
     where
         T: ComponentId + ComponentOrPairId + DataComponent,
