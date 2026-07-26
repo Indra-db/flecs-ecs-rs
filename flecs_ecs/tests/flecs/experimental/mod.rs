@@ -12,6 +12,8 @@ mod disjoint;
 mod entity_guard;
 #[cfg(feature = "flecs_safety_locks")]
 mod guard_pin;
+#[cfg(feature = "flecs_safety_locks")]
+mod singleton;
 mod exclusive;
 
 #[derive(Component, Clone, Debug, Default)]

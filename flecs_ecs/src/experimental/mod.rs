@@ -46,6 +46,8 @@ mod cached_ref;
 mod entity_access;
 #[cfg(feature = "flecs_safety_locks")]
 mod guard;
+#[cfg(feature = "flecs_safety_locks")]
+mod singleton;
 
 #[cfg(feature = "flecs_safety_locks")]
 pub use cached_ref::{CachedRef, WorldEntityRefExt};
@@ -53,6 +55,8 @@ pub use cached_ref::{CachedRef, WorldEntityRefExt};
 pub use entity_access::{EntityGuardExt, GuardElement, GuardTuple};
 #[cfg(feature = "flecs_safety_locks")]
 pub use guard::{AccessError, Mut, Ref};
+#[cfg(feature = "flecs_safety_locks")]
+pub use singleton::WorldSingletonExt;
 
 pub mod batches;
 pub mod bundle;
@@ -162,5 +166,7 @@ pub mod prelude {
     pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::guard::{AccessError, Mut, Ref};
+    #[cfg(feature = "flecs_safety_locks")]
+    pub use super::singleton::WorldSingletonExt;
     pub use crate::each;
 }
