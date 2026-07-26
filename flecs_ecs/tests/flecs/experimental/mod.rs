@@ -4,6 +4,7 @@ use flecs_ecs::macros::*;
 
 #[cfg(feature = "flecs_safety_locks")]
 mod entity_guard;
+mod exclusive;
 
 #[derive(Component, Clone, Debug, Default)]
 struct Position {

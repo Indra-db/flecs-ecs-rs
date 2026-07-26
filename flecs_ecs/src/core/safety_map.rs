@@ -124,6 +124,12 @@ impl StageLocks {
         false
     }
 
+    /// True when no borrow is currently registered in this stage map.
+    #[inline(always)]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
     /// Probe for a live write on `key` without registering a read.
     #[inline(always)]
     pub(crate) fn check_read(&self, key: LockKey) -> bool {

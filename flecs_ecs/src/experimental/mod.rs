@@ -47,10 +47,14 @@ pub use entity_access::{EntityGuardExt, GuardElement, GuardTuple};
 #[cfg(feature = "flecs_safety_locks")]
 pub use guard::{AccessError, Mut, Ref};
 
+pub mod exclusive;
+pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
+
 /// Convenience re-exports for the experimental surface.
 pub mod prelude {
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::entity_access::{EntityGuardExt, GuardTuple};
+    pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::guard::{AccessError, Mut, Ref};
 }
