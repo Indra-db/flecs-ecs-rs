@@ -6,7 +6,6 @@
 
 use super::Position;
 use flecs_ecs::core::*;
-use flecs_ecs::experimental::prelude::*;
 
 // --- doc setters defer behind a live guard (routed) ---
 

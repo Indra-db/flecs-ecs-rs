@@ -49,29 +49,20 @@ pub(crate) mod sealed {
     pub trait Sealed {}
 }
 
+// Entity-access surface promoted to `core::access` (SW-13). Re-exported here so
+// existing `flecs_ecs::experimental{,::prelude}` imports keep resolving; the
+// canonical home is the crate prelude.
 #[cfg(feature = "flecs_safety_locks")]
-mod cached_ref;
-#[cfg(feature = "flecs_safety_locks")]
-mod entity_access;
-#[cfg(feature = "flecs_safety_locks")]
-mod guard;
-#[cfg(feature = "flecs_safety_locks")]
-mod singleton;
-
-#[cfg(feature = "flecs_safety_locks")]
-pub use cached_ref::{CachedRef, WorldEntityRefExt};
-#[cfg(feature = "flecs_safety_locks")]
-pub use entity_access::{EntityGuardExt, GuardElement, GuardTuple};
-#[cfg(feature = "flecs_safety_locks")]
-pub use guard::{AccessError, Mut, Ref};
-#[cfg(feature = "flecs_safety_locks")]
-pub use singleton::WorldSingletonExt;
+pub use crate::core::access::{
+    AccessError, CachedRef, EntityGuardExt, GuardElement, GuardTuple, Mut, Ref, WorldEntityRefExt,
+    WorldSingletonExt,
+};
+pub use crate::core::access::{EntityMut, WorldExclusiveExt};
 
 pub mod batches;
 pub mod bundle;
 pub mod chunks;
 pub mod disjoint;
-pub mod entity_mut;
 pub mod exclusive;
 pub mod iter_ctx;
 pub mod shared;
@@ -79,10 +70,9 @@ pub mod stage;
 
 pub use batches::{LockedBatches, QueryBatchesExt};
 pub use bundle::{Bundle, EntityBundleExt, WorldBundleExt};
-pub use entity_mut::EntityMut;
 pub use chunks::{ChunkCursor, EachArity, EachCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
-pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
+pub use exclusive::QueryExclusiveExt;
 pub use iter_ctx::{Iter, QueryIterCtxExt};
 pub use shared::QuerySharedExt;
 pub use stage::Stage;
@@ -214,20 +204,17 @@ macro_rules! each {
 /// Convenience re-exports for the experimental surface.
 pub mod prelude {
     #[cfg(feature = "flecs_safety_locks")]
-    pub use super::cached_ref::{CachedRef, WorldEntityRefExt};
-    #[cfg(feature = "flecs_safety_locks")]
-    pub use super::entity_access::{EntityGuardExt, GuardTuple};
+    pub use crate::core::access::{
+        AccessError, CachedRef, EntityGuardExt, GuardTuple, Mut, Ref, WorldEntityRefExt,
+        WorldSingletonExt,
+    };
+    pub use crate::core::access::{EntityMut, WorldExclusiveExt};
     pub use super::batches::QueryBatchesExt;
     pub use super::bundle::{Bundle, EntityBundleExt, WorldBundleExt};
-    pub use super::entity_mut::EntityMut;
     pub use super::chunks::QueryChunksExt;
-    pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
+    pub use super::exclusive::QueryExclusiveExt;
     pub use super::iter_ctx::{Iter, QueryIterCtxExt};
     pub use super::shared::QuerySharedExt;
     pub use super::stage::Stage;
-    #[cfg(feature = "flecs_safety_locks")]
-    pub use super::guard::{AccessError, Mut, Ref};
-    #[cfg(feature = "flecs_safety_locks")]
-    pub use super::singleton::WorldSingletonExt;
     pub use crate::each;
 }

@@ -2,7 +2,6 @@
 
 use super::{Health, Position, Velocity};
 use flecs_ecs::core::*;
-use flecs_ecs::experimental::prelude::*;
 
 #[test]
 fn entity_ref_warm_hit_reads_correct_value() {

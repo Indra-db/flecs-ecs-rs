@@ -12,7 +12,6 @@
 
 use super::{Position, Velocity};
 use flecs_ecs::core::*;
-use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::macros::Component;
 
 #[derive(Component, Default)]

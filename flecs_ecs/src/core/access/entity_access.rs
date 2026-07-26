@@ -205,7 +205,7 @@ pub struct GuardParts {
     label = "not a guard element",
     note = "a guard element must be `&T`, `&mut T`, `Option<&T>`, or `Option<&mut T>` for a component `T`"
 )]
-pub trait GuardElement<'w>: GetTupleTypeOperation + crate::experimental::sealed::Sealed {
+pub trait GuardElement<'w>: GetTupleTypeOperation + super::sealed::Sealed {
     type Guard;
 
     /// # Safety

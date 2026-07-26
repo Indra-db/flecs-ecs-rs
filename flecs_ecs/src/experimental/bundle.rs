@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 use crate::core::{ComponentId, ComponentInfo, Entity, EntityView, World, WorldProvider, WorldRef};
 use crate::sys;
 
-use super::entity_mut::EntityMut;
+use crate::core::access::EntityMut;
 
 mod private {
     pub trait Sealed {}

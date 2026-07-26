@@ -4,7 +4,6 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 use super::{Health, Position};
 use flecs_ecs::core::*;
-use flecs_ecs::experimental::prelude::*;
 
 #[test]
 fn singleton_read_write_round_trip_both_registers() {

@@ -4,7 +4,6 @@
 
 use super::{Position, Velocity};
 use flecs_ecs::core::*;
-use flecs_ecs::experimental::prelude::*;
 
 #[test]
 fn option_ref_present_is_some_some_and_locks_read() {

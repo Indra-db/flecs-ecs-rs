@@ -27,6 +27,7 @@
 
 pub mod archetype;
 pub mod builder;
+pub mod access;
 pub mod c_types;
 pub(crate) mod cloned_tuple;
 pub mod component_registration;
@@ -55,6 +56,15 @@ pub mod utility;
 pub mod world;
 pub mod world_ctx;
 
+pub use access::{EntityMut, WorldExclusiveExt};
+// Guard types `Ref` / `Mut` are re-exported by the crate prelude (not the
+// `core::*` glob) so the guard `Mut` shadows the unused query-field marker
+// `table::multi_src_get::Mut` there instead of colliding with it.
+#[cfg(feature = "flecs_safety_locks")]
+pub use access::{
+    AccessError, CachedRef, EntityGuardExt, GuardElement, GuardTuple, WorldEntityRefExt,
+    WorldSingletonExt,
+};
 pub use archetype::Archetype;
 #[doc(hidden)]
 pub use builder::*;

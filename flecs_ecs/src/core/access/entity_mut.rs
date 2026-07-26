@@ -38,7 +38,8 @@ use crate::core::{
 };
 use crate::sys;
 
-use super::bundle::{Bundle, EntityBundleExt};
+#[cfg(feature = "flecs_experimental")]
+use crate::experimental::bundle::{Bundle, EntityBundleExt};
 
 /// Exclusive-register handle to a live entity (spec §2.2, §3.5).
 ///
@@ -279,6 +280,7 @@ impl<'w> EntityMut<'w> {
     /// Reuses the bundle machinery's immediate `ecs_commit` path unconditionally:
     /// no guard can be live on the exclusive register, so there is no guard
     /// episode to check and the move always applies now.
+    #[cfg(feature = "flecs_experimental")]
     #[inline]
     pub fn insert<B: Bundle>(&mut self, bundle: B) -> &mut Self {
         self.view().insert(bundle);
