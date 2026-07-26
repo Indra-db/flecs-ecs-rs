@@ -7,6 +7,7 @@ mod cached_ref;
 mod get_scope;
 mod multithreaded;
 mod pairs;
+mod scheduler_threadid;
 mod panic_cleanup;
 
 #[derive(Clone, Component)]
