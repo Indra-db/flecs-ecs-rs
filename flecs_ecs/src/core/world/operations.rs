@@ -69,7 +69,7 @@ impl World {
     /// ```
     /// use flecs_ecs::prelude::*;
     ///
-    /// let world = World::new();
+    /// let mut world = World::new();
     ///
     /// world.progress();
     ///
@@ -92,7 +92,7 @@ impl World {
     /// ```
     /// use flecs_ecs::prelude::*;
     ///
-    /// let world = World::new();
+    /// let mut world = World::new();
     ///
     /// let mut count = 0;
     /// while world.progress() {

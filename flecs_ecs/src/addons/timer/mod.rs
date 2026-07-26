@@ -21,7 +21,7 @@
 //! ```
 //! use flecs_ecs::prelude::*;
 //!
-//! let world = World::new();
+//! let mut world = World::new();
 //!
 //! // Create a system that runs every 2 seconds
 //! world.system::<()>()
@@ -39,7 +39,7 @@
 //! ```
 //! use flecs_ecs::prelude::*;
 //!
-//! let world = World::new();
+//! let mut world = World::new();
 //!
 //! // Create a system that runs once after 5 seconds
 //! let timer_system = world.system::<()>()
@@ -58,7 +58,7 @@
 //! ```
 //! use flecs_ecs::prelude::*;
 //!
-//! let world = World::new();
+//! let mut world = World::new();
 //!
 //! let timer = world.system::<()>()
 //!     .set_interval(1.0)

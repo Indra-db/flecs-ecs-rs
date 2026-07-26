@@ -554,7 +554,7 @@ impl QueryDisjointCache {
 /// # use flecs_ecs::prelude::*;
 /// # #[derive(Component)] struct Position { x: f32 }
 /// # #[derive(Component)] struct Velocity { x: f32 }
-/// # let world = World::new();
+/// # let mut world = World::new();
 /// # world.set_threads(2);
 /// # world.entity().set(Position { x: 0.0 }).set(Velocity { x: 1.0 });
 /// let q = world.new_query::<&Velocity>().handle();

@@ -299,8 +299,11 @@ impl App {
     ///     .app()
     ///     .set_frames(3)
     ///     .frame_action(|world, _desc| {
-    ///         // per-frame work on the main thread (rendering, UI, ...)
-    ///         if world.progress() { 0 } else { 1 }
+    ///         // A custom frame action replaces the app's default, so it drives
+    ///         // the world itself. `frame_action` hands a `WorldRef` (a shared
+    ///         // handle), so the exclusive `World::progress` is reached through
+    ///         // its raw C entry point here.
+    ///         if unsafe { flecs_ecs::sys::ecs_progress(world.ptr_mut(), 0.0) } { 0 } else { 1 }
     ///     })
     ///     .run();
     /// ```
