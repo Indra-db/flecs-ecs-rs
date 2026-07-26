@@ -457,6 +457,18 @@ pub fn query_experimental(criterion: &mut Criterion) {
         });
     });
 
+    // Same Tier-1 workload as exp_each_locked_4, but carrying the per-row `Iter`
+    // context (a stack struct built once per batch): expect near-parity.
+    group.bench_function("exp_each_iter_4", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            QueryIterCtxExt::each_iter(&q4, &mut world, |_it, (a, b_, c, d)| {
+                sum += (a.0 + b_.0 + c.0 + d.0) as u64;
+            });
+            black_box(sum)
+        });
+    });
+
     // Same workload as exp_each_locked_4, but through the shared-register locked
     // batch cursor (Tier-1 locks per batch, dense column slices).
     group.bench_function("exp_batches_4", |b| {

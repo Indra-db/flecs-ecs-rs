@@ -63,12 +63,14 @@ pub mod bundle;
 pub mod chunks;
 pub mod disjoint;
 pub mod exclusive;
+pub mod iter_ctx;
 
 pub use batches::{LockedBatches, QueryBatchesExt};
 pub use bundle::{Bundle, EntityBundleExt, WorldBundleExt};
 pub use chunks::{ChunkCursor, EachCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
+pub use iter_ctx::{Iter, QueryIterCtxExt};
 
 /// Iterate a [`chunks`](QueryChunksExt::chunks) cursor with a fused per-row
 /// loop, binding each row's components by the given names.
@@ -164,6 +166,7 @@ pub mod prelude {
     pub use super::bundle::{Bundle, EntityBundleExt, WorldBundleExt};
     pub use super::chunks::QueryChunksExt;
     pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
+    pub use super::iter_ctx::{Iter, QueryIterCtxExt};
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::guard::{AccessError, Mut, Ref};
     #[cfg(feature = "flecs_safety_locks")]
