@@ -4,6 +4,7 @@ use flecs_ecs::macros::*;
 
 mod batches;
 mod bundle;
+mod entity_mut;
 #[cfg(feature = "flecs_safety_locks")]
 mod cached_ref;
 mod chunks;
