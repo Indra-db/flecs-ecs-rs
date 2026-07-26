@@ -8,6 +8,11 @@ use crate::sys;
 use flecs_ecs_derive::tuples;
 use sys::ecs_record_t;
 
+const _: () = assert!(
+    core::mem::size_of::<sys::ecs_rust_get_ptr_t>() == 16,
+    "ecs_rust_get_ptr_t must stay 16 bytes so it returns in registers instead of via a hidden sret pointer; widening it loses the 19-30% get win over upstream ecs_get_id (spec §13.3, design-record hard invariant, never widen)"
+);
+
 #[inline(always)]
 pub(crate) fn get_ptr_raw(get_ptr: &sys::ecs_rust_get_ptr_t) -> *mut c_void {
     get_ptr.ptr
