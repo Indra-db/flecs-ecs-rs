@@ -189,23 +189,30 @@ left-to-right term order; release order is guard-drop order (reverse of
 declaration by Rust's drop rules), which is always a subset of the acquired set
 so it cannot underflow.
 
-### 3.4 Guard tuples do **not** model `Option<&T>` (decided)
+### 3.4 Guard tuples model `Option<&T>` (decided by user, 2026-07-26)
 
-**Decision:** the guard forms (`get` / `try_get`) require every requested
-component to be present; a null pointer for any element makes the whole acquire
-`None` / `AccessError::MissingComponent`. Optional / maybe-absent access is
-served by:
+**Decision:** the guard forms support optional elements:
+`get::<(&A, Option<&B>)>()` yields `(Ref<A>, Option<Ref<B>>)` and
+`Option<&mut B>` yields `Option<Mut<B>>`. A `None` element means the component
+was absent at acquire; non-optional elements still gate the whole acquire
+(`None` / `AccessError::MissingComponent`).
 
-- `cloned` for an owned copy-out (`Option` per element), and
-- the chunk cursor's `Option<&[T]>` / `Option<&mut [T]>` columns on the
-  exclusive register (§4.6), which already model absence.
+Semantics an implementer must honour:
 
-Rationale: an `Option<Ref<T>>` element would complicate the fused-acquire
-rollback (a `None` element holds no borrow, so the release loop must branch per
-element) and the row-at-a-time "maybe present" case is rare and fully covered by
-`cloned`. No optional guard element ships. This is final; revisit only if a
-concrete need for a *borrowed* optional row read appears (tracked in Open
-Questions as a non-blocker).
+- An absent optional element takes **no lock and no defer level**; only present
+  elements register borrows and hold levels. The fused-acquire rollback and the
+  range release therefore branch per element on presence (the acquire records
+  which elements locked).
+- Absence is stable for the guard's lifetime: the component cannot appear while
+  any guard from the same acquire lives, because shared-register `add`/`set` is
+  deferred and the flush is unreachable until the last guard drops (§3.6). An
+  all-absent, all-optional acquire holds nothing and pins nothing, which is
+  correct: it borrowed nothing.
+- `try_get` reports a conflict only for elements that actually attempt a borrow;
+  absent optionals cannot conflict.
+
+Owned copy-out of optionals stays on `cloned`; the chunk cursor's
+`Option<&[T]>` columns (§4.6) are unchanged.
 
 ### 3.5 `EntityMut` immediate ops (exclusive register)
 
@@ -1119,39 +1126,23 @@ Each verified against the tree; replacement stated.
 
 ---
 
-## 15. Open questions
+## 15. Resolved questions (user rulings, 2026-07-26)
 
-Only genuinely undecidable-without-the-user items remain; each has a
-recommendation.
+All four open questions were ruled on by the user; none remain open.
 
-1. **`Rest` public constructor shape.** The raw-pointer hazard is settled (wrap
-   it, §11), but the exact safe surface is a judgment call: (a)
-   `Rest::new(port: u16)` only, `ipaddr` defaulted; (b) `Rest::new(port,
-   ipaddr: &str)`; (c) a typed `RestConfig { port, ip: Option<IpAddr> }`.
-   **Recommendation: (c)** — a typed config struct with `impl_` kept private and
-   zero-initialised, converted to the `#[repr(C)]` FFI `Rest` internally. It is
-   the only option that never lets a user construct a `Rest` with a dangling
-   `impl_`.
+1. **`Rest` public constructor shape → typed `RestConfig`.** A
+   `RestConfig { port, ip: Option<IpAddr> }` struct, converted internally to the
+   `#[repr(C)]` FFI `Rest` with `impl_` kept private and zero-initialised. A
+   `Rest` with a dangling `impl_` is unconstructible from safe code.
 
-2. **Keep the manual `run` / `TableIter` escape hatch, or cut it in the clean
-   break?** `chunks` + `each` cover the common cases; `run`/`TableIter` is the
-   low-level table-batch surface (`each_iter` today). **Recommendation: keep it**,
-   world-threaded (§4.4), because reflection/serialization addons and advanced
-   users need raw field access, and `chunks` deliberately refuses non-dense
-   columns (ref/sparse/inherited) that only `TableIter` can reach. Cutting it
-   would force those users to `unsafe`.
+2. **Manual `run` / `TableIter` escape hatch → kept, world-threaded** (§4.4).
+   Reflection/serialization addons and advanced users keep a safe path to
+   non-dense columns (ref/sparse/inherited) that `chunks` deliberately refuses.
 
-3. **Borrowed optional row read (`Option<Ref<T>>` guard element).** §3.4 defers
-   it to `cloned` (owned) and the chunk cursor (exclusive). The only gap is a
-   *borrowed, shared-register, maybe-absent* single-row read. **Recommendation:
-   do not ship it initially** — no prototype user hit the gap, and adding it
-   complicates the fused-acquire rollback. Revisit if a concrete caller appears;
-   it is an additive, non-breaking change if added later.
+3. **Borrowed optional guard element → ships in the initial release.** §3.4 now
+   specifies `Option<Ref<T>>` / `Option<Mut<T>>` tuple elements with
+   per-element presence branching in the fused acquire, rollback, and release.
 
-4. **`Stage` vs `&World` as the `.each_with` second parameter.** The spec uses a
-   distinct `Stage<'s>` newtype (§6.1) rather than reusing `&World`.
-   **Recommendation: keep the distinct `Stage`** — it prevents a callback from
-   accidentally treating its stage as the owning world (e.g. calling immediate
-   `&mut World` ops), makes the deferred-command surface explicit, and carries the
-   `!Send`/`!Sync` and per-callback lifetime cleanly. The cost is one more type in
-   the surface, which the migration guide covers.
+4. **`.each_with` second parameter → distinct `Stage<'s>` newtype** (§6.1), not
+   a reused `&World`: the deferred-command surface stays explicit and a callback
+   cannot mistake its stage for the owning world.
