@@ -47,14 +47,85 @@ pub use entity_access::{EntityGuardExt, GuardElement, GuardTuple};
 #[cfg(feature = "flecs_safety_locks")]
 pub use guard::{AccessError, Mut, Ref};
 
+pub mod chunks;
+pub mod disjoint;
 pub mod exclusive;
+
+pub use chunks::{ChunkCursor, QueryChunksExt};
+pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
+
+/// Iterate a [`chunks`](QueryChunksExt::chunks) cursor with a fused per-row
+/// loop, binding each row's components by the given names.
+///
+/// ```ignore
+/// each!((pos, vel) in query.chunks(&mut world) {
+///     pos.x += vel.x;
+/// });
+/// ```
+///
+/// The body is inlined textually into the row loop, so native `break`,
+/// `continue`, and `?` all work as written. A `&mut T` column binds as
+/// `&mut T` per row, a `&T` column as `&T`. The number of bound names must
+/// match the number of query columns.
+#[macro_export]
+macro_rules! each {
+    ( ( $($name:ident),+ $(,)? ) in $($rest:tt)+ ) => {
+        $crate::each!(@tuple ( $($name),+ ) () $($rest)+)
+    };
+    ( $name:ident in $($rest:tt)+ ) => {
+        $crate::each!(@single $name () $($rest)+)
+    };
+
+    // Tuple muncher: accumulate the cursor expression token-by-token until only
+    // the trailing body block remains (an `expr` fragment cannot precede a
+    // block, so the cursor cannot be captured as `:expr` directly).
+    (@tuple ( $($name:ident),+ ) ( $($cur:tt)* ) { $($body:tt)* }) => {{
+        let mut __cursor = $($cur)*;
+        while let ::core::option::Option::Some(( $(mut $name,)+ )) =
+            $crate::experimental::chunks::ChunkCursor::next(&mut __cursor)
+        {
+            let __len = $crate::experimental::chunks::RowSlice::row_len(
+                $crate::each!(@first $($name),+)
+            );
+            for __row in 0..__len {
+                $(
+                    let $name = $crate::experimental::chunks::RowSlice::row(&mut $name, __row);
+                )+
+                { $($body)* }
+            }
+        }
+    }};
+    (@tuple ( $($name:ident),+ ) ( $($cur:tt)* ) $next:tt $($rest:tt)*) => {
+        $crate::each!(@tuple ( $($name),+ ) ( $($cur)* $next ) $($rest)*)
+    };
+
+    // Single-binding muncher.
+    (@single $name:ident ( $($cur:tt)* ) { $($body:tt)* }) => {{
+        let mut __cursor = $($cur)*;
+        while let ::core::option::Option::Some(mut $name) =
+            $crate::experimental::chunks::ChunkCursor::next(&mut __cursor)
+        {
+            for __row in 0..$crate::experimental::chunks::RowSlice::row_len(&$name) {
+                let $name = $crate::experimental::chunks::RowSlice::row(&mut $name, __row);
+                { $($body)* }
+            }
+        }
+    }};
+    (@single $name:ident ( $($cur:tt)* ) $next:tt $($rest:tt)*) => {
+        $crate::each!(@single $name ( $($cur)* $next ) $($rest)*)
+    };
+
+    (@first $first:ident $(, $rest:ident)*) => { & $first };
+}
 
 /// Convenience re-exports for the experimental surface.
 pub mod prelude {
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::entity_access::{EntityGuardExt, GuardTuple};
+    pub use super::chunks::QueryChunksExt;
     pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::guard::{AccessError, Mut, Ref};
+    pub use crate::each;
 }

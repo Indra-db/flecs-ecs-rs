@@ -2,6 +2,8 @@
 
 use flecs_ecs::macros::*;
 
+mod chunks;
+mod disjoint;
 #[cfg(feature = "flecs_safety_locks")]
 mod entity_guard;
 mod exclusive;

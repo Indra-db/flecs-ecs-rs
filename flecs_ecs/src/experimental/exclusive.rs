@@ -145,12 +145,21 @@ where
     Q: QueryAPI<'a, P, T>,
     T: QueryTuple,
 {
-    fn each_exclusive(&self, world: &mut World, mut func: impl FnMut(T::TupleType<'_>)) {
+    fn each_exclusive(&self, world: &mut World, func: impl FnMut(T::TupleType<'_>)) {
+        let _ = world;
         let world_ref = self.world();
+
+        // The &mut World proves no outstanding entity guard, but the query must
+        // still be intra-query disjoint for a lock-free run to be sound (nothing
+        // would otherwise catch two mutable terms hitting the same storage).
+        // When not proven, fall back to the locked path, which is always correct.
+        if !super::disjoint::is_proven_disjoint(world_ref, self.query_ptr()) {
+            self.each(func);
+            return;
+        }
 
         #[cfg(feature = "flecs_safety_locks")]
         {
-            let _ = world;
             let locks = crate::core::stage_locks_dyn(&world_ref);
             // SAFETY: the stage map is owned by this thread.
             debug_assert!(
@@ -159,9 +168,8 @@ where
                  the &mut World exclusivity invariant was violated"
             );
         }
-        #[cfg(not(feature = "flecs_safety_locks"))]
-        let _ = world;
 
+        let mut func = func;
         let mut iter = IterGuard::new(self.retrieve_iter());
         while iter.next(|i| self.iter_next(i)) {
             each_exclusive_batch::<T>(&mut iter, &mut func);
