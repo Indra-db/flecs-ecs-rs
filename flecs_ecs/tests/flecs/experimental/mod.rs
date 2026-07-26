@@ -6,6 +6,8 @@ mod chunks;
 mod disjoint;
 #[cfg(feature = "flecs_safety_locks")]
 mod entity_guard;
+#[cfg(feature = "flecs_safety_locks")]
+mod guard_pin;
 mod exclusive;
 
 #[derive(Component, Clone, Debug, Default)]
