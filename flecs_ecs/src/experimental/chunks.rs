@@ -25,6 +25,7 @@ use crate::core::{
     WorldProvider,
 };
 use crate::sys;
+use flecs_ecs_derive::tuples;
 
 use super::sealed::Sealed;
 
@@ -220,24 +221,30 @@ impl<A: ChunkElement> ChunkColumns for A {
     }
 }
 
+macro_rules! chunk_column_count {
+    () => { 0usize };
+    ($head:ident $(, $tail:ident)*) => { 1usize + chunk_column_count!($($tail),*) };
+}
+
 macro_rules! impl_chunk_columns_tuple {
-    ($n:literal; $( $t:ident @ $idx:tt ),+ $(,)?) => {
+    ($( $t:ident ),+) => {
         impl<$($t: ChunkElement),+> Sealed for ($($t,)+) {}
         impl<$($t: ChunkElement),+> ChunkColumns for ($($t,)+) {
             type Chunk<'c> = ($($t::Slice<'c>,)+);
-            type Arity = Cols<$n>;
+            type Arity = Cols<{ chunk_column_count!($($t),+) }>;
             #[inline(always)]
             unsafe fn columns<'c>(ptrs: &[*mut u8], count: usize) -> Self::Chunk<'c> {
-                ($( unsafe { $t::make(ptrs[$idx], count) }, )+)
+                let mut column: isize = -1;
+                ($( {
+                    column += 1;
+                    unsafe { $t::make(ptrs[column as usize], count) }
+                }, )+)
             }
         }
     };
 }
 
-impl_chunk_columns_tuple!(2; A @ 0, B @ 1);
-impl_chunk_columns_tuple!(3; A @ 0, B @ 1, C @ 2);
-impl_chunk_columns_tuple!(4; A @ 0, B @ 1, C @ 2, D @ 3);
-impl_chunk_columns_tuple!(5; A @ 0, B @ 1, C @ 2, D @ 3, E @ 4);
+tuples!(impl_chunk_columns_tuple, 1, 32);
 
 /// A true [`Iterator`] over a query's table batches, yielding whole-column
 /// slices.
