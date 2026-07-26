@@ -24,6 +24,8 @@ impl<'a> EntityView<'a> {
     /// For types that are not ZST and do not implement a constructor hook, use the `set_id` method to safely initialize the `id`.
     #[allow(clippy::should_implement_trait)]
     pub fn add<T: IntoId>(self, id: T) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         let id = *id.into_id(self.world);
         let world = self.world.world_ptr_mut();
 
@@ -82,6 +84,8 @@ impl<'a> EntityView<'a> {
     ///
     /// * [`set_id`](Self::set_id)
     pub unsafe fn add_id_unchecked(self, id: impl IntoId) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         let id = *id.into_id(self.world);
         let world = self.world.world_ptr_mut();
 
@@ -234,6 +238,8 @@ impl<'a> EntityView<'a> {
     ///
     /// * `component_id`: The entity to remove.
     pub fn remove<T: IntoId>(self, id: T) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         let id = *id.into_id(self.world);
         let id = if <T as IntoId>::IS_ENUM {
             ecs_pair(id, ECS_WILDCARD)
@@ -893,6 +899,8 @@ impl<'a> EntityView<'a> {
     ///
     /// * `name` - A string slice that holds the name to be set.
     pub fn set_name(self, name: &str) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         let name = compact_str::format_compact!("{}\0", name);
 
         // SAFETY: the world pointer is valid for 'a and `name` is a NUL-terminated buffer that outlives the call.
@@ -908,6 +916,8 @@ impl<'a> EntityView<'a> {
 
     /// Removes the name of the entity.
     pub fn remove_name(self) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; a null name pointer clears the entity's name.
         unsafe {
             sys::ecs_set_name(self.world.world_ptr_mut(), *self.id, core::ptr::null());
@@ -921,6 +931,8 @@ impl<'a> EntityView<'a> {
     ///
     /// * `name` - A string slice that holds the alias name to be set.
     pub fn set_alias(self, name: &str) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         let name = compact_str::format_compact!("{}\0", name);
 
         // SAFETY: the world pointer is valid for 'a and `name` is a NUL-terminated buffer that outlives the call.
@@ -938,6 +950,8 @@ impl<'a> EntityView<'a> {
     ///
     /// Enabled entities are matched with systems and can be searched with queries.
     pub fn enable_self(self) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; ecs_enable accepts any entity value.
         unsafe { sys::ecs_enable(self.world.world_ptr_mut(), *self.id, true) }
         self
@@ -952,6 +966,8 @@ impl<'a> EntityView<'a> {
     /// - `component_id`: The ID to enable.
     /// - `toggle`: True to enable, false to disable (default = true).
     pub fn enable(self, id: impl IntoId) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; ecs_enable_id accepts any entity/id values.
         unsafe {
             sys::ecs_enable_id(
@@ -969,6 +985,8 @@ impl<'a> EntityView<'a> {
     /// Disabled entities are not matched with systems and cannot be searched with queries,
     /// unless explicitly specified in the query expression.
     pub fn disable_self(self) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; ecs_enable accepts any entity value.
         unsafe { sys::ecs_enable(self.world.world_ptr_mut(), *self.id, false) }
         self
@@ -983,6 +1001,8 @@ impl<'a> EntityView<'a> {
     ///
     /// - `component_id`: The ID to disable.
     pub fn disable(self, id: impl IntoId) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; ecs_enable_id accepts any entity/id values.
         unsafe {
             sys::ecs_enable_id(
@@ -1094,6 +1114,8 @@ impl<'a> EntityView<'a> {
             }
         }
 
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; T was const-checked to not be a tag.
         unsafe {
             sys::ecs_modified_id(
@@ -1144,6 +1166,8 @@ impl<'a> EntityView<'a> {
     /// This operation removes all components from an entity without recycling
     /// the entity id.
     pub fn clear(&self) {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; ecs_clear accepts any entity value.
         unsafe { sys::ecs_clear(self.world.world_ptr_mut(), *self.id) }
     }
@@ -1153,6 +1177,8 @@ impl<'a> EntityView<'a> {
     /// Entities have to be deleted explicitly, and are not deleted when the
     /// entity object goes out of scope.
     pub fn destruct(self) {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         // SAFETY: the world pointer is valid for 'a; ecs_delete accepts any entity value.
         unsafe { sys::ecs_delete(self.world.world_ptr_mut(), *self.id) }
     }
@@ -1201,6 +1227,8 @@ impl<'a> EntityView<'a> {
     /// assert!(vec[2] == child_b);
     /// ```
     pub fn set_child_order(self, children: &[Entity]) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world);
         let world_ptr = self.world.world_ptr_mut();
         let child_count = children.len() as i32;
         let children_ptr = if child_count > 0 {

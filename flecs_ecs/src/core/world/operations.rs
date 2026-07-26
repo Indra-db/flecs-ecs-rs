@@ -1693,6 +1693,8 @@ impl World {
     /// The entity representing the component.
     #[inline(always)]
     pub fn set_alias_component<T: ComponentId>(&self, alias: &str) -> EntityView<'_> {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world());
         let alias = compact_str::format_compact!("{}\0", alias);
 
         let id = T::entity_id(self);
@@ -1722,6 +1724,8 @@ impl World {
     /// The entity found by name.
     #[inline(always)]
     pub fn set_alias_entity_by_name(&self, name: &str, alias: &str) -> EntityView<'_> {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world());
         let name = compact_str::format_compact!("{}\0", name);
         let alias = compact_str::format_compact!("{}\0", alias);
 
@@ -1748,6 +1752,8 @@ impl World {
     /// * `alias` - The alias to create.
     #[inline(always)]
     pub fn set_alias_entity(&self, entity: impl Into<Entity>, alias: &str) {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world());
         let entity = *entity.into();
         if alias.is_empty() {
             // Empty alias = use the entity's own short name (matches C++ ecs.use(entity) with no alias)
@@ -1989,6 +1995,8 @@ impl World {
     ///
     /// * `id`: The id to remove.
     pub fn remove_all(&self, id: impl IntoId) {
+        // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+        ensure_write_episode(&self.world());
         // SAFETY: raw_world is a valid, live world pointer.
         unsafe {
             sys::ecs_remove_all(self.raw_world.as_ptr(), *id.into_id(self));

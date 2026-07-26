@@ -358,7 +358,10 @@ pub(crate) fn set_helper<T: ComponentId>(
         );
     };
 
-    unsafe { WorldRef::from_ptr(world) }.check_thread_affinity_exclusive::<T>();
+    let world_ref = unsafe { WorldRef::from_ptr(world) };
+    world_ref.check_thread_affinity_exclusive::<T>();
+    // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+    ensure_write_episode(&world_ref);
 
     unsafe {
         let res = sys::ecs_rust_set(
@@ -403,7 +406,10 @@ pub(crate) fn assign_helper<T: ComponentId>(
         );
     };
 
-    unsafe { WorldRef::from_ptr(world) }.check_thread_affinity_exclusive::<T>();
+    let world_ref = unsafe { WorldRef::from_ptr(world) };
+    world_ref.check_thread_affinity_exclusive::<T>();
+    // Shared-register write hook (spec §3.6, §7.1): defer behind a live guard.
+    ensure_write_episode(&world_ref);
 
     let res = unsafe {
         sys::ecs_cpp_assign(
