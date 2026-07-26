@@ -36,8 +36,8 @@ fn net_silent_across_legit_structural_ops_under_guards() {
         .set(Velocity { x: 9, y: 9 });
     {
         // Two live guards on `e`'s dense storage.
-        let p = e.get_ref::<&Position>().unwrap();
-        let v = e.get_ref::<&mut Velocity>().unwrap();
+        let p = e.get::<&Position>().unwrap();
+        let v = e.get::<&mut Velocity>().unwrap();
         // A spread of safe structural ops, all deferred behind the pins: adds,
         // removes, entity creation into the guarded archetype, and destruct of
         // the sibling that shares its table. The guarded pointers stay valid,
@@ -52,7 +52,7 @@ fn net_silent_across_legit_structural_ops_under_guards() {
     }
     // The deferred ops landed once the last guard dropped.
     assert!(e.has(Tag::id()));
-    assert_eq!(e.get_ref::<&Position>().unwrap().x, 1);
+    assert_eq!(e.get::<&Position>().unwrap().x, 1);
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn net_fires_when_raw_add_moves_pinned_storage() {
     // A plain tag entity used as a raw component id; registered before the guard.
     let marker = world.entity();
 
-    let g = e.get_ref::<&Position>().unwrap();
+    let g = e.get::<&Position>().unwrap();
     // Bypass: raw add executes immediately (a read guard opens no defer level),
     // moving `e` to a new table and relocating its Position column. The safe
     // `e.add(..)` would have deferred behind the pin.
@@ -108,7 +108,7 @@ fn net_fires_when_raw_remove_frees_pinned_storage() {
         .set(Velocity { x: 3, y: 4 });
     let pos_id = *world.component::<Position>().id();
 
-    let g = e.get_ref::<&Position>().unwrap();
+    let g = e.get::<&Position>().unwrap();
     // Bypass: raw remove of the guarded component executes immediately; the
     // fresh re-resolve finds no Position, a move the net must catch.
     unsafe {

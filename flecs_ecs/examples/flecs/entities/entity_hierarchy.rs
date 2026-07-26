@@ -25,7 +25,7 @@ fn iterate_tree(entity: EntityView, position_parent: &Position) {
 
     // A guard read borrows the component and the result composes like ordinary
     // Rust: no callback whose only job is to return a value.
-    let pos = entity.get_ref::<&Position>().unwrap();
+    let pos = entity.get::<&Position>().unwrap();
     let pos_actual = Position {
         x: pos.x + position_parent.x,
         y: pos.y + position_parent.y,

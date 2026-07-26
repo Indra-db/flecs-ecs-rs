@@ -576,7 +576,7 @@ pub mod on_instantiate {
     /// let inst = world.entity().is_a(base); // Mass is copied to inst
     ///
     /// assert!(inst.owns(Mass::id()));
-    /// assert!(base.cloned_owned::<&Mass>() == inst.cloned_owned::<&Mass>());
+    /// assert!(base.cloned::<&Mass>() == inst.cloned::<&Mass>());
     /// ```
     #[derive(Debug, Default, Clone)]
     pub struct Override;
@@ -611,7 +611,7 @@ pub mod on_instantiate {
     /// assert!(inst.has(Mass::id()));
     /// assert!(!inst.owns(Mass::id()));
     /// // Inherited component points to the same data
-    /// assert!(base.cloned_owned::<&Mass>() == inst.cloned_owned::<&Mass>());
+    /// assert!(base.cloned::<&Mass>() == inst.cloned::<&Mass>());
     /// ```
     #[derive(Debug, Default, Clone)]
     pub struct Inherit;
@@ -645,7 +645,7 @@ pub mod on_instantiate {
     ///
     /// assert!(!inst.has(Mass::id()));
     /// assert!(!inst.owns(Mass::id()));
-    /// assert!(inst.get_ref::<&Mass>().is_none());
+    /// assert!(inst.get::<&Mass>().is_none());
     /// ```
     #[derive(Debug, Default, Clone)]
     pub struct DontInherit;

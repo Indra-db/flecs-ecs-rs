@@ -39,7 +39,7 @@ fn each_with_delivers_stage_and_defers() {
     world.progress();
 
     {
-        let v = world.entity_from_id(e).get_ref::<&Value>().unwrap();
+        let v = world.entity_from_id(e).get::<&Value>().unwrap();
         assert_eq!(v.0, 42);
     };
 }
@@ -125,7 +125,7 @@ fn each_entity_with_registers_write_term_lock() {
         .each_entity_with(|entity, _v, _stage| {
             let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
                 // read guard on Value vs the batch's write term on Value
-                let _ = entity.get_ref::<&Value>().unwrap();
+                let _ = entity.get::<&Value>().unwrap();
             }));
             if result.is_err() {
                 CONFLICTED.store(true, Ordering::Relaxed);
@@ -151,7 +151,7 @@ fn each_entity_with_disjoint_guard_ok() {
         .system::<&mut Value>()
         .each_entity_with(|entity, _v, _stage| {
             // Spawned is disjoint from the Value write term: no conflict.
-            let mut s = entity.get_ref::<&mut Spawned>().unwrap();
+            let mut s = entity.get::<&mut Spawned>().unwrap();
             s.0 += 1;
         });
 

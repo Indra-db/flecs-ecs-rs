@@ -24,7 +24,7 @@ fn prefabs_introduction_01() {
 
     // Get instantiated component
     {
-    let defense = inst_1.get_ref::<&Defense>().unwrap();
+    let defense = inst_1.get::<&Defense>().unwrap();
     println!("Defense value: {}", defense.value);
     };
 }
@@ -86,13 +86,13 @@ fn prefabs_component_inheritance_06() {
 
     // Component is retrieved from instance
     {
-    let health = inst.get_ref::<&Health>().unwrap();
+    let health = inst.get::<&Health>().unwrap();
     println!("Health value: {}", health.value);
     };
 
     // Component is retrieved from prefab
     {
-    let defense = inst.get_ref::<&Defense>().unwrap();
+    let defense = inst.get::<&Defense>().unwrap();
     println!("Defense value: {}", defense.value);
     };
 }
@@ -188,11 +188,11 @@ fn prefabs_prefab_variants_12() {
     // Create prefab instance
     let inst = world.entity().is_a(freighter);
     {
-    let health = inst.get_ref::<&Health>().unwrap();
+    let health = inst.get::<&Health>().unwrap();
     println!("Health value: {}", health.value); // 150
     };
     {
-    let defense = inst.get_ref::<&Defense>().unwrap();
+    let defense = inst.get::<&Defense>().unwrap();
     println!("Defense value: {}", defense.value); // 50
     };
 

@@ -18,7 +18,7 @@ fn set_doc_name_under_live_guard_defers_until_drop() {
     {
         // A read guard on Position would dangle if adding EcsDocDescription moved
         // the entity's table; the routed deferral keeps its pointer valid.
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         world.set_doc_name(e, "hero");
         assert!(
             world.is_deferred(),
@@ -53,7 +53,7 @@ fn set_json_under_live_guard_defers_until_drop() {
     {
         // A read guard on Position dangles if adding Velocity moves the entity's
         // table; the routed deferral keeps its pointer valid.
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         // `ecs_ensure_id(Velocity)` would move `e` to a new table; routed so it
         // defers behind the pin instead of relocating the pinned Position column.
         e.set_json(Velocity::id(), r#"{"x":5,"y":6}"#, None);
@@ -69,7 +69,7 @@ fn set_json_under_live_guard_defers_until_drop() {
     }
     assert!(!world.is_deferred());
     assert!(e.has(Velocity::id()));
-    assert_eq!(e.get_ref::<&Velocity>().unwrap().x, 5);
+    assert_eq!(e.get::<&Velocity>().unwrap().x, 5);
 }
 
 // --- bulk creation refuses under a live guard (cannot defer) ---
@@ -79,7 +79,7 @@ fn set_json_under_live_guard_defers_until_drop() {
 fn entity_bulk_build_refuses_under_live_guard() {
     let world = World::new();
     let e = world.entity().set(Position { x: 1, y: 2 });
-    let _g = e.get_ref::<&Position>().unwrap();
+    let _g = e.get::<&Position>().unwrap();
     // `ecs_bulk_init` appends rows to existing tables and must observe its ids
     // immediately, so it cannot defer behind the pin: it refuses.
     let positions: Vec<Position> = (0..4).map(|i| Position { x: i, y: i }).collect();
@@ -100,7 +100,7 @@ fn quantity_self_under_live_guard_defers() {
     let world = World::new();
     let e = world.entity().set(Position { x: 1, y: 2 });
     {
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         // Adds `Quantity` to `e`, moving it; routed so it defers behind the pin.
         e.quantity_self();
         assert!(
@@ -117,7 +117,7 @@ fn entity_bulk_build_allowed_with_no_live_guard() {
     let world = World::new();
     let e = world.entity().set(Position { x: 1, y: 2 });
     {
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         assert_eq!(g.x, 1);
         // guard dropped here
     }

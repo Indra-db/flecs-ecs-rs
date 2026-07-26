@@ -1360,7 +1360,7 @@ fn flecs_entities_components_docs_compile_test() {
     let pos = world.component::<Position>();
     // Component entities have the Component component
     {
-        let comp_data = pos.get_ref::<&flecs::Component>().unwrap();
+        let comp_data = pos.get::<&flecs::Component>().unwrap();
         println!(
             "size: {}, alignment: {}",
             comp_data.size, comp_data.alignment
@@ -1631,25 +1631,25 @@ fn flecs_docs_relationships_compile_test() {
 
     // Obtain the inherited component from Spaceship
     let is_100 = {
-        let v = frigate.get_ref::<&mut MaxSpeed>().unwrap();
+        let v = frigate.get::<&mut MaxSpeed>().unwrap();
         v.value == 100 // True
     };
 
     // Obtain the overridden component from Frigate
     let is_75 = {
-        let v = frigate.get_ref::<&mut Defense>().unwrap();
+        let v = frigate.get::<&mut Defense>().unwrap();
         v.value == 75 // True
     };
 
     let fast_frigate = world.entity().is_a(frigate).set(MaxSpeed { value: 200 });
     // Obtain the overridden component from FastFrigate
     let is_200 = {
-        let v = fast_frigate.get_ref::<&mut MaxSpeed>().unwrap();
+        let v = fast_frigate.get::<&mut MaxSpeed>().unwrap();
         v.value == 200 // True
     };
     // Obtain the inherited component from Frigate
     let is_75 = {
-        let v = fast_frigate.get_ref::<&mut Defense>().unwrap();
+        let v = fast_frigate.get::<&mut Defense>().unwrap();
         v.value == 75 // True
     };
 
@@ -1717,7 +1717,7 @@ fn flecs_docs_quick_start_compile_test() {
 
     // Get a component
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         println!("Position: ({}, {})", p.x, p.y);
     }
 
@@ -1735,7 +1735,7 @@ fn flecs_docs_quick_start_compile_test() {
     let pos_e = world.entity_from::<Position>();
 
     {
-        let c = pos_e.get_ref::<&flecs::Component>().unwrap();
+        let c = pos_e.get::<&flecs::Component>().unwrap();
         println!("Component size: {}", c.size);
     }
 
@@ -1842,7 +1842,7 @@ fn flecs_docs_quick_start_compile_test() {
     grav_e.set(Gravity { x: 10, y: 20 });
 
     {
-        let g = grav_e.get_ref::<&Gravity>().unwrap();
+        let g = grav_e.get::<&Gravity>().unwrap();
         println!("Gravity: {}, {}", g.x, g.y);
     }
 
@@ -2326,7 +2326,7 @@ fn flecs_docs_prefabs_compile_test() {
 
     // Get instantiated component
     {
-        let defense = inst_1.get_ref::<&Defense>().unwrap();
+        let defense = inst_1.get::<&Defense>().unwrap();
         println!("Defense value: {}", defense.value);
     }
 
@@ -2371,13 +2371,13 @@ fn flecs_docs_prefabs_compile_test() {
 
     // Component is retrieved from instance
     {
-        let health = inst.get_ref::<&Health>().unwrap();
+        let health = inst.get::<&Health>().unwrap();
         println!("Health value: {}", health.value);
     }
 
     // Component is retrieved from prefab
     {
-        let defense = inst.get_ref::<&Defense>().unwrap();
+        let defense = inst.get::<&Defense>().unwrap();
         println!("Defense value: {}", defense.value);
     }
 
@@ -2447,11 +2447,11 @@ fn flecs_docs_prefabs_compile_test() {
     // Create prefab instance
     let inst = world.entity().is_a(freighter);
     {
-        let health = inst.get_ref::<&Health>().unwrap();
+        let health = inst.get::<&Health>().unwrap();
         println!("Health value: {}", health.value); // 150
     }
     {
-        let defense = inst.get_ref::<&Defense>().unwrap();
+        let defense = inst.get::<&Defense>().unwrap();
         println!("Defense value: {}", defense.value); // 50
     }
 
@@ -2620,12 +2620,12 @@ fn flecs_docs_component_traits_compile_test() {
 
     // Gets value from Position component
     {
-        let pos = e.get_ref::<&Position>().unwrap();
+        let pos = e.get::<&Position>().unwrap();
         println!("Position: ({}, {})", pos.x, pos.y);
     }
     // Gets (unintended) value from (Serializable, Position) pair
     {
-        let pos = e.get_ref::<&(Serializable, Position)>().unwrap();
+        let pos = e.get::<&(Serializable, Position)>().unwrap();
         println!("Serializable Position: ({}, {})", pos.x, pos.y);
     }
 
@@ -2644,7 +2644,7 @@ fn flecs_docs_component_traits_compile_test() {
     let inst = world.entity().is_a(base); // Mass is copied to inst
 
     assert!(inst.owns(Mass::id()));
-    assert!(base.cloned_owned::<&Mass>().unwrap() != inst.cloned_owned::<&Mass>().unwrap());
+    assert!(base.cloned::<&Mass>().unwrap() != inst.cloned::<&Mass>().unwrap());
 
     // Register component with trait
     world
@@ -2656,7 +2656,7 @@ fn flecs_docs_component_traits_compile_test() {
 
     assert!(inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(base.cloned_owned::<&Mass>().unwrap() != inst.cloned_owned::<&Mass>().unwrap());
+    assert!(base.cloned::<&Mass>().unwrap() != inst.cloned::<&Mass>().unwrap());
 
     // Register component with trait
     world
@@ -2668,7 +2668,7 @@ fn flecs_docs_component_traits_compile_test() {
 
     assert!(!inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(inst.try_get_ref::<&Mass>().is_err());
+    assert!(inst.try_get::<&Mass>().is_err());
 
     let locatedin = world.entity();
     let manhattan = world.entity();

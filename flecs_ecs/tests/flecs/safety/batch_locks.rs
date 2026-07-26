@@ -35,7 +35,7 @@ fn batch_write_term_view_read() {
     seed(&world);
     query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
         {
-            let _guard = entity.get_ref::<&A>().unwrap();
+            let _guard = entity.get::<&A>().unwrap();
         };
     });
 }
@@ -48,7 +48,7 @@ fn batch_write_term_view_write() {
     seed(&world);
     query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
         {
-            let _guard = entity.get_ref::<&mut A>().unwrap();
+            let _guard = entity.get::<&mut A>().unwrap();
         };
     });
 }
@@ -61,7 +61,7 @@ fn batch_read_term_view_write() {
     seed(&world);
     query!(world, &A, &B).build().each_entity_shared(&world, |entity, _| {
         {
-            let _guard = entity.get_ref::<&mut A>().unwrap();
+            let _guard = entity.get::<&mut A>().unwrap();
         };
     });
 }
@@ -73,7 +73,7 @@ fn batch_read_term_view_read_ok() {
     seed(&world);
     query!(world, &A, &B).build().each_entity_shared(&world, |entity, _| {
         {
-            let _guard = entity.get_ref::<&A>().unwrap();
+            let _guard = entity.get::<&A>().unwrap();
         };
     });
 }
@@ -86,7 +86,7 @@ fn batch_disjoint_view_ok() {
     seed(&world);
     query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
         {
-            let _guard = entity.get_ref::<&mut C>().unwrap();
+            let _guard = entity.get::<&mut C>().unwrap();
         };
     });
 }
@@ -100,7 +100,7 @@ fn write_held_across_batch_read_term() {
     let world = World::new();
     let entity = world.entity().set(A(0)).set(B(0));
     {
-        let _guard = entity.get_ref::<&mut A>().unwrap();
+        let _guard = entity.get::<&mut A>().unwrap();
         query!(world, &A, &B).build().each_shared(&world, |_| {});
     };
 }
@@ -112,7 +112,7 @@ fn read_held_across_batch_read_term_ok() {
     let world = World::new();
     let entity = world.entity().set(A(0)).set(B(0));
     {
-        let _guard = entity.get_ref::<&A>().unwrap();
+        let _guard = entity.get::<&A>().unwrap();
         query!(world, &A, &B).build().each_shared(&world, |_| {});
     };
 }
@@ -136,7 +136,7 @@ mod sparse {
         seed_sparse(&world);
         query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
             {
-                let _guard = entity.get_ref::<&A>().unwrap();
+                let _guard = entity.get::<&A>().unwrap();
             };
         });
     }
@@ -150,7 +150,7 @@ mod sparse {
         seed_sparse(&world);
         query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
             {
-                let _guard = entity.get_ref::<&mut C>().unwrap();
+                let _guard = entity.get::<&mut C>().unwrap();
             };
         });
     }

@@ -6,7 +6,7 @@
 //!
 //! ## What the borrow checker excludes (and what it does not)
 //!
-//! [`WorldExclusiveExt::get_exclusive`] returns `&'w mut T` where `'w` is the
+//! [`WorldExclusiveExt::get_mut`] returns `&'w mut T` where `'w` is the
 //! `&'w mut World` borrow. While that reference is live:
 //!
 //! * every `&self` / `&mut self` method on the same `World` is excluded — this
@@ -28,10 +28,10 @@
 //!
 //! let mut world = World::new();
 //! let e = world.entity().set(Position { x: 0 });
-//! let p = world.get_exclusive::<Position>(e).unwrap();
+//! let p = world.get_mut::<Position>(e).unwrap();
 //! // Holding `p` (which borrows `&mut world`) while touching the world again
 //! // must not compile:
-//! let _q = world.get_exclusive::<Position>(e);
+//! let _q = world.get_mut::<Position>(e);
 //! p.x += 1;
 //! ```
 
@@ -51,7 +51,7 @@ pub trait WorldExclusiveExt {
     /// skipping the runtime lock sound.
     ///
     /// Returns `None` if the entity is not alive or does not have the component.
-    fn get_exclusive<T>(
+    fn get_mut<T>(
         &mut self,
         entity: impl Into<Entity>,
     ) -> Option<&mut <T as ComponentOrPairId>::CastType>
@@ -60,7 +60,7 @@ pub trait WorldExclusiveExt {
 }
 
 impl WorldExclusiveExt for World {
-    fn get_exclusive<T>(
+    fn get_mut<T>(
         &mut self,
         entity: impl Into<Entity>,
     ) -> Option<&mut <T as ComponentOrPairId>::CastType>

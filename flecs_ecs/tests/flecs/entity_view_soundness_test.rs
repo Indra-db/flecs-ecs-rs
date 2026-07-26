@@ -50,28 +50,28 @@ fn entity_try_get_on_deleted_entity_returns_none() {
     let e = world.entity().set(Position { x: 1, y: 2 });
     e.destruct();
 
-    assert!(e.get_ref::<&Position>().is_none());
-    assert!(e.cloned_owned::<&Position>().is_none());
+    assert!(e.get::<&Position>().is_none());
+    assert!(e.cloned::<&Position>().is_none());
 }
 
 #[test]
-fn entity_get_ref_on_deleted_entity_returns_none() {
+fn entity_get_on_deleted_entity_returns_none() {
     let world = World::new();
 
     let e = world.entity().set(Position { x: 1, y: 2 });
     e.destruct();
 
-    assert!(e.get_ref::<&Position>().is_none());
+    assert!(e.get::<&Position>().is_none());
 }
 
 #[test]
-fn entity_cloned_owned_on_deleted_entity_returns_none() {
+fn entity_cloned_on_deleted_entity_returns_none() {
     let world = World::new();
 
     let e = world.entity().set(Position { x: 1, y: 2 });
     e.destruct();
 
-    assert!(e.cloned_owned::<&Position>().is_none());
+    assert!(e.cloned::<&Position>().is_none());
 }
 
 #[test]

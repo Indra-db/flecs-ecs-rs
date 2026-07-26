@@ -23,7 +23,7 @@ fn main() {
     let e = world.entity().set(Position { x: 2.0, y: 4.0 });
 
     // Convert position component to flecs expression string
-    let p = e.get_ref::<&Position>().unwrap();
+    let p = e.get::<&Position>().unwrap();
     let expr: String = world.to_expr(&*p);
     println!("Position: {expr}");
 

@@ -87,7 +87,7 @@ fn rust_trait_cast_mut_mutates_component() {
     });
 
     {
-        let circle = entity.get_ref::<&Circle>().unwrap();
+        let circle = entity.get::<&Circle>().unwrap();
         assert_eq!(circle.value, 6);
     };
 }

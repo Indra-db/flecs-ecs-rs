@@ -32,7 +32,7 @@ fn meta_struct_field_order() {
     });
 
     {
-        let ptr = e.get_ref::<&Test>().unwrap();
+        let ptr = e.get::<&Test>().unwrap();
         assert_eq!(ptr.a, 10);
         assert_eq!(ptr.b, 20);
         let json = world.to_expr(&*ptr);

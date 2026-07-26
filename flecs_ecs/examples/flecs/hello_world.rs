@@ -53,17 +53,17 @@ fn main() {
     world.progress();
     world.progress();
 
-    // get_ref borrows the component through a guard.
-    // - a required &Position returns None (as an AccessError via try_get_ref) if
+    // get borrows the component through a guard.
+    // - a required &Position returns None (as an AccessError via try_get) if
     //   absent; wrap the term in Option to handle a missing component instead.
     let bob_ref = world.entity_from_id(bob);
-    let pos = bob_ref.get_ref::<&Position>().unwrap();
+    let pos = bob_ref.get::<&Position>().unwrap();
     // See if Bob has moved (he has)
     println!("{}'s position: {:?}", bob_ref.name(), pos);
     drop(pos);
 
     // Option example: a missing component becomes None instead of a panic.
-    let (pos,) = bob_ref.get_ref::<(Option<&Position>,)>().unwrap();
+    let (pos,) = bob_ref.get::<(Option<&Position>,)>().unwrap();
     let has_pos = pos.is_some();
     if let Some(pos) = &pos {
         // See if Bob has moved (he has)

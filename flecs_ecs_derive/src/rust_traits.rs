@@ -287,7 +287,7 @@ pub(crate) fn expand_ecs_rust_trait(name: Ident) -> TokenStream {
                     entity
                         .world()
                         .component_untyped_from(*derived_id)
-                        .get_ref::<&(Self, Self)>()
+                        .get::<&(Self, Self)>()
                         .expect("entity does not have the component identified by `derived_id`")
                         .vtable
                 };
@@ -352,7 +352,7 @@ pub(crate) fn expand_ecs_rust_trait(name: Ident) -> TokenStream {
                     entity
                         .world()
                         .component_untyped_from(*derived_id)
-                        .get_ref::<&(Self, Self)>()
+                        .get::<&(Self, Self)>()
                         .expect("entity does not have the component identified by `derived_id`")
                         .vtable
                 };

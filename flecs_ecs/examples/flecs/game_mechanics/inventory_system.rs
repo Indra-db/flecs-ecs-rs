@@ -173,7 +173,7 @@ fn find_item_w_kind(
 fn transfer_item(container: EntityView<'_>, item: EntityView<'_>) {
     let world = container.world();
 
-    let amt = item.cloned_owned::<&Amount>().unwrap_or(Amount { amount: 1 });
+    let amt = item.cloned::<&Amount>().unwrap_or(Amount { amount: 1 });
 
     #[allow(clippy::redundant_else)]
     if amt.amount > 0 {
@@ -186,7 +186,7 @@ fn transfer_item(container: EntityView<'_>, item: EntityView<'_>) {
             // If a matching item was found, increase its amount
             let mut dst_amt = world
                 .entity_from_id(dst_item)
-                .get_ref::<&mut Amount>()
+                .get::<&mut Amount>()
                 .unwrap();
             dst_amt.amount += amt.amount;
             drop(dst_amt); // release the write guard before the structural destruct
@@ -229,7 +229,7 @@ fn attack(player: EntityView<'_>, weapon: EntityView<'_>) {
         item_name(weapon).unwrap_or("UnknownItem".to_string())
     );
 
-    let atk = weapon.cloned_owned::<&Attack>();
+    let atk = weapon.cloned::<&Attack>();
 
     if atk.is_none() {
         // A weapon without Attack power? Odd.
@@ -242,7 +242,7 @@ fn attack(player: EntityView<'_>, weapon: EntityView<'_>) {
     // Get armor item, if player has equipped any
     if let Some(armor_e) = find_item_w_kind(player, world.component_id::<Armor>(), true) {
         let armor_e = world.entity_from_id(armor_e);
-        let (health,) = armor_e.get_ref::<(Option<&mut Health>,)>().unwrap();
+        let (health,) = armor_e.get::<(Option<&mut Health>,)>().unwrap();
         if let Some(mut armor_health) = health {
             println!(
                 " - {} defends with {} ({} health)",
@@ -280,7 +280,7 @@ fn attack(player: EntityView<'_>, weapon: EntityView<'_>) {
     }
 
     // For each usage of the weapon, subtract one from its health
-    let mut weapon_health = weapon.get_ref::<&mut Health>().unwrap();
+    let mut weapon_health = weapon.get::<&mut Health>().unwrap();
     if weapon_health.value > 0 {
         weapon_health.value -= 1;
         if weapon_health.value == 0 {
@@ -298,7 +298,7 @@ fn attack(player: EntityView<'_>, weapon: EntityView<'_>) {
 
     // If armor didn't counter the whole attack, subtract from the player health
     if att_value > 0 {
-        let mut player_health = player.get_ref::<&mut Health>().unwrap();
+        let mut player_health = player.get::<&mut Health>().unwrap();
         player_health.value -= att_value;
         if player_health.value <= 0 {
             drop(player_health); // release the guard before the structural destruct
@@ -332,7 +332,7 @@ fn print_items(container: EntityView<'_>) {
         // Items with an Amount component fill up a single inventory slot but
         // represent multiple instances, like coins.
         let amount = item
-            .cloned_owned::<&Amount>()
+            .cloned::<&Amount>()
             .unwrap_or(Amount { amount: 1 })
             .amount;
         println!(

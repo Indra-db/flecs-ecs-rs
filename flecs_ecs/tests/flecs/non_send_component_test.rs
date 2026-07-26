@@ -75,7 +75,7 @@ fn non_send_component_access_from_worker_thread_panics() {
             let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
                 let singleton = world
                     .entity_from_id(NonSendSingleton::entity_id(world))
-                    .get_ref::<&NonSendSingleton>()
+                    .get::<&NonSendSingleton>()
                     .unwrap();
                 core::hint::black_box(&singleton.value);
             }));
@@ -179,12 +179,12 @@ fn non_send_component_set_and_get() {
     });
 
     {
-        let handle = entity.get_ref::<&NonSendHandle>().unwrap();
+        let handle = entity.get::<&NonSendHandle>().unwrap();
         assert_eq!(*handle.value.borrow(), 42);
     };
 
     {
-        let handle = entity.get_ref::<&mut NonSendHandle>().unwrap();
+        let handle = entity.get::<&mut NonSendHandle>().unwrap();
         *handle.value.borrow_mut() = 7;
     };
 

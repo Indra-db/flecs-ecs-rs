@@ -423,7 +423,7 @@ fn live_pin_panic(op: &str) -> ! {
     panic!(
         "cannot {op} while component guards are live on this stage: the operation appends \
          rows to existing tables and can reallocate a pinned column, which would dangle a \
-         live `Ref` / `Mut` guard. Drop all guards (from `get_ref` / `entity_ref` / \
+         live `Ref` / `Mut` guard. Drop all guards (from `get` / `entity_ref` / \
          `singleton`) before calling {op}"
     );
 }

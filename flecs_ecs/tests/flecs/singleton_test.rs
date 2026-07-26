@@ -92,7 +92,7 @@ fn singleton_modified_singleton() {
         .each_entity(|e, _p| {
             let w = e.world();
             w.entity_from_id(Count::entity_id(w))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap()
                 .0 += 1;
         });
@@ -120,7 +120,7 @@ fn singleton_add_singleton() {
         .each_entity(|e, _| {
             let w = e.world();
             w.entity_from_id(Count::entity_id(w))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap()
                 .0 += 1;
         });
@@ -141,7 +141,7 @@ fn singleton_remove_singleton() {
         .each_entity(|e, _p| {
             let w = e.world();
             w.entity_from_id(Count::entity_id(w))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap()
                 .0 += 1;
         });
@@ -207,7 +207,7 @@ fn singleton_get_singleton() {
     assert_eq!(*s.id(), *world.component_id::<Position>());
 
     {
-        let p = s.get_ref::<&Position>().unwrap();
+        let p = s.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     }
@@ -305,7 +305,7 @@ fn singleton_get_set_singleton_pair_r_t() {
 
     let result = world
         .entity_from_id(Position::entity_id(&world))
-        .get_ref::<&(Position, Tag)>();
+        .get::<&(Position, Tag)>();
     assert!(result.is_some());
     let p = result.unwrap();
     assert_eq!(p.x, 10);
@@ -541,7 +541,7 @@ fn singleton_get_r_t_pair_types() {
     {
         let p = world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&(Position, Tgt)>()
+            .get::<&(Position, Tgt)>()
             .unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
@@ -573,7 +573,7 @@ fn singleton_get_r_t_not_found() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&(Position, Tgt2)>()
+            .get::<&(Position, Tgt2)>()
             .is_none()
     );
 }
@@ -587,7 +587,7 @@ fn singleton_get_r_t_pair_types_not_found() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&(Position, Tgt3)>()
+            .get::<&(Position, Tgt3)>()
             .is_none()
     );
 }
@@ -601,7 +601,7 @@ fn singleton_get_r_t_both_typed_not_found() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&(Position, TgtBoth)>()
+            .get::<&(Position, TgtBoth)>()
             .is_none()
     );
 }
@@ -698,7 +698,7 @@ fn singleton_try_get_r_t_pair_types() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&(Position, Tgt4)>()
+            .get::<&(Position, Tgt4)>()
             .is_none()
     );
 
@@ -706,7 +706,7 @@ fn singleton_try_get_r_t_pair_types() {
 
     let result = world
         .entity_from_id(Position::entity_id(&world))
-        .get_ref::<&(Position, Tgt4)>();
+        .get::<&(Position, Tgt4)>();
     assert!(result.is_some());
     let p = result.unwrap();
     assert_eq!(p.x, 10);
@@ -715,7 +715,7 @@ fn singleton_try_get_r_t_pair_types() {
 
 // ── get_mut variants ─────────────────────────────────────────────────────────
 // C++ get_mut returns mutable ref and panics when missing.
-// Rust: singleton_mut / pair get_ref return None when missing.
+// Rust: singleton_mut / pair get return None when missing.
 
 #[test]
 fn singleton_get_mut_w_id() {
@@ -790,7 +790,7 @@ fn singleton_get_mut_r_t_pair_types() {
     {
         let p = world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&mut (Position, Tgt5)>()
+            .get::<&mut (Position, Tgt5)>()
             .unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
@@ -820,7 +820,7 @@ fn singleton_get_mut_r_t_not_found() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&mut (Position, Tgt6)>()
+            .get::<&mut (Position, Tgt6)>()
             .is_none()
     );
 }
@@ -834,7 +834,7 @@ fn singleton_get_mut_r_t_typed_not_found() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&mut (Position, Tgt7)>()
+            .get::<&mut (Position, Tgt7)>()
             .is_none()
     );
 }
@@ -848,7 +848,7 @@ fn singleton_get_mut_r_t_pair_types_not_found() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&mut (Position, Tgt8)>()
+            .get::<&mut (Position, Tgt8)>()
             .is_none()
     );
 }
@@ -942,7 +942,7 @@ fn singleton_try_get_mut_r_t_pair_types() {
     assert!(
         world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&mut (Position, Tgt9)>()
+            .get::<&mut (Position, Tgt9)>()
             .is_none()
     );
 
@@ -950,7 +950,7 @@ fn singleton_try_get_mut_r_t_pair_types() {
 
     let result = world
         .entity_from_id(Position::entity_id(&world))
-        .get_ref::<&mut (Position, Tgt9)>();
+        .get::<&mut (Position, Tgt9)>();
     assert!(result.is_some());
     let p = result.unwrap();
     assert_eq!(p.x, 10);

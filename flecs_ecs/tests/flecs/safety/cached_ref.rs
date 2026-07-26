@@ -33,7 +33,7 @@ fn ref_nested_in_entity_get_panics() {
 
     let mut r = world.entity_ref::<Pos>(e.id()).unwrap();
 
-    let _outer = e.get_ref::<&mut Pos>().unwrap();
+    let _outer = e.get::<&mut Pos>().unwrap();
     let _inner = r.get_mut(&world).unwrap();
 }
 

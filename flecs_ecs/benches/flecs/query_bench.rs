@@ -413,9 +413,9 @@ pub fn query_experimental(criterion: &mut Criterion) {
 
     // --- entity access: guard get ---
 
-    group.bench_function("exp_entity_get_ref_1", |b| {
+    group.bench_function("exp_entity_get_1", |b| {
         b.iter(|| {
-            let g = world.entity_from_id(e_id).get_ref::<&C1>().unwrap();
+            let g = world.entity_from_id(e_id).get::<&C1>().unwrap();
             black_box(g.0)
         });
     });

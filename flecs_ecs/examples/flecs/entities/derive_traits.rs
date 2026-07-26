@@ -50,7 +50,7 @@ fn main() {
     let base = world.prefab_named("Spaceship").set(Mass { value: 100.0 });
     let inst = world.entity_named("MySpaceship").is_a(base);
     println!("MySpaceship owns Mass: {}", inst.owns(Mass::id()));
-    let mass = inst.get_ref::<&Mass>().unwrap();
+    let mass = inst.get::<&Mass>().unwrap();
     println!("MySpaceship mass: {}", mass.value);
     drop(mass); // release the read guard so the sets below apply immediately
 
@@ -60,7 +60,7 @@ fn main() {
     // Velocity is stored in a sparse set, the component data stays valid even
     // as the entity moves between tables.
     inst.set(Velocity { x: 1.0, y: 2.0 });
-    let v = inst.get_ref::<&Velocity>().unwrap();
+    let v = inst.get::<&Velocity>().unwrap();
     println!("MySpaceship velocity: {{{}, {}}}", v.x, v.y);
     drop(v);
 

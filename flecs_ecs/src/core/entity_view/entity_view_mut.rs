@@ -450,7 +450,7 @@ impl<'a> EntityView<'a> {
     /// entity.set_id(Position { x: 1.0, y: 2.0 }, position);
     ///
     /// {
-    ///     let _pos = entity.get_ref::<&(InWorld, Position)>().unwrap();
+    ///     let _pos = entity.get::<&(InWorld, Position)>().unwrap();
     ///     // ...
     /// }
     /// ```
@@ -506,7 +506,7 @@ impl<'a> EntityView<'a> {
     /// entity.set_pair::<InWorld, _>(Position { x: 1.0, y: 2.0 });
     ///
     /// {
-    ///     let _pos = entity.get_ref::<&(InWorld, Position)>().unwrap();
+    ///     let _pos = entity.get::<&(InWorld, Position)>().unwrap();
     ///     // ...
     /// }
     /// ```

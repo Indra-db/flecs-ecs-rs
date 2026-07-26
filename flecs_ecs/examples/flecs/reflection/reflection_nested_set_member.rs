@@ -23,7 +23,7 @@ fn main() {
     // Create entity, set value of Line using reflection API
     let e = world.entity().add(Line::id());
 
-    let mut line = e.get_ref::<&mut Line>().unwrap();
+    let mut line = e.get::<&mut Line>().unwrap();
     let mut cur = world.cursor(&mut *line);
 
     cur.push(); // {

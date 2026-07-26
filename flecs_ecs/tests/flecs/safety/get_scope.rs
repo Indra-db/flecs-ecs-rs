@@ -35,7 +35,7 @@ fn mutation_in_get_callback_is_deferred_and_observers_fire_after() {
     let e = world.entity().set(Foo(1));
 
     {
-        let mut foo = e.get_ref::<&mut Foo>().unwrap();
+        let mut foo = e.get::<&mut Foo>().unwrap();
         e.set(Bar(42));
         assert_eq!(
             ON_SET_COUNT.load(Ordering::Relaxed),
@@ -52,7 +52,7 @@ fn mutation_in_get_callback_is_deferred_and_observers_fire_after() {
     assert_eq!(ON_SET_COUNT.load(Ordering::Relaxed), 1);
     assert!(e.has(Bar::id()));
     {
-        let (foo, bar) = e.get_ref::<(&Foo, &Bar)>().unwrap();
+        let (foo, bar) = e.get::<(&Foo, &Bar)>().unwrap();
         assert_eq!(foo.0, 2);
         assert_eq!(bar.0, 42);
     }
@@ -74,7 +74,7 @@ fn mutation_in_try_get_callback_is_deferred() {
     let e = world.entity().set(Foo(1));
 
     {
-        let mut foo = e.get_ref::<&mut Foo>().unwrap();
+        let mut foo = e.get::<&mut Foo>().unwrap();
         e.set(Bar(42));
         assert_eq!(ON_SET_COUNT.load(Ordering::Relaxed), 0);
         assert!(!e.has(Bar::id()));
@@ -103,7 +103,7 @@ fn mutation_in_world_get_callback_is_deferred() {
 
     let foo_e = world.entity_from_id(Foo::entity_id(&world));
     {
-        let mut foo = foo_e.get_ref::<&mut Foo>().unwrap();
+        let mut foo = foo_e.get::<&mut Foo>().unwrap();
         world.set(Bar(42));
         assert_eq!(
             ON_SET_COUNT.load(Ordering::Relaxed),
@@ -114,10 +114,10 @@ fn mutation_in_world_get_callback_is_deferred() {
     }
 
     assert_eq!(ON_SET_COUNT.load(Ordering::Relaxed), 1);
-    let foo = foo_e.get_ref::<&Foo>().unwrap();
+    let foo = foo_e.get::<&Foo>().unwrap();
     let bar = world
         .entity_from_id(Bar::entity_id(&world))
-        .get_ref::<&Bar>()
+        .get::<&Bar>()
         .unwrap();
     assert_eq!(foo.0, 2);
     assert_eq!(bar.0, 42);
@@ -135,7 +135,7 @@ fn archetype_move_in_own_get_callback_keeps_borrow_valid() {
     let e = world.entity().set(Foo(1));
 
     {
-        let mut foo = e.get_ref::<&mut Foo>().unwrap();
+        let mut foo = e.get::<&mut Foo>().unwrap();
         e.add(MoveTag::id());
         assert!(
             !e.has(MoveTag::id()),
@@ -146,7 +146,7 @@ fn archetype_move_in_own_get_callback_keeps_borrow_valid() {
 
     assert!(e.has(MoveTag::id()));
     {
-        let foo = e.get_ref::<&Foo>().unwrap();
+        let foo = e.get::<&Foo>().unwrap();
         assert_eq!(
             foo.0, 99,
             "value written through the borrow must survive the move"
@@ -162,7 +162,7 @@ fn destruct_in_own_get_callback_is_deferred() {
     let e = world.entity().set(Foo(1));
 
     {
-        let mut foo = e.get_ref::<&mut Foo>().unwrap();
+        let mut foo = e.get::<&mut Foo>().unwrap();
         e.destruct();
         assert!(e.is_alive(), "deferred destruct must not land while guard is live");
         foo.0 = 5;
@@ -179,7 +179,7 @@ fn same_table_spawns_in_get_callback_are_deferred() {
     let e = world.entity().set(Foo(1));
 
     {
-        let mut foo = e.get_ref::<&mut Foo>().unwrap();
+        let mut foo = e.get::<&mut Foo>().unwrap();
         for i in 0..64 {
             world.entity().set(Foo(i));
         }
@@ -187,7 +187,7 @@ fn same_table_spawns_in_get_callback_are_deferred() {
     }
 
     {
-        let foo = e.get_ref::<&Foo>().unwrap();
+        let foo = e.get::<&Foo>().unwrap();
         assert_eq!(foo.0, 7);
     }
 }
@@ -209,7 +209,7 @@ fn remove_in_get_callback_fires_observer_after() {
     let e = world.entity().set(Foo(1)).set(Bar(42));
 
     {
-        let mut foo = e.get_ref::<&mut Foo>().unwrap();
+        let mut foo = e.get::<&mut Foo>().unwrap();
         e.remove(Bar::id());
         assert_eq!(
             ON_REMOVE_COUNT.load(Ordering::Relaxed),
@@ -226,7 +226,7 @@ fn remove_in_get_callback_fires_observer_after() {
     assert_eq!(ON_REMOVE_COUNT.load(Ordering::Relaxed), 1);
     assert!(!e.has(Bar::id()));
     {
-        let foo = e.get_ref::<&Foo>().unwrap();
+        let foo = e.get::<&Foo>().unwrap();
         assert_eq!(foo.0, 2);
     }
 }

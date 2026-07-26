@@ -116,7 +116,7 @@ fn enum_standard_enum_reflection() {
     //let enum_comp = entity.get::<StandardEnum>().unwrap();
     entity2.set(StandardEnum::Red);
     {
-        let enum_comp2 = entity2.get_ref::<&StandardEnum>().unwrap();
+        let enum_comp2 = entity2.get::<&StandardEnum>().unwrap();
         assert_eq!(*enum_comp2, StandardEnum::Red);
     };
     //assert!(*enum_comp == StandardEnum::Red);
@@ -253,9 +253,9 @@ fn enum_get_constant() {
     let e = world.entity().add_enum(StandardEnum::Red);
     assert!(e.has_enum(StandardEnum::Red));
 
-    // get_enum_constant not available; use get_ref instead
+    // get_enum_constant not available; use get instead
     {
-        let v = e.get_ref::<&StandardEnum>().unwrap();
+        let v = e.get::<&StandardEnum>().unwrap();
         assert_eq!(*v, StandardEnum::Red);
     };
 
@@ -263,7 +263,7 @@ fn enum_get_constant() {
     assert!(e.has_enum(StandardEnum::Green));
 
     {
-        let v = e.get_ref::<&StandardEnum>().unwrap();
+        let v = e.get::<&StandardEnum>().unwrap();
         assert_eq!(*v, StandardEnum::Green);
     };
 }
@@ -302,7 +302,7 @@ fn enum_enum_as_component() {
     assert!(e.has(StandardEnum::id()));
 
     {
-        let v = e.get_ref::<&StandardEnum>().unwrap();
+        let v = e.get::<&StandardEnum>().unwrap();
         assert_eq!(*v, StandardEnum::Green);
     };
 }

@@ -1,5 +1,5 @@
 //! Arity smoke tests for the `tuples!`-generated experimental tuple impls
-//! (spec §4.8): guard tuples (`get_ref`), chunk tuples (`chunks`), and
+//! (spec §4.8): guard tuples (`get`), chunk tuples (`chunks`), and
 //! `EntityMut::get_many` at arities the old hand-capped impls (max 5) never
 //! covered.
 
@@ -53,29 +53,29 @@ fn seed_12(world: &World, n: i32) {
 }
 
 #[test]
-fn get_ref_tuple_arity_8() {
+fn get_tuple_arity_8() {
     let world = World::new();
     seed_12(&world, 1);
     let e = world.new_query::<&C1>().first_entity();
 
     let (mut a, b, c, d, e2, f, g, h) = e
-        .get_ref::<(&mut C1, &C2, &C3, &C4, &C5, &C6, &C7, &C8)>()
+        .get::<(&mut C1, &C2, &C3, &C4, &C5, &C6, &C7, &C8)>()
         .unwrap();
     a.0 = b.0 + c.0 + d.0 + e2.0 + f.0 + g.0 + h.0;
     drop((a, b, c, d, e2, f, g, h));
 
-    let a = e.get_ref::<&C1>().unwrap();
+    let a = e.get::<&C1>().unwrap();
     assert_eq!(a.0, 2 + 3 + 4 + 5 + 6 + 7 + 8);
 }
 
 #[test]
-fn get_ref_tuple_arity_12() {
+fn get_tuple_arity_12() {
     let world = World::new();
     seed_12(&world, 1);
     let e = world.new_query::<&C1>().first_entity();
 
     let guards = e
-        .get_ref::<(
+        .get::<(
             &mut C1,
             &C2,
             &C3,
@@ -105,18 +105,18 @@ fn get_ref_tuple_arity_12() {
     a.0 = sum;
     drop(a);
 
-    let a = e.get_ref::<&C1>().unwrap();
+    let a = e.get::<&C1>().unwrap();
     assert_eq!(a.0, (2..=12).sum::<i32>());
 }
 
 #[test]
-fn get_ref_tuple_arity_12_conflict_still_detected() {
+fn get_tuple_arity_12_conflict_still_detected() {
     let world = World::new();
     seed_12(&world, 1);
     let e = world.new_query::<&C1>().first_entity();
 
-    let _held = e.get_ref::<&mut C12>().unwrap();
-    let r = e.try_get_ref::<(
+    let _held = e.get::<&mut C12>().unwrap();
+    let r = e.try_get::<(
         &C1,
         &C2,
         &C3,

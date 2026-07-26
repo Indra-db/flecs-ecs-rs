@@ -23,7 +23,7 @@ fn main() {
     let e = world.entity().add(Position::id());
 
     {
-        let mut pos = e.get_ref::<&mut Position>().unwrap();
+        let mut pos = e.get::<&mut Position>().unwrap();
         let mut cur = world.cursor::<Position>(&mut pos);
         cur.push(); // {
         cur.set_float(10.0); //   10
@@ -36,7 +36,7 @@ fn main() {
 
     // Use member names before assigning values
     {
-        let mut pos = e.get_ref::<&mut Position>().unwrap();
+        let mut pos = e.get::<&mut Position>().unwrap();
         let mut cur = world.cursor::<Position>(&mut pos);
         cur.push(); // {
         cur.member("y"); //   y:

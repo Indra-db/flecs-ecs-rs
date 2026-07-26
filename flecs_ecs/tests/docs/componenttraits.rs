@@ -202,7 +202,7 @@ fn component_traits_oninstantiate_trait_override_16() {
     let inst = world.entity().is_a(base); // Mass is copied to inst
 
     assert!(inst.owns(Mass::id()));
-    assert!(base.cloned_owned::<&Mass>().unwrap() == inst.cloned_owned::<&Mass>().unwrap());
+    assert!(base.cloned::<&Mass>().unwrap() == inst.cloned::<&Mass>().unwrap());
 }
 
 #[test]
@@ -218,7 +218,7 @@ fn component_traits_oninstantiate_trait_inherit_17() {
 
     assert!(inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(base.cloned_owned::<&Mass>().unwrap() == inst.cloned_owned::<&Mass>().unwrap());
+    assert!(base.cloned::<&Mass>().unwrap() == inst.cloned::<&Mass>().unwrap());
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn component_traits_oninstantiate_trait_dontinherit_18() {
 
     assert!(!inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(inst.get_ref::<&Mass>().is_none());
+    assert!(inst.get::<&Mass>().is_none());
 }
 
 #[test]
@@ -271,12 +271,12 @@ fn component_traits_pairistag_trait_20() {
 
     // Gets value from Position component
     {
-        let pos = e.get_ref::<&Position>().unwrap();
+        let pos = e.get::<&Position>().unwrap();
         println!("Position: ({}, {})", pos.x, pos.y);
     };
     // Gets (unintended) value from (Serializable, Position) pair
     {
-        let pos = e.get_ref::<&(Serializable, Position)>().unwrap();
+        let pos = e.get::<&(Serializable, Position)>().unwrap();
         println!("Serializable Position: ({}, {})", pos.x, pos.y);
     };
 }

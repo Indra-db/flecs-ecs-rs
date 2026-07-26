@@ -103,7 +103,7 @@ impl World {
     ///
     /// `progress` takes `&mut self`. A shared-register guard
     /// ([`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut) /
-    /// `get_ref`) borrows the world `&World`, so the borrow checker forbids it
+    /// `get`) borrows the world `&World`, so the borrow checker forbids it
     /// from being live across a frame step. This replaces the old runtime refusal
     /// (which could only fire after the fact); it is now a compile error:
     ///
@@ -115,7 +115,7 @@ impl World {
     ///
     /// let mut world = World::new();
     /// let e = world.entity().set(Position { x: 1, y: 2 });
-    /// let guard = e.get_ref::<&Position>().unwrap(); // borrows the world
+    /// let guard = e.get::<&Position>().unwrap(); // borrows the world
     /// world.progress();                              // needs &mut world -> conflict
     /// let _ = guard;
     /// ```

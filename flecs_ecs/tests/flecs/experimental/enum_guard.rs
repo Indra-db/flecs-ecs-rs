@@ -2,7 +2,7 @@
 //!
 //! An enum component's data pointer resolves into the enum CONSTANT entity's
 //! storage, not the queried entity's. The debug-only revalidation net must
-//! cache the identity of the storage it actually points into, so `get_ref` on
+//! cache the identity of the storage it actually points into, so `get` on
 //! an enum does not false-fire the "storage moved" panic in debug builds.
 
 use flecs_ecs::core::*;
@@ -19,17 +19,17 @@ enum Color {
 }
 
 #[test]
-fn get_ref_on_enum_component() {
+fn get_on_enum_component() {
     let world = World::new();
     let e = world.entity();
     e.add_enum(Color::Blue);
 
     {
-        let c = e.get_ref::<&Color>().unwrap();
+        let c = e.get::<&Color>().unwrap();
         assert_eq!(*c, Color::Blue);
     }
 
     e.add_enum(Color::Green);
-    let c = e.get_ref::<&Color>().unwrap();
+    let c = e.get::<&Color>().unwrap();
     assert_eq!(*c, Color::Green);
 }

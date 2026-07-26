@@ -96,7 +96,7 @@ fn cached_ref_conflicts_with_live_write_guard() {
     let world = World::new();
     let e = world.entity().set(Position::default());
     // A live write guard on the same storage must make a cached read conflict.
-    let _w = e.get_ref::<&mut Position>().unwrap();
+    let _w = e.get::<&mut Position>().unwrap();
     let cached = world.entity_ref::<Position>(e).unwrap();
     let _r = cached.get(&world);
 }

@@ -136,8 +136,8 @@ fn conflict_detection_still_active_after_multithreaded_run() {
     // nested mutable access to the same sparse component on the same stage
     // must still panic
     let e = world.entity_from_id(e);
-    let _outer = e.get_ref::<&mut SparseCounter>().unwrap();
-    let _inner = e.get_ref::<&mut SparseCounter>().unwrap();
+    let _outer = e.get::<&mut SparseCounter>().unwrap();
+    let _inner = e.get::<&mut SparseCounter>().unwrap();
 }
 
 // Deleted: par_each_entity_cached_ref_preserves_worker_stage pinned the legacy

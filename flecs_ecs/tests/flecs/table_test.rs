@@ -202,7 +202,7 @@ fn table_multi_get() {
         .set(Velocity { x: 0, y: 0 });
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
-    let found = e1.get_ref::<(&Position, &Velocity)>().map(|(_p, _v)| {
+    let found = e1.get::<(&Position, &Velocity)>().map(|(_p, _v)| {
         e2.add(Mass::id());
     });
     assert!(found.is_some());
@@ -225,7 +225,7 @@ fn table_multi_get_locked() {
     // A shared-register write issued while a guard is live is queued, not
     // immediate; it flushes when the guard drops at the end of the block.
     {
-        let (_p, _v) = e1.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (_p, _v) = e1.get::<(&Position, &Velocity)>().unwrap();
         e2.add(Velocity::id());
     }
 
@@ -247,7 +247,7 @@ fn table_multi_set() {
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
     {
-        let (_p, _v) = e1.get_ref::<(&mut Position, &mut Velocity)>().unwrap();
+        let (_p, _v) = e1.get::<(&mut Position, &mut Velocity)>().unwrap();
         e2.add(Mass::id());
     }
 
@@ -269,7 +269,7 @@ fn table_multi_set_locked() {
     // A shared-register write issued while a guard is live is queued, not
     // immediate; it flushes when the guard drops at the end of the block.
     {
-        let (_p, _v) = e1.get_ref::<(&mut Position, &mut Velocity)>().unwrap();
+        let (_p, _v) = e1.get::<(&mut Position, &mut Velocity)>().unwrap();
         e2.add(Velocity::id());
     }
 

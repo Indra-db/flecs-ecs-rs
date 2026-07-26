@@ -9,7 +9,7 @@
 //!   needed and plain `&T` / `&mut T` can be returned. The borrow checker then
 //!   forbids every other world access for as long as the reference is live.
 //!   See
-//!   [`WorldExclusiveExt::get_exclusive`](crate::experimental::exclusive::WorldExclusiveExt::get_exclusive)
+//!   [`WorldExclusiveExt::get_mut`](crate::experimental::exclusive::WorldExclusiveExt::get_mut)
 //!   and
 //!   [`QueryExclusiveExt::each_exclusive`](crate::experimental::exclusive::QueryExclusiveExt::each_exclusive).
 //!

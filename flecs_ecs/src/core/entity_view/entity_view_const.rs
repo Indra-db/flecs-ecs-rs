@@ -65,7 +65,7 @@ type ObserverIterFnPtr = extern "C" fn(*mut sys::ecs_iter_t);
 ///
 /// // Get component data
 /// {
-///     let pos = player.get_ref::<&Position>().unwrap();
+///     let pos = player.get::<&Position>().unwrap();
 ///     println!("Position: ({}, {})", pos.x, pos.y);
 /// }
 ///
@@ -1328,18 +1328,18 @@ impl<'a> EntityView<'a> {
     ///     .set(Position { x: 10.0, y: 20.0 })
     ///     .set_pair::<Tag, Position>(Position { x: 30.0, y: 40.0 });
     ///
-    /// let pos = entity.cloned_owned::<&Position>();
+    /// let pos = entity.cloned::<&Position>();
     /// assert!(pos.is_some());
     /// assert_eq!(pos.unwrap().x, 10.0);
     ///
     /// let (vel, pos) = entity
-    ///     .cloned_owned::<(Option<&Velocity>, &Position)>()
+    ///     .cloned::<(Option<&Velocity>, &Position)>()
     ///     .unwrap();
     /// assert_eq!(pos.x, 10.0);
     /// assert!(vel.is_none());
     ///
     /// let (tag_pos_rel, pos) = entity
-    ///     .cloned_owned::<(&(Tag, Position), &Position)>()
+    ///     .cloned::<(&(Tag, Position), &Position)>()
     ///     .unwrap();
     /// assert_eq!(pos.x, 10.0);
     /// assert_eq!(tag_pos_rel.x, 30.0);

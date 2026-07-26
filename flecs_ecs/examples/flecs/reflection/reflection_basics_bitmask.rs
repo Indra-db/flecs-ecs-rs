@@ -76,7 +76,7 @@ fn main() {
     });
 
     // Convert Sandwidth component to flecs expression string
-    let val = e.get_ref::<&Sandwich>().unwrap();
+    let val = e.get::<&Sandwich>().unwrap();
     println!("{}", world.to_expr(&*val));
 
     // Output:

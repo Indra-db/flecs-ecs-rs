@@ -59,7 +59,7 @@ fn iter() {
     {
         let (p, v) = world
             .entity_from_id(entity)
-            .get_ref::<(&Position, &Velocity)>()
+            .get::<(&Position, &Velocity)>()
             .unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
@@ -94,7 +94,7 @@ fn iter_macro() {
     {
         let (p, v) = world
             .entity_from_id(entity)
-            .get_ref::<(&Position, &Velocity)>()
+            .get::<(&Position, &Velocity)>()
             .unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
@@ -129,7 +129,7 @@ fn iter_const() {
     {
         let (p, v) = world
             .entity_from_id(entity)
-            .get_ref::<(&Position, &Velocity)>()
+            .get::<(&Position, &Velocity)>()
             .unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
@@ -189,13 +189,13 @@ fn iter_shared() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     };
@@ -249,25 +249,25 @@ fn iter_optional() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     };
 
     {
-        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e3).get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     };
 
     {
-        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e4).get::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     };
@@ -293,7 +293,7 @@ fn each() {
     world.progress();
 
     {
-        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(entity).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -319,7 +319,7 @@ fn each_const() {
     world.progress();
 
     {
-        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(entity).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -353,13 +353,13 @@ fn each_shared() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     };
@@ -405,30 +405,30 @@ fn each_optional() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     };
 
     {
-        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e3).get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     };
 
     {
-        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e4).get::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     };
@@ -463,13 +463,13 @@ fn signature() {
     world.progress();
 
     {
-        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(entity).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let v = world.entity_from_id(entity).get_ref::<&Velocity>().unwrap();
+        let v = world.entity_from_id(entity).get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -504,13 +504,13 @@ fn signature_const() {
     world.progress();
 
     {
-        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(entity).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let v = world.entity_from_id(entity).get_ref::<&Velocity>().unwrap();
+        let v = world.entity_from_id(entity).get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -567,13 +567,13 @@ fn signature_shared() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     };
@@ -629,25 +629,25 @@ fn signature_optional() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     };
 
     {
-        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e3).get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     };
 
     {
-        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e4).get::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     };
@@ -702,7 +702,7 @@ fn empty_signature() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -729,7 +729,7 @@ fn iter_tag() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -759,7 +759,7 @@ fn each_tag() {
                 {
                     let mut c = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     c.0 += 1;
                 };
@@ -815,7 +815,7 @@ fn order_by_type() {
             {
                 let mut last_val = world
                     .entity_from_id(LastVal::entity_id(world))
-                    .get_ref::<&mut LastVal>()
+                    .get::<&mut LastVal>()
                     .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
@@ -823,7 +823,7 @@ fn order_by_type() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -869,7 +869,7 @@ fn order_by_id() {
             {
                 let mut last_val = world
                     .entity_from_id(LastVal::entity_id(world))
-                    .get_ref::<&mut LastVal>()
+                    .get::<&mut LastVal>()
                     .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
@@ -877,7 +877,7 @@ fn order_by_id() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -916,7 +916,7 @@ fn order_by_type_after_create() {
             {
                 let mut last_val = world
                     .entity_from_id(LastVal::entity_id(world))
-                    .get_ref::<&mut LastVal>()
+                    .get::<&mut LastVal>()
                     .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
@@ -924,7 +924,7 @@ fn order_by_type_after_create() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -971,7 +971,7 @@ fn order_by_id_after_create() {
             {
                 let mut last_val = world
                     .entity_from_id(LastVal::entity_id(world))
-                    .get_ref::<&mut LastVal>()
+                    .get::<&mut LastVal>()
                     .unwrap();
                 assert!(p.x > last_val.0);
                 last_val.0 = p.x;
@@ -979,7 +979,7 @@ fn order_by_id_after_create() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -1020,7 +1020,7 @@ fn get_query() {
                 {
                     let mut c = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     c.0 += 1;
                 };
@@ -1112,19 +1112,19 @@ fn add_from_each_world_handle() {
     world.progress();
 
     {
-        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e1).get::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     };
 
     {
-        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e2).get::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     };
 
     {
-        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e3).get::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     };
@@ -1153,17 +1153,17 @@ fn new_from_each() {
     assert!(world.entity_from_id(e3).has(EntityRef::id()));
 
     {
-        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e1).get::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     };
 
     {
-        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e2).get::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     };
 
     {
-        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e3).get::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     };
 }
@@ -1256,19 +1256,19 @@ fn add_from_iter_world_handle() {
     world.progress();
 
     {
-        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e1).get::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     };
 
     {
-        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e2).get::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     };
 
     {
-        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e3).get::<&EntityRef>().unwrap();
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     };
@@ -1299,17 +1299,17 @@ fn new_from_iter() {
     assert!(world.entity_from_id(e3).has(EntityRef::id()));
 
     {
-        let c = world.entity_from_id(e1).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e1).get::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     };
 
     {
-        let c = world.entity_from_id(e2).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e2).get::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     };
 
     {
-        let c = world.entity_from_id(e3).get_ref::<&EntityRef>().unwrap();
+        let c = world.entity_from_id(e3).get::<&EntityRef>().unwrap();
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     };
 }
@@ -1346,7 +1346,7 @@ fn each_w_mut_children_it() {
                     {
                         let mut c = world
                             .entity_from_id(Count::entity_id(world))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         c.0 += 1;
                     };
@@ -1387,7 +1387,7 @@ fn readonly_children_iter() {
                 world.entity_from_id(c[i].value).each_child(|child| {
                     // Dummy code to ensure we can access the entity
                     {
-                        let p = child.get_ref::<&Position>().unwrap();
+                        let p = child.get::<&Position>().unwrap();
                         assert_eq!(p.x, 1);
                         assert_eq!(p.y, 0);
                     };
@@ -1395,7 +1395,7 @@ fn readonly_children_iter() {
                     {
                         let mut c = world
                             .entity_from_id(Count::entity_id(world))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         c.0 += 1;
                     };
@@ -1442,7 +1442,7 @@ fn rate_filter() {
             {
                 let mut c = world
                     .entity_from_id(Counter::entity_id(world))
-                    .get_ref::<&mut Counter>()
+                    .get::<&mut Counter>()
                     .unwrap();
                 c.root += 1;
             };
@@ -1458,7 +1458,7 @@ fn rate_filter() {
                 {
                     let mut c = world
                         .entity_from_id(Counter::entity_id(world))
-                        .get_ref::<&mut Counter>()
+                        .get::<&mut Counter>()
                         .unwrap();
                     c.l1_a += 1;
                 };
@@ -1474,7 +1474,7 @@ fn rate_filter() {
                 {
                     let mut c = world
                         .entity_from_id(Counter::entity_id(world))
-                        .get_ref::<&mut Counter>()
+                        .get::<&mut Counter>()
                         .unwrap();
                     c.l1_b += 1;
                 };
@@ -1490,7 +1490,7 @@ fn rate_filter() {
                 {
                     let mut c = world
                         .entity_from_id(Counter::entity_id(world))
-                        .get_ref::<&mut Counter>()
+                        .get::<&mut Counter>()
                         .unwrap();
                     c.l1_c += 1;
                 };
@@ -1506,7 +1506,7 @@ fn rate_filter() {
                 {
                     let mut c = world
                         .entity_from_id(Counter::entity_id(world))
-                        .get_ref::<&mut Counter>()
+                        .get::<&mut Counter>()
                         .unwrap();
                     c.l2_a += 1;
                 };
@@ -1522,7 +1522,7 @@ fn rate_filter() {
                 {
                     let mut c = world
                         .entity_from_id(Counter::entity_id(world))
-                        .get_ref::<&mut Counter>()
+                        .get::<&mut Counter>()
                         .unwrap();
                     c.l2_b += 1;
                 };
@@ -1558,7 +1558,7 @@ fn self_rate_filter() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -1600,7 +1600,7 @@ fn update_rate_filter() {
             {
                 let mut c = world
                     .entity_from_id(Counter::entity_id(world))
-                    .get_ref::<&mut Counter>()
+                    .get::<&mut Counter>()
                     .unwrap();
                 c.root += 1;
             };
@@ -1616,7 +1616,7 @@ fn update_rate_filter() {
                 {
                     let mut c = world
                         .entity_from_id(Counter::entity_id(world))
-                        .get_ref::<&mut Counter>()
+                        .get::<&mut Counter>()
                         .unwrap();
                     c.l1 += 1;
                 };
@@ -1632,7 +1632,7 @@ fn update_rate_filter() {
                 {
                     let mut c = world
                         .entity_from_id(Counter::entity_id(world))
-                        .get_ref::<&mut Counter>()
+                        .get::<&mut Counter>()
                         .unwrap();
                     c.l2 += 1;
                 };
@@ -1700,17 +1700,17 @@ fn test_auto_defer_each() {
     assert!(world.entity_from_id(e3).has(Value::id()));
 
     {
-        let v = world.entity_from_id(e1).get_ref::<&Value>().unwrap();
+        let v = world.entity_from_id(e1).get::<&Value>().unwrap();
         assert_eq!(v.value, 11);
     };
 
     {
-        let v = world.entity_from_id(e2).get_ref::<&Value>().unwrap();
+        let v = world.entity_from_id(e2).get::<&Value>().unwrap();
         assert_eq!(v.value, 21);
     };
 
     {
-        let v = world.entity_from_id(e3).get_ref::<&Value>().unwrap();
+        let v = world.entity_from_id(e3).get::<&Value>().unwrap();
         assert_eq!(v.value, 31);
     };
 }
@@ -1746,17 +1746,17 @@ fn test_auto_defer_iter() {
     assert!(world.entity_from_id(e3).has(Value::id()));
 
     {
-        let v = world.entity_from_id(e1).get_ref::<&Value>().unwrap();
+        let v = world.entity_from_id(e1).get::<&Value>().unwrap();
         assert_eq!(v.value, 11);
     };
 
     {
-        let v = world.entity_from_id(e2).get_ref::<&Value>().unwrap();
+        let v = world.entity_from_id(e2).get::<&Value>().unwrap();
         assert_eq!(v.value, 21);
     };
 
     {
-        let v = world.entity_from_id(e3).get_ref::<&Value>().unwrap();
+        let v = world.entity_from_id(e3).get::<&Value>().unwrap();
         assert_eq!(v.value, 31);
     };
 }
@@ -1799,7 +1799,7 @@ fn custom_pipeline() {
                     let w = it.world();
                     let mut c = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     c.0 += 1;
                 };
@@ -1818,7 +1818,7 @@ fn custom_pipeline() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -1840,7 +1840,7 @@ fn custom_pipeline() {
                     let w = it.world();
                     let mut c = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     c.0 += 1;
                 };
@@ -1882,7 +1882,7 @@ fn custom_pipeline_w_kind() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 assert_eq!(c.0, 0);
                 c.0 += 1;
@@ -1896,7 +1896,7 @@ fn custom_pipeline_w_kind() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 assert_eq!(c.0, 1);
                 c.0 += 1;
@@ -1910,7 +1910,7 @@ fn custom_pipeline_w_kind() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 assert_eq!(c.0, 2);
                 c.0 += 1;
@@ -1968,7 +1968,7 @@ fn instanced_query_w_singleton_each() {
                 let w = e.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -1984,27 +1984,27 @@ fn instanced_query_w_singleton_each() {
     };
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e3).get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e4).get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e5).get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
@@ -2073,7 +2073,7 @@ fn instanced_query_w_base_each() {
                 let w = e.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -2089,37 +2089,37 @@ fn instanced_query_w_base_each() {
     };
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e3).get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e4).get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e5).get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
     {
-        let p = world.entity_from_id(e6).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e6).get::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
     };
     {
-        let p = world.entity_from_id(e7).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e7).get::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
     };
@@ -2166,7 +2166,7 @@ fn instanced_query_w_singleton_iter() {
                         let w = it.world();
                         let mut c = w
                             .entity_from_id(Count::entity_id(w))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         c.0 += 1;
                     };
@@ -2184,27 +2184,27 @@ fn instanced_query_w_singleton_iter() {
     };
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e3).get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e4).get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e5).get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
@@ -2284,7 +2284,7 @@ fn instanced_query_w_base_iter() {
                         let w = it.world();
                         let mut c = w
                             .entity_from_id(Count::entity_id(w))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         c.0 += 1;
                     };
@@ -2302,37 +2302,37 @@ fn instanced_query_w_base_iter() {
     };
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = world.entity_from_id(e2).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e2).get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = world.entity_from_id(e3).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e3).get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = world.entity_from_id(e4).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e4).get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = world.entity_from_id(e5).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e5).get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
     {
-        let p = world.entity_from_id(e6).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e6).get::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
     };
     {
-        let p = world.entity_from_id(e7).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e7).get::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
     };
@@ -2356,7 +2356,7 @@ fn create_w_no_template_args() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -2419,7 +2419,7 @@ fn system_w_type_kind_type_pipeline() {
                     {
                         let mut c = world
                             .entity_from_id(Count2::entity_id(world))
-                            .get_ref::<&mut Count2>()
+                            .get::<&mut Count2>()
                             .unwrap();
                         assert_eq!(c.a, 0);
                         assert_eq!(c.b, 1);
@@ -2442,7 +2442,7 @@ fn system_w_type_kind_type_pipeline() {
                     {
                         let mut c = world
                             .entity_from_id(Count2::entity_id(world))
-                            .get_ref::<&mut Count2>()
+                            .get::<&mut Count2>()
                             .unwrap();
                         assert_eq!(c.b, 0);
                         c.b += 1;
@@ -2473,7 +2473,7 @@ fn default_ctor() {
             let w = e.world();
             let mut c = w
                 .entity_from_id(Count::entity_id(w))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap();
             c.0 += 1;
         };
@@ -2505,7 +2505,7 @@ fn entity_ctor() {
             {
                 let mut c = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -2539,7 +2539,7 @@ fn ensure_instanced_w_each() {
             let w = it.world();
             let mut count = w
                 .entity_from_id(Count::entity_id(w))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap();
             count.0 += 1;
         };
@@ -2580,7 +2580,7 @@ fn multithread_system_w_query_each() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e1).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e1).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -2616,7 +2616,7 @@ fn multithread_system_w_query_each_w_iter() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -2652,7 +2652,7 @@ fn multithread_system_w_query_each_w_world() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -2690,7 +2690,7 @@ fn multithread_system_w_query_iter() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -2732,7 +2732,7 @@ fn multithread_system_w_query_iter_w_iter() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -2774,7 +2774,7 @@ fn multithread_system_w_query_iter_w_world() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -2808,7 +2808,7 @@ fn multithread_system_w_get_var() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2847,13 +2847,13 @@ fn run_callback() {
     world.progress();
 
     {
-        let p = world.entity_from_id(entity).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(entity).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let v = world.entity_from_id(entity).get_ref::<&Velocity>().unwrap();
+        let v = world.entity_from_id(entity).get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -2875,7 +2875,7 @@ fn startup_system() {
                 {
                     let mut c = world
                         .entity_from_id(Count2::entity_id(world))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     c.a += 1;
                 };
@@ -2892,7 +2892,7 @@ fn startup_system() {
                 {
                     let mut c = world
                         .entity_from_id(Count2::entity_id(world))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     c.b += 1;
                 };
@@ -2920,7 +2920,7 @@ fn interval_tick_source() {
     let t = world.timer().set_interval(2.1);
 
     {
-        let mut timer = t.get_ref::<&mut flecs::timer::Timer>().unwrap();
+        let mut timer = t.get::<&mut flecs::timer::Timer>().unwrap();
         timer.time = 0.0;
     };
 
@@ -2932,7 +2932,7 @@ fn interval_tick_source() {
             {
                 let mut c = world
                     .entity_from_id(Count2::entity_id(world))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 c.a += 1;
             };
@@ -2945,7 +2945,7 @@ fn interval_tick_source() {
             {
                 let mut c = world
                     .entity_from_id(Count2::entity_id(world))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 c.b += 1;
             };
@@ -2953,17 +2953,17 @@ fn interval_tick_source() {
     });
 
     world.progress_time(1.0);
-    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned::<&Count2>().unwrap();
     assert_eq!(c.a, 0);
     assert_eq!(c.b, 0);
 
     world.progress_time(1.0);
-    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned::<&Count2>().unwrap();
     assert_eq!(c.a, 0);
     assert_eq!(c.b, 0);
 
     world.progress_time(1.0);
-    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned::<&Count2>().unwrap();
     assert_eq!(c.a, 1);
     assert_eq!(c.b, 1);
 }
@@ -2982,7 +2982,7 @@ fn rate_tick_source() {
             {
                 let mut c = world
                     .entity_from_id(Count2::entity_id(world))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 c.a += 1;
             };
@@ -2995,7 +2995,7 @@ fn rate_tick_source() {
             {
                 let mut c = world
                     .entity_from_id(Count2::entity_id(world))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 c.b += 1;
             };
@@ -3003,17 +3003,17 @@ fn rate_tick_source() {
     });
 
     world.progress_time(1.0);
-    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned::<&Count2>().unwrap();
     assert_eq!(0, c.a);
     assert_eq!(0, c.b);
 
     world.progress_time(1.0);
-    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned::<&Count2>().unwrap();
     assert_eq!(0, c.a);
     assert_eq!(0, c.b);
 
     world.progress_time(1.0);
-    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned::<&Count2>().unwrap();
     assert_eq!(1, c.a);
     assert_eq!(1, c.b);
 }
@@ -3037,7 +3037,7 @@ fn nested_rate_tick_source() {
                     let w = it.world();
                     let mut c = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     c.0 += 1;
                 };
@@ -3053,7 +3053,7 @@ fn nested_rate_tick_source() {
                     let w = it.world();
                     let mut c = w
                         .entity_from_id(Count2::entity_id(w))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     c.a += 1;
                 };
@@ -3196,7 +3196,7 @@ fn randomize_timers() {
         .run(|mut it| while it.next() {});
 
     {
-        let t = s1.cloned_owned::<&flecs::timer::Timer>();
+        let t = s1.cloned::<&flecs::timer::Timer>();
         assert!(t.is_some());
         assert_eq!(t.unwrap().time, 0.0);
     }
@@ -3209,13 +3209,13 @@ fn randomize_timers() {
         .run(|mut it| while it.next() {});
 
     {
-        let t = s1.cloned_owned::<&flecs::timer::Timer>();
+        let t = s1.cloned::<&flecs::timer::Timer>();
         assert!(t.is_some());
         assert_ne!(t.unwrap().time, 0.0);
     }
 
     {
-        let t = s2.cloned_owned::<&flecs::timer::Timer>();
+        let t = s2.cloned::<&flecs::timer::Timer>();
         assert!(t.is_some());
         assert_ne!(t.unwrap().time, 0.0);
     }
@@ -3273,7 +3273,7 @@ fn singleton_tick_source() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -3316,7 +3316,7 @@ fn pipeline_step_with_kind_enum() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -3349,7 +3349,7 @@ fn pipeline_step_depends_on_pipeline_step_with_enum() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 c.0 += 1;
             };
@@ -3379,7 +3379,7 @@ fn register_twice_w_each() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -3398,7 +3398,7 @@ fn register_twice_w_each() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.b += 1;
             };
@@ -3424,7 +3424,7 @@ fn register_twice_w_run() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -3443,7 +3443,7 @@ fn register_twice_w_run() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.b += 1;
             };
@@ -3469,7 +3469,7 @@ fn register_twice_w_run_each() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -3488,7 +3488,7 @@ fn register_twice_w_run_each() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.b += 1;
             };
@@ -3514,7 +3514,7 @@ fn register_twice_w_each_run() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -3533,7 +3533,7 @@ fn register_twice_w_each_run() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.b += 1;
             };
@@ -3561,7 +3561,7 @@ fn lookup_and_update_each() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count2::entity_id(w))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     count.a += 1;
                 };
@@ -3585,7 +3585,7 @@ fn lookup_and_update_each() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count2::entity_id(w))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     count.b += 1;
                 };
@@ -3614,7 +3614,7 @@ fn lookup_and_update_run() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count2::entity_id(w))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     count.a += 1;
                 };
@@ -3638,7 +3638,7 @@ fn lookup_and_update_run() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count2::entity_id(w))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     count.b += 1;
                 };
@@ -3751,7 +3751,7 @@ fn set_group() {
                         let w = it.world();
                         let mut count = w
                             .entity_from_id(Count::entity_id(w))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         if e == e1_id || e == e4_id || e == e2_id || e == e5_id {
                             count.0 += 1;
@@ -3787,7 +3787,7 @@ fn run_w_0_src_query() {
         {
             let mut c = world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap();
             c.0 += 1;
         };

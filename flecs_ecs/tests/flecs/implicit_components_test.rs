@@ -86,7 +86,7 @@ fn implicit_components_set() {
     assert!(e.has(Position::id()));
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert!((p.x - 10.0_f32).abs() < f32::EPSILON);
         assert!((p.y - 20.0_f32).abs() < f32::EPSILON);
     };
@@ -108,7 +108,7 @@ fn implicit_components_get() {
     let e = world.entity();
 
     // try_get returns None when component is absent
-    let found = e.get_ref::<&Position>().map(|_p| true);
+    let found = e.get::<&Position>().map(|_p| true);
     assert!(found.is_none());
 
     let position = world.lookup("Position");
@@ -323,7 +323,7 @@ fn implicit_components_system_const() {
     assert_eq!(count.load(Ordering::Relaxed), 1);
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert!((p.x - 11.0_f32).abs() < f32::EPSILON);
         assert!((p.y - 22.0_f32).abs() < f32::EPSILON);
     };
@@ -539,7 +539,7 @@ fn implicit_components_first_use_enum_in_system() {
     assert!(world.entity_from_id(e).has(Tag::id()));
 
     {
-        let c = world.entity_from_id(e).get_ref::<&Color>().unwrap();
+        let c = world.entity_from_id(e).get::<&Color>().unwrap();
         assert_eq!(*c, Color::Green);
     };
 
@@ -566,7 +566,7 @@ fn implicit_components_use_const() {
     assert!(e.has(Position::id()));
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert!((p.x - 10.0_f32).abs() < f32::EPSILON);
         assert!((p.y - 20.0_f32).abs() < f32::EPSILON);
     };
@@ -600,7 +600,7 @@ fn implicit_components_use_const_w_stage() {
     assert!(world.entity_from_id(e).has(Velocity::id()));
 
     {
-        let v = world.entity_from_id(e).get_ref::<&Velocity>().unwrap();
+        let v = world.entity_from_id(e).get::<&Velocity>().unwrap();
         assert!((v.x - 1.0_f32).abs() < f32::EPSILON);
         assert!((v.y - 2.0_f32).abs() < f32::EPSILON);
     };
@@ -635,7 +635,7 @@ fn implicit_components_use_const_w_threads() {
     assert!(world.entity_from_id(e).has(Velocity::id()));
 
     {
-        let v = world.entity_from_id(e).get_ref::<&Velocity>().unwrap();
+        let v = world.entity_from_id(e).get::<&Velocity>().unwrap();
         assert!((v.x - 1.0_f32).abs() < f32::EPSILON);
         assert!((v.y - 2.0_f32).abs() < f32::EPSILON);
     };

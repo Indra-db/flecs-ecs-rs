@@ -34,7 +34,7 @@
 //!
 //! // Serialize component to JSON
 //! {
-//!     let pos = entity.get_ref::<&Position>().unwrap();
+//!     let pos = entity.get::<&Position>().unwrap();
 //!     let json = world.to_json::<Position>(&*pos);
 //!     println!("Position: {}", json);
 //!     // Output: Position: {"x":10, "y":20}

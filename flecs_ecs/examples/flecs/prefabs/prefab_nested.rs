@@ -54,7 +54,7 @@ fn main() {
         // Get the TirePressure component & print its value. A single optional
         // term is spelled as a one-element tuple; the all-optional read is
         // always Some.
-        let (p,) = inst.get_ref::<(Option<&TirePressure>,)>().unwrap();
+        let (p,) = inst.get::<(Option<&TirePressure>,)>().unwrap();
         if let Some(p) = &p {
             println!("pressure: {}", p.value);
         }

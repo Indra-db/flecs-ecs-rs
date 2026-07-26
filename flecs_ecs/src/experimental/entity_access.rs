@@ -1,4 +1,4 @@
-//! Shared-register entity access: `get_ref` / `try_get_ref` / `cloned_owned`.
+//! Shared-register entity access: `get` / `try_get` / `cloned`.
 //!
 //! These replace the closure-CPS `EntityView::get` with guard returns. A
 //! successful call hands back [`Ref`] / [`Mut`] guards (or a tuple of them);
@@ -15,7 +15,7 @@
 //! zero defer FFI, and a shared-register write lazily opens one episode-scoped
 //! level only while a guard is live. Owned copy-out of optional/absent
 //! components stays on [`EntityView::try_cloned`], surfaced here as
-//! [`EntityGuardExt::cloned_owned`].
+//! [`EntityGuardExt::cloned`].
 
 use core::ffi::c_void;
 use core::ptr::NonNull;
@@ -314,11 +314,11 @@ where
     }
 }
 
-/// A request shape for [`EntityGuardExt::get_ref`]: `&T`, `&mut T`, or a tuple
+/// A request shape for [`EntityGuardExt::get`]: `&T`, `&mut T`, or a tuple
 /// of those. Produces the matching guard or tuple of guards.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid guard request",
-    label = "not a `get_ref` request",
+    label = "not a `get` request",
     note = "request one component as `&T` / `&mut T` (optional: `Option<&T>` / `Option<&mut T>`), or a tuple of up to 32 of those"
 )]
 pub trait GuardTuple<'w>: GetTuple {
@@ -468,7 +468,7 @@ macro_rules! impl_guard_tuple {
 tuples!(impl_guard_tuple, 1, 32);
 
 /// Shared-register component access on [`EntityView`]. Provisional names; the
-/// intended final surface renames `get_ref` to `get`.
+/// intended final surface renames `get` to `get`.
 pub trait EntityGuardExt<'a> {
     /// Borrow one or more components, returning guards. Panics on a borrow
     /// conflict (like `RefCell::borrow`); returns `None` if the entity is not
@@ -487,30 +487,30 @@ pub trait EntityGuardExt<'a> {
     ///
     /// let world = World::new();
     /// let e = world.entity();
-    /// let _ = e.get_ref::<i32>();
+    /// let _ = e.get::<i32>();
     /// ```
-    fn get_ref<G: GuardTuple<'a>>(self) -> Option<G::Guards>;
+    fn get<G: GuardTuple<'a>>(self) -> Option<G::Guards>;
 
-    /// Fallible [`get_ref`](EntityGuardExt::get_ref): returns the conflict (or
+    /// Fallible [`get`](EntityGuardExt::get): returns the conflict (or
     /// missing/not-alive) as an [`AccessError`] instead of panicking.
-    fn try_get_ref<G: GuardTuple<'a>>(self) -> Result<G::Guards, AccessError>;
+    fn try_get<G: GuardTuple<'a>>(self) -> Result<G::Guards, AccessError>;
 
     /// Owned copy-out with no guard held after return. Thin alias for
     /// [`EntityView::try_cloned`], included for API symmetry.
-    fn cloned_owned<T: ClonedTuple>(self) -> Option<T::TupleType<'a>>;
+    fn cloned<T: ClonedTuple>(self) -> Option<T::TupleType<'a>>;
 }
 
 impl<'a> EntityGuardExt<'a> for EntityView<'a> {
     #[inline]
-    fn try_get_ref<G: GuardTuple<'a>>(self) -> Result<G::Guards, AccessError> {
+    fn try_get<G: GuardTuple<'a>>(self) -> Result<G::Guards, AccessError> {
         // SAFETY: self.world and self.id name the same live world.
         unsafe { G::acquire(self.world, self.id) }
     }
 
     #[inline]
     #[track_caller]
-    fn get_ref<G: GuardTuple<'a>>(self) -> Option<G::Guards> {
-        // SAFETY: as try_get_ref.
+    fn get<G: GuardTuple<'a>>(self) -> Option<G::Guards> {
+        // SAFETY: as try_get.
         match unsafe { G::acquire(self.world, self.id) } {
             Ok(guards) => Some(guards),
             Err(AccessError::Conflict { component, write }) => {
@@ -521,7 +521,7 @@ impl<'a> EntityGuardExt<'a> for EntityView<'a> {
     }
 
     #[inline]
-    fn cloned_owned<T: ClonedTuple>(self) -> Option<T::TupleType<'a>> {
+    fn cloned<T: ClonedTuple>(self) -> Option<T::TupleType<'a>> {
         self.try_cloned::<T>()
     }
 }

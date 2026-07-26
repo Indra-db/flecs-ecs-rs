@@ -50,7 +50,7 @@ impl WorldSingletonExt for World {
     {
         // The singleton entity is T's own component entity.
         let component = T::entity_id(self);
-        self.entity_from_id(component).get_ref::<&T>()
+        self.entity_from_id(component).get::<&T>()
     }
 
     #[inline]
@@ -59,6 +59,6 @@ impl WorldSingletonExt for World {
         T: ComponentId + ComponentOrPairId + DataComponent,
     {
         let component = T::entity_id(&*self);
-        self.get_exclusive::<T>(component)
+        self.get_mut::<T>(component)
     }
 }

@@ -16,7 +16,7 @@ use flecs_ecs::experimental::prelude::{CachedRef, EntityGuardExt, WorldEntityRef
 //     pair-id refs; `entity_ref::<T>` takes a single typed data component.
 //   - refs_base_type, refs_empty_base_type: a ref typed as one component but
 //     backed by a different component's storage (C++ base-class aliasing).
-//   - refs_untyped_get_ref_by_method, refs_untyped_runtime_component_ref: untyped
+//   - refs_untyped_get_by_method, refs_untyped_runtime_component_ref: untyped
 //     (`c_void`) refs; the typed cache has no untyped form.
 //   - refs_get_component (`.component()`), refs_ref_world (`.world()`): accessors
 //     removed from the typed cache.
@@ -24,7 +24,7 @@ use flecs_ecs::experimental::prelude::{CachedRef, EntityGuardExt, WorldEntityRef
 // ─── Basic ref access ────────────────────────────────────────────────────────
 
 #[test]
-fn refs_get_ref_by_ptr() {
+fn refs_get_by_ptr() {
     let world = World::new();
 
     let e = world.entity().set(Position { x: 10, y: 20 });
@@ -36,7 +36,7 @@ fn refs_get_ref_by_ptr() {
 }
 
 #[test]
-fn refs_get_ref_by_method() {
+fn refs_get_by_method() {
     let world = World::new();
 
     let e = world.entity().set(Position { x: 10, y: 20 });
@@ -107,7 +107,7 @@ fn refs_non_const_ref() {
         pos.x += 1;
     }
 
-    let pos = e.get_ref::<&Position>().unwrap();
+    let pos = e.get::<&Position>().unwrap();
     assert_eq!(pos.x, 11);
 }
 

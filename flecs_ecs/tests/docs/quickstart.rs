@@ -64,7 +64,7 @@ fn flecs_quickstart_concepts_component_05() {
 
     // Get a component
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         println!("Position: ({}, {})", p.x, p.y);
     };
 
@@ -89,7 +89,7 @@ fn flecs_quickstart_concepts_component_07() {
     let pos_e = world.entity_from::<Position>();
 
     {
-        let c = pos_e.get_ref::<&flecs::Component>().unwrap();
+        let c = pos_e.get::<&flecs::Component>().unwrap();
         println!("Component size: {}", c.size);
     };
 }
@@ -258,7 +258,7 @@ fn flecs_quickstart_concepts_singleton_20() {
     grav_e.set(Gravity { value: 9.8 });
 
     {
-        let g = grav_e.get_ref::<&Gravity>().unwrap();
+        let g = grav_e.get::<&Gravity>().unwrap();
         println!("Gravity: {}", g.value);
     };
 }

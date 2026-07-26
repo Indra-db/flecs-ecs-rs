@@ -59,17 +59,17 @@ fn entity_get_panic_releases_safety_scope() {
     let entity = world.entity().set(Foo(1));
 
     let result = catch_unwind(AssertUnwindSafe(|| {
-        let _foo = entity.get_ref::<&mut Foo>().unwrap();
+        let _foo = entity.get::<&mut Foo>().unwrap();
         panic!("expected");
     }));
 
     assert!(result.is_err());
     {
-        let mut foo = entity.get_ref::<&mut Foo>().unwrap();
+        let mut foo = entity.get::<&mut Foo>().unwrap();
         foo.0 += 1;
     }
     {
-        let foo = entity.get_ref::<&Foo>().unwrap();
+        let foo = entity.get::<&Foo>().unwrap();
         assert_eq!(foo.0, 2);
     }
 }
@@ -117,20 +117,20 @@ fn partial_tuple_acquisition_rolls_back_prior_keys() {
     let entity = world.entity().set(Foo(1)).set(Bar(1));
 
     {
-        let _foo = entity.get_ref::<&mut Foo>().unwrap();
+        let _foo = entity.get::<&mut Foo>().unwrap();
         let result = catch_unwind(AssertUnwindSafe(|| {
-            let _ = entity.get_ref::<(&mut Bar, &mut Foo)>();
+            let _ = entity.get::<(&mut Bar, &mut Foo)>();
         }));
 
         assert!(result.is_err());
         {
-            let mut bar = entity.get_ref::<&mut Bar>().unwrap();
+            let mut bar = entity.get::<&mut Bar>().unwrap();
             bar.0 += 1;
         }
     }
 
     {
-        let bar = entity.get_ref::<&Bar>().unwrap();
+        let bar = entity.get::<&Bar>().unwrap();
         assert_eq!(bar.0, 2);
     }
 }

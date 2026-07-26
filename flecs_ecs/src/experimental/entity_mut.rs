@@ -28,7 +28,7 @@
 //! world owns different storage and cannot alias this one's components. Nor does
 //! it attempt to exclude raw-pointer aliasing produced by `unsafe` code, which
 //! is already outside the safe API. This is exactly the guarantee validated by
-//! [`WorldExclusiveExt::get_exclusive`](crate::experimental::exclusive::WorldExclusiveExt::get_exclusive).
+//! [`WorldExclusiveExt::get_mut`](crate::experimental::exclusive::WorldExclusiveExt::get_mut).
 
 use core::marker::PhantomData;
 

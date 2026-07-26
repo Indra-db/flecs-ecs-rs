@@ -69,7 +69,7 @@ fn each_shared_legal_while_other_shared_borrow_live() {
     let q = query!(world, &mut Position, &Velocity).build();
 
     // A live guard on a component the query does not name must not conflict.
-    let h = unrelated.get_ref::<&super::Health>().unwrap();
+    let h = unrelated.get::<&super::Health>().unwrap();
     let mut rows = 0;
     q.each_shared(&world, |(p, v)| {
         p.x += v.x;
@@ -141,7 +141,7 @@ fn each_shared_write_term_conflicts_with_callback_guard() {
     });
     let q = query!(world, &mut Position, &Velocity).build();
     q.each_shared(&world, |_| {
-        let _p = e.get_ref::<&Position>();
+        let _p = e.get::<&Position>();
     });
 }
 
@@ -155,7 +155,7 @@ fn each_entity_shared_write_term_conflicts_with_callback_guard() {
     seed(&world, 1);
     let q = query!(world, &mut Position, &Velocity).build();
     q.each_entity_shared(&world, |e, _| {
-        let _p = e.get_ref::<&mut Position>();
+        let _p = e.get::<&mut Position>();
     });
 }
 
@@ -172,7 +172,7 @@ fn write_guard_held_across_each_shared_conflicts() {
         y: 0,
     });
     let q = query!(world, &Position, &Velocity).build();
-    let _p = e.get_ref::<&mut Position>().unwrap();
+    let _p = e.get::<&mut Position>().unwrap();
     q.each_shared(&world, |_| {});
 }
 

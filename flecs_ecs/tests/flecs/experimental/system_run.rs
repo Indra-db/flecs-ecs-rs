@@ -44,7 +44,7 @@ fn run_with_runs_the_system() {
     sys.run_with(&mut world, RunArgs::default());
 
     {
-        let c = world.entity_from_id(e).get_ref::<&Counter>().unwrap();
+        let c = world.entity_from_id(e).get::<&Counter>().unwrap();
         assert_eq!(c.0, 2);
     };
 }
@@ -96,7 +96,7 @@ fn run_with_and_progress_mix_in_one_frame() {
     sys.run_with(&mut world, RunArgs::default());
 
     {
-        let c = world.entity_from_id(e).get_ref::<&Counter>().unwrap();
+        let c = world.entity_from_id(e).get::<&Counter>().unwrap();
         assert_eq!(c.0, 2);
     };
 }

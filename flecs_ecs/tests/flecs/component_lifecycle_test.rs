@@ -437,7 +437,7 @@ fn ctor_on_add() {
     assert!(e.has(PodDefaultCloneDrop::id()));
 
     {
-        let (pod,) = e.get_ref::<(Option<&PodDefaultCloneDrop>,)>().unwrap();
+        let (pod,) = e.get::<(Option<&PodDefaultCloneDrop>,)>().unwrap();
         assert!(pod.is_some());
         test_pod_ctor(1);
         test_pod_clone(0);
@@ -529,7 +529,7 @@ fn copy_on_set() {
     test_pod_clone(0);
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 42);
     }
 
@@ -565,7 +565,7 @@ fn copy_on_override() {
     test_pod_clone(1);
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 100);
     }
 
@@ -679,7 +679,7 @@ fn struct_w_string_add() {
     assert!(e.has(StructWithString::id()));
 
     {
-        let str_comp = e.get_ref::<&StructWithString>().unwrap();
+        let str_comp = e.get::<&StructWithString>().unwrap();
         assert_eq!(str_comp.value, "");
     }
 }
@@ -707,7 +707,7 @@ fn struct_w_string_set() {
     assert!(e.has(StructWithString::id()));
 
     {
-        let str_comp = e.get_ref::<&StructWithString>().unwrap();
+        let str_comp = e.get::<&StructWithString>().unwrap();
         assert_eq!(str_comp.value, "Hello World");
     }
 }
@@ -729,7 +729,7 @@ fn struct_w_string_override() {
     e.add(StructWithString::id());
 
     {
-        let str_comp = e.get_ref::<&StructWithString>().unwrap();
+        let str_comp = e.get::<&StructWithString>().unwrap();
         assert_eq!(str_comp.value, "Hello World");
     }
 }
@@ -742,28 +742,28 @@ fn struct_w_string_add_2_remove() {
     let e2 = world.entity().add(StructWithString::id());
 
     {
-        let str1 = e1.get_ref::<&StructWithString>().unwrap();
+        let str1 = e1.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "");
     }
     {
-        let str2 = e2.get_ref::<&StructWithString>().unwrap();
+        let str2 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str2.value, "");
     }
 
     e1.remove(StructWithString::id());
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str2 = e2.get_ref::<&StructWithString>().unwrap();
+        let str2 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str2.value, "");
     }
 
     e2.remove(StructWithString::id());
     {
-        let (str2,) = e2.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str2,) = e2.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str2.is_none());
     }
 }
@@ -776,28 +776,28 @@ fn struct_w_string_set_2_remove() {
     let e2 = world.entity().set(StructWithString::new("world"));
 
     {
-        let str1 = e1.get_ref::<&StructWithString>().unwrap();
+        let str1 = e1.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "hello");
     }
     {
-        let str2 = e2.get_ref::<&StructWithString>().unwrap();
+        let str2 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str2.value, "world");
     }
 
     e1.remove(StructWithString::id());
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str2 = e2.get_ref::<&StructWithString>().unwrap();
+        let str2 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str2.value, "world");
     }
 
     e2.remove(StructWithString::id());
     {
-        let (str2,) = e2.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str2,) = e2.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str2.is_none());
     }
 }
@@ -810,31 +810,31 @@ fn struct_w_string_add_2_remove_w_tag() {
     let e2 = world.entity().add(Tag).add(StructWithString::id());
 
     {
-        let str1 = e1.get_ref::<&StructWithString>().unwrap();
+        let str1 = e1.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "");
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithString>().unwrap();
+        let str1 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "");
     }
 
     e1.remove(StructWithString::id());
 
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithString>().unwrap();
+        let str1 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "");
     }
 
     e2.remove(StructWithString::id());
 
     {
-        let (str1,) = e2.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str1,) = e2.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str1.is_none());
     }
 }
@@ -847,31 +847,31 @@ fn struct_w_string_set_2_remove_w_tag() {
     let e2 = world.entity().add(Tag).set(StructWithString::new("world"));
 
     {
-        let str1 = e1.get_ref::<&StructWithString>().unwrap();
+        let str1 = e1.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "hello");
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithString>().unwrap();
+        let str1 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "world");
     }
 
     e1.remove(StructWithString::id());
 
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithString>().unwrap();
+        let str1 = e2.get::<&StructWithString>().unwrap();
         assert_eq!(str1.value, "world");
     }
 
     e2.remove(StructWithString::id());
 
     {
-        let (str1,) = e2.get_ref::<(Option<&StructWithString>,)>().unwrap();
+        let (str1,) = e2.get::<(Option<&StructWithString>,)>().unwrap();
         assert!(str1.is_none());
     }
 }
@@ -886,7 +886,7 @@ fn struct_w_vector_add() {
     assert!(e.has(StructWithVector::id()));
 
     {
-        let str_comp = e.get_ref::<&StructWithVector>().unwrap();
+        let str_comp = e.get::<&StructWithVector>().unwrap();
         assert_eq!(str_comp.value, Vec::<i32>::default());
     }
 }
@@ -914,7 +914,7 @@ fn struct_w_vector_set() {
     assert!(e.has(StructWithVector::id()));
 
     {
-        let str_comp = e.get_ref::<&StructWithVector>().unwrap();
+        let str_comp = e.get::<&StructWithVector>().unwrap();
         assert_eq!(str_comp.value, vec![1, 2]);
     }
 }
@@ -936,7 +936,7 @@ fn struct_w_vector_override() {
     e.add(StructWithVector::id());
 
     {
-        let str_comp = e.get_ref::<&StructWithVector>().unwrap();
+        let str_comp = e.get::<&StructWithVector>().unwrap();
         assert_eq!(str_comp.value, vec![1, 2]);
     }
 }
@@ -949,28 +949,28 @@ fn struct_w_vector_add_2_remove() {
     let e2 = world.entity().add(StructWithVector::id());
 
     {
-        let str1 = e1.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e1.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, Vec::<i32>::new());
     }
     {
-        let str2 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str2 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str2.value, Vec::<i32>::new());
     }
 
     e1.remove(StructWithVector::id());
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str2 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str2 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str2.value, Vec::<i32>::new());
     }
 
     e2.remove(StructWithVector::id());
     {
-        let (str2,) = e2.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str2,) = e2.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str2.is_none());
     }
 }
@@ -983,28 +983,28 @@ fn struct_w_vector_set_2_remove() {
     let e2 = world.entity().set(StructWithVector::new(&[3, 4]));
 
     {
-        let str1 = e1.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e1.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, vec![1, 2]);
     }
     {
-        let str2 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str2 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str2.value, vec![3, 4]);
     }
 
     e1.remove(StructWithVector::id());
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str2 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str2 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str2.value, vec![3, 4]);
     }
 
     e2.remove(StructWithVector::id());
     {
-        let (str2,) = e2.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str2,) = e2.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str2.is_none());
     }
 }
@@ -1017,31 +1017,31 @@ fn struct_w_vector_add_2_remove_w_tag() {
     let e2 = world.entity().add(Tag).add(StructWithVector::id());
 
     {
-        let str1 = e1.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e1.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, Vec::<i32>::new());
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, Vec::<i32>::new());
     }
 
     e1.remove(StructWithVector::id());
 
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, Vec::<i32>::new());
     }
 
     e2.remove(StructWithVector::id());
 
     {
-        let (str1,) = e2.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str1,) = e2.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str1.is_none());
     }
 }
@@ -1054,31 +1054,31 @@ fn struct_w_vector_set_2_remove_w_tag() {
     let e2 = world.entity().add(Tag).set(StructWithVector::new(&[3, 4]));
 
     {
-        let str1 = e1.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e1.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, vec![1, 2]);
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, vec![3, 4]);
     }
 
     e1.remove(StructWithVector::id());
 
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str1 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, vec![3, 4]);
     }
 
     e2.remove(StructWithVector::id());
 
     {
-        let (str1,) = e2.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str1,) = e2.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str1.is_none());
     }
 
@@ -1098,7 +1098,7 @@ fn implicit_component() {
     assert!(e.has(PodDefaultCloneDrop::id()));
 
     {
-        let (pod,) = e.get_ref::<(Option<&PodDefaultCloneDrop>,)>().unwrap();
+        let (pod,) = e.get::<(Option<&PodDefaultCloneDrop>,)>().unwrap();
         assert!(pod.is_some());
         test_pod_ctor(1);
         test_pod_clone(0);
@@ -1130,7 +1130,7 @@ fn implicit_component_after_query() {
     assert!(e.has(PodDefaultCloneDrop::id()));
 
     {
-        let (pod,) = e.get_ref::<(Option<&PodDefaultCloneDrop>,)>().unwrap();
+        let (pod,) = e.get::<(Option<&PodDefaultCloneDrop>,)>().unwrap();
         assert!(pod.is_some());
         test_pod_ctor(1);
         test_pod_clone(0);
@@ -1336,9 +1336,9 @@ fn grow_no_default_invoked() {
     test_no_default_invoked_clone(0);
     test_no_default_invoked_drop(0);
 
-    { let val = e.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
 }
 
 #[test]
@@ -1360,9 +1360,9 @@ fn grow_no_default_invoked_w_tag() {
     test_no_default_invoked_clone(0);
     test_no_default_invoked_drop(0);
 
-    { let val = e.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
 
     e.add(Tag);
     test_no_default_invoked_ctor(3);
@@ -1397,9 +1397,9 @@ fn grow_no_default_invoked_w_component() {
     test_no_default_invoked_clone(0);
     test_no_default_invoked_drop(0);
 
-    { let val = e.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
 
     e.add(Position::id());
     test_no_default_invoked_ctor(3);
@@ -1429,9 +1429,9 @@ fn delete_no_default_ctor() {
     test_no_default_clone(0);
     test_no_default_drop(0);
 
-    { let val = e1.get_ref::<&NoDefault>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefault>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefault>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e1.get::<&NoDefault>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefault>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefault>().unwrap(); assert_eq!(val.value, 3) }
 
     e2.destruct();
     test_no_default_ctor(3);
@@ -1447,7 +1447,7 @@ fn on_add_hook() {
 
     world.component::<Position>().on_add(|e, _| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     let e = world.entity().set(Position { x: 1, y: 2 });
@@ -1459,7 +1459,7 @@ fn on_add_hook() {
 
     world.new_query::<&Position>().each_entity(|e, _| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
@@ -1485,7 +1485,7 @@ fn on_remove_hook() {
 
     world.new_query::<&Position>().each_entity(|e, _| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1503,7 +1503,7 @@ fn on_set_hook() {
 
     world.component::<Position>().on_set(|e, _| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1513,13 +1513,13 @@ fn on_set_hook() {
 
     e1.set(Position { x: 10, y: 20 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
-    let v = e1.cloned_owned::<&Position>().unwrap();
+    let v = e1.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 10);
     assert_eq!(v.y, 20);
 
     let e2 = world.entity().set(Position { x: 30, y: 40 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
-    let v = e2.cloned_owned::<&Position>().unwrap();
+    let v = e2.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 30);
     assert_eq!(v.y, 40);
 }
@@ -1536,7 +1536,7 @@ fn on_add_hook_w_entity() {
     world.component::<Position>().on_add(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1566,7 +1566,7 @@ fn on_remove_hook_w_entity() {
     world.component::<Position>().on_remove(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1599,7 +1599,7 @@ fn on_set_hook_w_entity() {
     world.component::<Position>().on_set(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1610,14 +1610,14 @@ fn on_set_hook_w_entity() {
     e1.set(Position { x: 10, y: 20 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
     assert_eq!(e_arg.get(), *e1.id());
-    let v = e1.cloned_owned::<&Position>().unwrap();
+    let v = e1.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 10);
     assert_eq!(v.y, 20);
 
     let e2 = world.entity().set(Position { x: 30, y: 40 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
     assert_eq!(e_arg.get(), *e2.id());
-    let v = e2.cloned_owned::<&Position>().unwrap();
+    let v = e2.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 30);
     assert_eq!(v.y, 40);
 }
@@ -1631,7 +1631,7 @@ fn on_add_hook_sparse() {
     world.component::<Position>().add_trait::<flecs::Sparse>();
     world.component::<Position>().on_add(|e, _| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1652,7 +1652,7 @@ fn on_remove_hook_sparse() {
     world.component::<Position>().add_trait::<flecs::Sparse>();
     world.component::<Position>().on_remove(|e, _| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1676,7 +1676,7 @@ fn on_set_hook_sparse() {
     world.component::<Position>().add_trait::<flecs::Sparse>();
     world.component::<Position>().on_set(|e, _| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1686,13 +1686,13 @@ fn on_set_hook_sparse() {
 
     e1.set(Position { x: 10, y: 20 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
-    let v = e1.cloned_owned::<&Position>().unwrap();
+    let v = e1.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 10);
     assert_eq!(v.y, 20);
 
     let e2 = world.entity().set(Position { x: 30, y: 40 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
-    let v = e2.cloned_owned::<&Position>().unwrap();
+    let v = e2.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 30);
     assert_eq!(v.y, 40);
 }
@@ -1710,7 +1710,7 @@ fn on_add_hook_sparse_w_entity() {
     world.component::<Position>().on_add(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1741,7 +1741,7 @@ fn on_remove_hook_sparse_w_entity() {
     world.component::<Position>().on_remove(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1775,7 +1775,7 @@ fn on_set_hook_sparse_w_entity() {
     world.component::<Position>().on_set(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -1786,14 +1786,14 @@ fn on_set_hook_sparse_w_entity() {
     e1.set(Position { x: 10, y: 20 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
     assert_eq!(e_arg.get(), *e1.id());
-    let v = e1.cloned_owned::<&Position>().unwrap();
+    let v = e1.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 10);
     assert_eq!(v.y, 20);
 
     let e2 = world.entity().set(Position { x: 30, y: 40 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
     assert_eq!(e_arg.get(), *e2.id());
-    let v = e2.cloned_owned::<&Position>().unwrap();
+    let v = e2.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 30);
     assert_eq!(v.y, 40);
 }
@@ -1893,7 +1893,7 @@ fn defer_set() {
     test_pod_drop(0);
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 5);
     }
 
@@ -1948,7 +1948,7 @@ fn set_pair_no_copy() {
     let e = world.entity().set_pair::<NoCopy, Tag>(NoCopy::new(100));
 
     {
-        let no_copy = e.get_ref::<&(NoCopy, Tag)>().unwrap();
+        let no_copy = e.get::<&(NoCopy, Tag)>().unwrap();
         assert_eq!(no_copy.value, 100);
     }
 }
@@ -1988,7 +1988,7 @@ fn set_override_no_copy() {
     let e = world.entity().set_auto_override(NoCopy::new(100));
 
     {
-        let no_copy = e.get_ref::<&NoCopy>().unwrap();
+        let no_copy = e.get::<&NoCopy>().unwrap();
         assert_eq!(no_copy.value, 100);
     }
 
@@ -2005,7 +2005,7 @@ fn set_override_pair_no_copy() {
         .set_pair_override::<NoCopy, Tag>(NoCopy::new(10));
 
     {
-        let no_copy = e.get_ref::<&(NoCopy, Tag)>().unwrap();
+        let no_copy = e.get::<&(NoCopy, Tag)>().unwrap();
         assert_eq!(no_copy.value, 10);
     }
 
@@ -2057,7 +2057,7 @@ fn dtor_after_defer_set() {
     test_pod_clone(0);
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 10);
     }
 
@@ -2085,7 +2085,7 @@ fn dtor_with_relation() {
     test_pod_drop(0);
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 100);
     }
 
@@ -2111,7 +2111,7 @@ fn dtor_relation_target() {
     test_no_default_invoked_drop(0);
 
     {
-        let val = e2.get_ref::<&NoDefaultInvoked>().unwrap();
+        let val = e2.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(val.value, 5);
     }
 
@@ -2144,7 +2144,7 @@ fn sparse_component() {
     assert!(e.has(PodDefaultCloneDrop::id()));
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 10);
     }
 
@@ -2257,7 +2257,7 @@ fn on_replace_hook() {
 
     world.component::<Position>().on_replace(|e, _t1, _t2| {
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     let e1 = world.entity().set(Position { x: 1, y: 2 });
@@ -2266,18 +2266,18 @@ fn on_replace_hook() {
 
     e1.set(Position { x: 3, y: 4 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
-    let v = e1.cloned_owned::<&Position>().unwrap();
+    let v = e1.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 3);
     assert_eq!(v.y, 4);
 
     let e2 = world.entity().set(Position { x: 5, y: 6 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 1);
-    let v = e2.cloned_owned::<&Position>().unwrap();
+    let v = e2.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 5);
     assert_eq!(v.y, 6);
     e2.set(Position { x: 7, y: 8 });
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 2);
-    let v = e2.cloned_owned::<&Position>().unwrap();
+    let v = e2.cloned::<&Position>().unwrap();
     assert_eq!(v.x, 7);
     assert_eq!(v.y, 8);
 }
@@ -2291,7 +2291,7 @@ fn lifecycle_struct_w_vector_set() {
     assert!(e.has(StructWithVector::id()));
 
     {
-        let str_comp = e.get_ref::<&StructWithVector>().unwrap();
+        let str_comp = e.get::<&StructWithVector>().unwrap();
         assert_eq!(str_comp.value, vec![1, 2]);
     }
 }
@@ -2312,7 +2312,7 @@ fn lifecycle_struct_w_vector_override() {
     e.add(StructWithVector::id());
 
     {
-        let str_comp = e.get_ref::<&StructWithVector>().unwrap();
+        let str_comp = e.get::<&StructWithVector>().unwrap();
         assert_eq!(str_comp.value, vec![1, 2]);
     }
 }
@@ -2325,28 +2325,28 @@ fn lifecycle_struct_w_vector_set_2_remove() {
     let e2 = world.entity().set(StructWithVector::new(&[3, 4]));
 
     {
-        let str1 = e1.get_ref::<&StructWithVector>().unwrap();
+        let str1 = e1.get::<&StructWithVector>().unwrap();
         assert_eq!(str1.value, vec![1, 2]);
     }
     {
-        let str2 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str2 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str2.value, vec![3, 4]);
     }
 
     e1.remove(StructWithVector::id());
     {
-        let (str1,) = e1.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str1,) = e1.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str1.is_none());
     }
 
     {
-        let str2 = e2.get_ref::<&StructWithVector>().unwrap();
+        let str2 = e2.get::<&StructWithVector>().unwrap();
         assert_eq!(str2.value, vec![3, 4]);
     }
 
     e2.remove(StructWithVector::id());
     {
-        let (str2,) = e2.get_ref::<(Option<&StructWithVector>,)>().unwrap();
+        let (str2,) = e2.get::<(Option<&StructWithVector>,)>().unwrap();
         assert!(str2.is_none());
     }
 }
@@ -2362,7 +2362,7 @@ fn lifecycle_on_add_hook_sparse_w_iter() {
     world.component::<Position>().on_add(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -2391,7 +2391,7 @@ fn lifecycle_on_remove_hook_sparse_w_iter() {
     world.component::<Position>().on_remove(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -2425,9 +2425,9 @@ fn lifecycle_on_set_hook_sparse_w_iter() {
     world.component::<Position>().on_set(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
         {
-            let p = e.get_ref::<&Position>().unwrap();
+            let p = e.get::<&Position>().unwrap();
             v_clone.set(*p);
         }
     });
@@ -2498,7 +2498,7 @@ fn lifecycle_emplace_w_ctor() {
     test_pod_drop(0);
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 10);
     }
 
@@ -2514,7 +2514,7 @@ fn lifecycle_emplace_no_default_ctor() {
     test_no_default_invoked_drop(0);
 
     {
-        let val = e.get_ref::<&NoDefaultInvoked>().unwrap();
+        let val = e.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(val.value, 10);
     }
 
@@ -2564,7 +2564,7 @@ fn lifecycle_emplace_defer_use_move_ctor() {
     test_no_default_invoked_drop(0);
 
     {
-        let val = e.get_ref::<&NoDefaultInvoked>().unwrap();
+        let val = e.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(val.value, 10);
     }
 
@@ -2595,9 +2595,9 @@ fn lifecycle_grow_no_default_ctor() {
     assert!(e2.has(NoDefaultInvoked::id()));
     assert!(e3.has(NoDefaultInvoked::id()));
 
-    { let val = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
 
     drop(world);
 
@@ -2626,9 +2626,9 @@ fn lifecycle_grow_no_default_ctor_move() {
     assert!(e2.has(NoDefaultInvoked::id()));
     assert!(e3.has(NoDefaultInvoked::id()));
 
-    { let val = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
 
     reset_count_no_default_counters();
     e1.add(Tag);
@@ -2677,9 +2677,9 @@ fn lifecycle_grow_no_default_ctor_move_w_component() {
     assert!(e2.has(NoDefaultInvoked::id()));
     assert!(e3.has(NoDefaultInvoked::id()));
 
-    { let val = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(val.value, 3) }
 
     reset_count_no_default_counters();
     e1.add(Position::id());
@@ -2718,9 +2718,9 @@ fn lifecycle_delete_no_default_ctor() {
     test_no_default_ctor(3);
     test_no_default_drop(0);
 
-    { let val = e1.get_ref::<&NoDefault>().unwrap(); assert_eq!(val.value, 1) }
-    { let val = e2.get_ref::<&NoDefault>().unwrap(); assert_eq!(val.value, 2) }
-    { let val = e3.get_ref::<&NoDefault>().unwrap(); assert_eq!(val.value, 3) }
+    { let val = e1.get::<&NoDefault>().unwrap(); assert_eq!(val.value, 1) }
+    { let val = e2.get::<&NoDefault>().unwrap(); assert_eq!(val.value, 2) }
+    { let val = e3.get::<&NoDefault>().unwrap(); assert_eq!(val.value, 3) }
 
     e2.destruct();
 
@@ -2741,11 +2741,11 @@ fn lifecycle_move_ctor_no_default_ctor() {
     assert!(e1.has(Tag));
 
     {
-        let ptr = e1.get_ref::<&NoDefaultInvoked>().unwrap();
+        let ptr = e1.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(ptr.value, 1);
     }
     {
-        let ptr = e2.get_ref::<&NoDefaultInvoked>().unwrap();
+        let ptr = e2.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(ptr.value, 2);
     }
 }
@@ -2853,7 +2853,7 @@ fn component_lifecycle_emplace_w_ctor() {
     let e = world.entity().set(EmplaceTest::new(10));
 
     {
-        let p = e.get_ref::<&EmplaceTest>().unwrap();
+        let p = e.get::<&EmplaceTest>().unwrap();
         assert_eq!(p.value, 10);
     }
 }
@@ -2869,7 +2869,7 @@ fn component_lifecycle_no_default_ctor_emplace() {
     test_no_default_invoked_drop(0);
 
     {
-        let p = e.get_ref::<&NoDefaultInvoked>().unwrap();
+        let p = e.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(p.value, 10);
     }
 
@@ -2902,7 +2902,7 @@ fn component_lifecycle_defer_emplace() {
     assert!(e.has(DeferEmplaceTest::id()));
 
     {
-        let p = e.get_ref::<&DeferEmplaceTest>().unwrap();
+        let p = e.get::<&DeferEmplaceTest>().unwrap();
         assert_eq!(p.x as i32, 10);
         assert_eq!(p.y as i32, 20);
     }
@@ -2923,7 +2923,7 @@ fn component_lifecycle_emplace_defer_use_move_ctor() {
 
     assert!(e.has(NoDefaultInvoked::id()));
     {
-        let p = e.get_ref::<&NoDefaultInvoked>().unwrap();
+        let p = e.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(p.value, 10);
     }
 }
@@ -2939,7 +2939,7 @@ fn component_lifecycle_emplace_existing() {
     let e = world.entity().set(PodDefaultCloneDrop::new(10));
 
     {
-        let pod = e.get_ref::<&PodDefaultCloneDrop>().unwrap();
+        let pod = e.get::<&PodDefaultCloneDrop>().unwrap();
         assert_eq!(pod.value, 10);
     }
 
@@ -3105,7 +3105,7 @@ fn component_lifecycle_no_move() {
 
     let e = world.entity().add(NoMoveComponent::id());
     {
-        let p = e.get_ref::<&NoMoveComponent>().unwrap();
+        let p = e.get::<&NoMoveComponent>().unwrap();
         assert_eq!(p.value, 99);
     }
 
@@ -3113,7 +3113,7 @@ fn component_lifecycle_no_move() {
     // with Sparse, the pointer stays stable
     e.add(Position::id());
     {
-        let p = e.get_ref::<&NoMoveComponent>().unwrap();
+        let p = e.get::<&NoMoveComponent>().unwrap();
         assert_eq!(p.value, 99);
     }
 }
@@ -3128,13 +3128,13 @@ fn component_lifecycle_no_move_ctor() {
 
     let e = world.entity().add(NoMoveComponent::id());
     {
-        let p = e.get_ref::<&NoMoveComponent>().unwrap();
+        let p = e.get::<&NoMoveComponent>().unwrap();
         assert_eq!(p.value, 99);
     }
 
     e.add(Position::id());
     {
-        let p = e.get_ref::<&NoMoveComponent>().unwrap();
+        let p = e.get::<&NoMoveComponent>().unwrap();
         assert_eq!(p.value, 99);
     }
 }
@@ -3149,13 +3149,13 @@ fn component_lifecycle_no_move_assign() {
 
     let e = world.entity().add(NoMoveComponent::id());
     {
-        let p = e.get_ref::<&NoMoveComponent>().unwrap();
+        let p = e.get::<&NoMoveComponent>().unwrap();
         assert_eq!(p.value, 99);
     }
 
     e.add(Position::id());
     {
-        let p = e.get_ref::<&NoMoveComponent>().unwrap();
+        let p = e.get::<&NoMoveComponent>().unwrap();
         assert_eq!(p.value, 99);
     }
 }
@@ -3207,13 +3207,13 @@ fn component_lifecycle_default_ctor_w_value_ctor() {
 
     let e = world.entity().add(DefaultCtorValueCtor::id());
     {
-        let p = e.get_ref::<&DefaultCtorValueCtor>().unwrap();
+        let p = e.get::<&DefaultCtorValueCtor>().unwrap();
         assert_eq!(p.value, 99);
     }
 
     let e2 = world.entity().set(DefaultCtorValueCtor::new(42));
     {
-        let p = e2.get_ref::<&DefaultCtorValueCtor>().unwrap();
+        let p = e2.get::<&DefaultCtorValueCtor>().unwrap();
         assert_eq!(p.value, 42);
     }
 }
@@ -3230,7 +3230,7 @@ fn component_lifecycle_no_default_ctor_move_ctor_on_set() {
     assert!(e.has(NoDefaultInvoked::id()));
 
     {
-        let p = e.get_ref::<&NoDefaultInvoked>().unwrap();
+        let p = e.get::<&NoDefaultInvoked>().unwrap();
         assert_eq!(p.value, 10);
     }
 
@@ -3269,11 +3269,11 @@ fn component_lifecycle_move_ctor_no_default_ctor() {
     assert!(e1.has(Tag));
 
     {
-        let p = e1.get_ref::<&NonDefaultConstructible>().unwrap();
+        let p = e1.get::<&NonDefaultConstructible>().unwrap();
         assert_eq!(p.value, 1);
     }
     {
-        let p = e2.get_ref::<&NonDefaultConstructible>().unwrap();
+        let p = e2.get::<&NonDefaultConstructible>().unwrap();
         assert_eq!(p.value, 2);
     }
 }
@@ -3302,9 +3302,9 @@ fn component_lifecycle_grow_no_default_ctor() {
     assert!(e2.has(NoDefaultInvoked::id()));
     assert!(e3.has(NoDefaultInvoked::id()));
 
-    { let v = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
-    { let v = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
-    { let v = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
+    { let v = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
+    { let v = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
+    { let v = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
 }
 
 #[test]
@@ -3324,16 +3324,16 @@ fn component_lifecycle_grow_no_default_ctor_move() {
     test_no_default_invoked_ctor(3);
     test_no_default_invoked_clone(0);
 
-    { let v = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
-    { let v = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
-    { let v = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
+    { let v = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
+    { let v = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
+    { let v = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
 
     e1.add(Tag);
-    { let v = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
+    { let v = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
     e2.add(Tag);
-    { let v = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
+    { let v = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
     e3.add(Tag);
-    { let v = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
+    { let v = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
 }
 
 #[test]
@@ -3353,16 +3353,16 @@ fn component_lifecycle_grow_no_default_ctor_move_w_component() {
     test_no_default_invoked_ctor(3);
     test_no_default_invoked_clone(0);
 
-    { let v = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
-    { let v = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
-    { let v = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
+    { let v = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
+    { let v = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
+    { let v = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
 
     e1.add(Position::id());
-    { let v = e1.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
+    { let v = e1.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 1) }
     e2.add(Position::id());
-    { let v = e2.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
+    { let v = e2.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 2) }
     e3.add(Position::id());
-    { let v = e3.get_ref::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
+    { let v = e3.get::<&NoDefaultInvoked>().unwrap(); assert_eq!(v.value, 3) }
 }
 
 // dtor_w_non_trivial_implicit_move — drop fires when entity is destructed
@@ -3407,8 +3407,8 @@ fn component_lifecycle_dtor_w_non_trivial_implicit_move() {
     let e1 = world.entity().set(CtorDtorNonTrivial::new(10));
     let e2 = world.entity().set(CtorDtorNonTrivial::new(20));
 
-    { let p = e1.get_ref::<&CtorDtorNonTrivial>().unwrap(); assert_eq!(p.value, 10) }
-    { let p = e2.get_ref::<&CtorDtorNonTrivial>().unwrap(); assert_eq!(p.value, 20) }
+    { let p = e1.get::<&CtorDtorNonTrivial>().unwrap(); assert_eq!(p.value, 10) }
+    { let p = e2.get::<&CtorDtorNonTrivial>().unwrap(); assert_eq!(p.value, 20) }
 
     assert_eq!(
         IMPLICIT_MOVE_CTOR.load(core::sync::atomic::Ordering::SeqCst),
@@ -3465,8 +3465,8 @@ fn component_lifecycle_dtor_w_non_trivial_explicit_move() {
     let e1 = world.entity().set(CtorDtorWithMoveAssign::new(10));
     let e2 = world.entity().set(CtorDtorWithMoveAssign::new(20));
 
-    { let p = e1.get_ref::<&CtorDtorWithMoveAssign>().unwrap(); assert_eq!(p.value, 10) }
-    { let p = e2.get_ref::<&CtorDtorWithMoveAssign>().unwrap(); assert_eq!(p.value, 20) }
+    { let p = e1.get::<&CtorDtorWithMoveAssign>().unwrap(); assert_eq!(p.value, 10) }
+    { let p = e2.get::<&CtorDtorWithMoveAssign>().unwrap(); assert_eq!(p.value, 20) }
 
     assert_eq!(
         EXPLICIT_MOVE_CTOR.load(core::sync::atomic::Ordering::SeqCst),
@@ -3534,7 +3534,7 @@ fn component_lifecycle_on_add_hook_sparse_w_iter() {
     world.component::<Position>().on_add(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -3566,7 +3566,7 @@ fn component_lifecycle_on_remove_hook_sparse_w_iter() {
     world.component::<Position>().on_remove(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);
@@ -3600,7 +3600,7 @@ fn component_lifecycle_on_set_hook_sparse_w_iter() {
     world.component::<Position>().on_set(move |e, _| {
         e_arg_clone.set(*e.id());
         let w = e.world();
-        w.entity_from_id(Count::entity_id(w)).get_ref::<&mut Count>().unwrap().0 += 1;
+        w.entity_from_id(Count::entity_id(w)).get::<&mut Count>().unwrap().0 += 1;
     });
 
     assert_eq!(WorldSingletonExt::singleton::<Count>(&world).unwrap().0, 0);

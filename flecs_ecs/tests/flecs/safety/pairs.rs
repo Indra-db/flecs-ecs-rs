@@ -17,9 +17,9 @@ mod wildcard_into_id {
 
             let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
                 {
-                    let _outer = entity.get_ref::<&(Foo, flecs::Wildcard)>().unwrap();
+                    let _outer = entity.get::<&(Foo, flecs::Wildcard)>().unwrap();
                     {
-                        let _inner = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
+                        let _inner = entity.get::<&mut (Foo, Bar)>().unwrap();
                     };
                 };
             }));
@@ -33,9 +33,9 @@ mod wildcard_into_id {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&(Foo, flecs::Wildcard)>().unwrap();
+                let _outer = entity.get::<&(Foo, flecs::Wildcard)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&(Foo, Bar)>().unwrap();
+                    let _inner = entity.get::<&(Foo, Bar)>().unwrap();
                 };
             };
         }
@@ -47,9 +47,9 @@ mod wildcard_into_id {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&(Foo, flecs::Wildcard)>().unwrap();
+                let _outer = entity.get::<&(Foo, flecs::Wildcard)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
+                    let _inner = entity.get::<&mut (Foo, Bar)>().unwrap();
                 };
             };
         }
@@ -61,9 +61,9 @@ mod wildcard_into_id {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&mut (Foo, flecs::Wildcard)>().unwrap();
+                let _outer = entity.get::<&mut (Foo, flecs::Wildcard)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&(Foo, Bar)>().unwrap();
+                    let _inner = entity.get::<&(Foo, Bar)>().unwrap();
                 };
             };
         }
@@ -75,8 +75,8 @@ mod wildcard_into_id {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _guard = entity.get_ref::<&mut (Foo, flecs::Wildcard)>().unwrap();
-                let _ = entity.cloned_owned::<&(Foo, Bar)>();
+                let _guard = entity.get::<&mut (Foo, flecs::Wildcard)>().unwrap();
+                let _ = entity.cloned::<&(Foo, Bar)>();
             };
         }
 
@@ -87,9 +87,9 @@ mod wildcard_into_id {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&mut (Foo, flecs::Wildcard)>().unwrap();
+                let _outer = entity.get::<&mut (Foo, flecs::Wildcard)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
+                    let _inner = entity.get::<&mut (Foo, Bar)>().unwrap();
                 };
             };
         }
@@ -355,7 +355,7 @@ mod wildcard_into_id {
                 .build()
                 .each_entity_shared(&world, |entity, _| {
                     {
-                        let _guard = entity.get_ref::<&(Foo, Bar)>().unwrap();
+                        let _guard = entity.get::<&(Foo, Bar)>().unwrap();
                     };
                 });
         }
@@ -370,7 +370,7 @@ mod wildcard_into_id {
                 .build()
                 .each_entity_shared(&world, |entity, _| {
                     {
-                        let _guard = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
+                        let _guard = entity.get::<&mut (Foo, Bar)>().unwrap();
                     };
                 });
         }
@@ -385,7 +385,7 @@ mod wildcard_into_id {
                 .build()
                 .each_entity_shared(&world, |entity, _| {
                     {
-                        let _guard = entity.get_ref::<&(Foo, Bar)>().unwrap();
+                        let _guard = entity.get::<&(Foo, Bar)>().unwrap();
                     };
                 });
         }
@@ -400,7 +400,7 @@ mod wildcard_into_id {
                 .build()
                 .each_entity_shared(&world, |entity, _| {
                     {
-                        let _guard = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
+                        let _guard = entity.get::<&mut (Foo, Bar)>().unwrap();
                     };
                 });
         }
@@ -418,9 +418,9 @@ mod id_into_wildcard {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&(Foo, Bar)>().unwrap();
+                let _outer = entity.get::<&(Foo, Bar)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&(Foo, flecs::Wildcard)>().unwrap();
+                    let _inner = entity.get::<&(Foo, flecs::Wildcard)>().unwrap();
                 };
             };
         }
@@ -430,9 +430,9 @@ mod id_into_wildcard {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&(Foo, Bar)>().unwrap();
+                let _outer = entity.get::<&(Foo, Bar)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&mut (Foo, flecs::Wildcard)>().unwrap();
+                    let _inner = entity.get::<&mut (Foo, flecs::Wildcard)>().unwrap();
                 };
             };
         }
@@ -442,9 +442,9 @@ mod id_into_wildcard {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
+                let _outer = entity.get::<&mut (Foo, Bar)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&(Foo, flecs::Wildcard)>().unwrap();
+                    let _inner = entity.get::<&(Foo, flecs::Wildcard)>().unwrap();
                 };
             };
         }
@@ -454,8 +454,8 @@ mod id_into_wildcard {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _guard = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
-                let _ = entity.cloned_owned::<&(Foo, flecs::Wildcard)>();
+                let _guard = entity.get::<&mut (Foo, Bar)>().unwrap();
+                let _ = entity.cloned::<&(Foo, flecs::Wildcard)>();
             };
         }
 
@@ -464,9 +464,9 @@ mod id_into_wildcard {
             let bar_id = world.component::<Bar>().id();
             let entity = world.entity().set_first(Foo(0), bar_id);
             {
-                let _outer = entity.get_ref::<&mut (Foo, Bar)>().unwrap();
+                let _outer = entity.get::<&mut (Foo, Bar)>().unwrap();
                 {
-                    let _inner = entity.get_ref::<&mut (Foo, flecs::Wildcard)>().unwrap();
+                    let _inner = entity.get::<&mut (Foo, flecs::Wildcard)>().unwrap();
                 };
             };
         }
@@ -734,7 +734,7 @@ mod id_into_wildcard {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &(Foo, Bar)).build().each_entity_shared(&world, |entity, _| {
                 {
-                    let _guard = entity.get_ref::<&(Foo, flecs::Wildcard)>().unwrap();
+                    let _guard = entity.get::<&(Foo, flecs::Wildcard)>().unwrap();
                 };
             });
         }
@@ -747,7 +747,7 @@ mod id_into_wildcard {
             world.entity().set_first(Foo(0), bar_id);
             query!(world, &(Foo, Bar)).build().each_entity_shared(&world, |entity, _| {
                 {
-                    let _guard = entity.get_ref::<&mut (Foo, flecs::Wildcard)>().unwrap();
+                    let _guard = entity.get::<&mut (Foo, flecs::Wildcard)>().unwrap();
                 };
             });
         }
@@ -762,7 +762,7 @@ mod id_into_wildcard {
                 .build()
                 .each_entity_shared(&world, |entity, _| {
                     {
-                        let _guard = entity.get_ref::<&(Foo, flecs::Wildcard)>().unwrap();
+                        let _guard = entity.get::<&(Foo, flecs::Wildcard)>().unwrap();
                     };
                 });
         }
@@ -777,7 +777,7 @@ mod id_into_wildcard {
                 .build()
                 .each_entity_shared(&world, |entity, _| {
                     {
-                        let _guard = entity.get_ref::<&mut (Foo, flecs::Wildcard)>().unwrap();
+                        let _guard = entity.get::<&mut (Foo, flecs::Wildcard)>().unwrap();
                     };
                 });
         }

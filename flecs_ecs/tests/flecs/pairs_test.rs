@@ -176,7 +176,7 @@ fn pairs_set_component_pair() {
     );
 
     {
-        let t = entity.get_ref::<&(PairData, Position)>().unwrap();
+        let t = entity.get::<&(PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 10);
     }
 }
@@ -380,7 +380,7 @@ fn pairs_ensure_pair() {
     e.set_pair::<PairData, Position>(PairData { value: 10.0 });
 
     {
-        let t = e.get_ref::<&(PairData, Position)>().unwrap();
+        let t = e.get::<&(PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 10);
     }
 }
@@ -395,13 +395,13 @@ fn pairs_ensure_pair_existing() {
 
     // Verify existing value, then mutate in-place
     {
-        let mut t = e.get_ref::<&mut (PairData, Position)>().unwrap();
+        let mut t = e.get::<&mut (PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 20);
         t.value = 10.0;
     }
 
     {
-        let t = e.get_ref::<&(PairData, Position)>().unwrap();
+        let t = e.get::<&(PairData, Position)>().unwrap();
         assert_eq!(t.value as i32, 10);
     }
 }
@@ -448,7 +448,7 @@ fn pairs_ensure_r_tag_o() {
         .set_pair::<Tag, Position>(Position { x: 10, y: 20 });
 
     {
-        let mut t = e.get_ref::<&mut (Tag, Position)>().unwrap();
+        let mut t = e.get::<&mut (Tag, Position)>().unwrap();
         assert_eq!(t.x, 10);
         assert_eq!(t.y, 20);
         t.x = 30;
@@ -456,7 +456,7 @@ fn pairs_ensure_r_tag_o() {
     }
 
     {
-        let t = e.get_ref::<&(Tag, Position)>().unwrap();
+        let t = e.get::<&(Tag, Position)>().unwrap();
         assert_eq!(t.x, 30);
         assert_eq!(t.y, 40);
     }
@@ -678,7 +678,7 @@ fn pairs_get_r_o() {
     assert!(e.has((Position::id(), Tag::id())));
 
     {
-        let ptr = e.get_ref::<&(Position, Tag)>().unwrap();
+        let ptr = e.get::<&(Position, Tag)>().unwrap();
         assert_eq!(ptr.x, 10);
         assert_eq!(ptr.y, 20);
     }
@@ -695,7 +695,7 @@ fn pairs_get_r_tag_o() {
     assert!(e.has((Tag::id(), Position::id())));
 
     {
-        let ptr = e.get_ref::<&(Tag, Position)>().unwrap();
+        let ptr = e.get::<&(Tag, Position)>().unwrap();
         assert_eq!(ptr.x, 10);
         assert_eq!(ptr.y, 20);
     }
@@ -1116,7 +1116,7 @@ fn pairs_get_1_pair_arg() {
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
     assert!(e.has((LocalEats::id(), LocalApples::id())));
 
-    let result = e.get_ref::<&(LocalEats, LocalApples)>();
+    let result = e.get::<&(LocalEats, LocalApples)>();
     assert!(result.is_some());
     assert_eq!(result.unwrap().amount, 10);
 }
@@ -1133,7 +1133,7 @@ fn pairs_get_2_pair_arg() {
     assert!(e.has((LocalEats::id(), LocalApples::id())));
     assert!(e.has((LocalEats::id(), LocalPears::id())));
 
-    let result = e.get_ref::<(&(LocalEats, LocalApples), &(LocalEats, LocalPears))>();
+    let result = e.get::<(&(LocalEats, LocalApples), &(LocalEats, LocalPears))>();
     assert!(result.is_some());
     let (a, p) = result.unwrap();
     assert_eq!(a.amount, 10);
@@ -1151,7 +1151,7 @@ fn pairs_set_1_pair_arg() {
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
 
     {
-        let eats = e.get_ref::<&(LocalEats, LocalApples)>().unwrap();
+        let eats = e.get::<&(LocalEats, LocalApples)>().unwrap();
         assert_eq!(eats.amount, 10);
     }
 }
@@ -1168,12 +1168,12 @@ fn pairs_set_2_pair_arg() {
         .set_pair::<LocalEats, LocalPears>(LocalEats { amount: 20 });
 
     {
-        let eats = e.get_ref::<&(LocalEats, LocalApples)>().unwrap();
+        let eats = e.get::<&(LocalEats, LocalApples)>().unwrap();
         assert_eq!(eats.amount, 10);
     }
 
     {
-        let eats = e.get_ref::<&(LocalEats, LocalPears)>().unwrap();
+        let eats = e.get::<&(LocalEats, LocalPears)>().unwrap();
         assert_eq!(eats.amount, 20);
     }
 }
@@ -1188,7 +1188,7 @@ fn pairs_get_inline_pair_type() {
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
     assert!(e.has((LocalEats::id(), LocalApples::id())));
 
-    let result = e.get_ref::<&(LocalEats, LocalApples)>();
+    let result = e.get::<&(LocalEats, LocalApples)>();
     assert!(result.is_some());
     assert_eq!(result.unwrap().amount, 10);
 }
@@ -1203,7 +1203,7 @@ fn pairs_set_inline_pair_type() {
         .set_pair::<LocalEats, LocalApples>(LocalEats { amount: 10 });
 
     {
-        let eats = e.get_ref::<&(LocalEats, LocalApples)>().unwrap();
+        let eats = e.get::<&(LocalEats, LocalApples)>().unwrap();
         assert_eq!(eats.amount, 10);
     }
 }
@@ -1220,7 +1220,7 @@ fn pairs_get_pair_type_object() {
     assert!(e.has((LocalApples::id(), LocalEats::id())));
 
     {
-        let a = e.get_ref::<&(LocalApples, LocalEats)>().unwrap();
+        let a = e.get::<&(LocalApples, LocalEats)>().unwrap();
         assert_eq!(a.amount, 10);
     }
 }
@@ -1235,7 +1235,7 @@ fn pairs_set_pair_type_object() {
         .set_pair::<LocalApples, LocalEats>(LocalEats { amount: 10 });
 
     {
-        let eats = e.get_ref::<&(LocalApples, LocalEats)>().unwrap();
+        let eats = e.get::<&(LocalApples, LocalEats)>().unwrap();
         assert_eq!(eats.amount, 10);
     }
 }
@@ -1252,7 +1252,7 @@ fn pairs_set_get_second_variants() {
         .set_pair::<LocalBegin, LocalEvent>(LocalEvent { value: "Big Bang" });
     assert!(e1.has((LocalBegin::id(), LocalEvent::id())));
     {
-        let v = e1.get_ref::<&(LocalBegin, LocalEvent)>().unwrap();
+        let v = e1.get::<&(LocalBegin, LocalEvent)>().unwrap();
         assert_eq!(v.value, "Big Bang");
     }
 
@@ -1262,7 +1262,7 @@ fn pairs_set_get_second_variants() {
         .set_pair::<LocalBegin, LocalEvent>(LocalEvent { value: "Big Bang" });
     assert!(e2.has((LocalBegin::id(), LocalEvent::id())));
     {
-        let v = e2.get_ref::<&(LocalBegin, LocalEvent)>().unwrap();
+        let v = e2.get::<&(LocalBegin, LocalEvent)>().unwrap();
         assert_eq!(v.value, "Big Bang");
     }
 }
@@ -1380,7 +1380,7 @@ fn pairs_set_r_existing_value() {
     let e = world.entity().set_pair::<Position, Tag>(p);
 
     {
-        let ptr = e.get_ref::<&(Position, Tag)>().unwrap();
+        let ptr = e.get::<&(Position, Tag)>().unwrap();
         assert_eq!(ptr.x, 10);
         assert_eq!(ptr.y, 20);
     }

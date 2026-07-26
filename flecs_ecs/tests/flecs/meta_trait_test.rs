@@ -34,7 +34,7 @@ fn test_pos() {
 
     // Convert position component to flecs expression string
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         let expr: String = world.to_expr(&*p);
         assert_eq!(expr, "{x: 2, y: 4}");
     };
@@ -49,7 +49,7 @@ fn test_pos_skip_y() {
 
     // Convert position component to flecs expression string
     {
-        let p = e.get_ref::<&PositionSkipY>().unwrap();
+        let p = e.get::<&PositionSkipY>().unwrap();
         let expr: String = world.to_expr(&*p);
         assert_eq!(expr, "{x: 2}");
     };
@@ -64,7 +64,7 @@ fn test_pos_skip_x() {
 
     // Convert position component to flecs expression string
     {
-        let p = e.get_ref::<&PositionSkipX>().unwrap();
+        let p = e.get::<&PositionSkipX>().unwrap();
         let expr: String = world.to_expr(&*p);
         assert_eq!(expr, "{y: 4}");
     };
@@ -105,7 +105,7 @@ fn test_enum() {
     // goes through the guard surface now that pin revalidation resolves an
     // `add_enum` relationship target correctly.
     {
-        let (color, type_enum) = e.get_ref::<(&Color, &TypeWithEnum)>().unwrap();
+        let (color, type_enum) = e.get::<(&Color, &TypeWithEnum)>().unwrap();
         let expr: String = world.to_expr(&*color);
         assert_eq!(expr, "Green");
         let expr = world.to_expr(&*type_enum);
@@ -136,7 +136,7 @@ fn test_type_w_string() {
 
     // Convert TypeWithEnum component to flecs expression string
     {
-        let str = e.get_ref::<&TypeWithString>().unwrap();
+        let str = e.get::<&TypeWithString>().unwrap();
         let json: String = world.to_json::<TypeWithString>(&str);
         assert_eq!(json, "{\"name\":\"hello\"}");
     };
@@ -165,7 +165,7 @@ fn test_type_w_vec_string() {
 
     // Convert TypeWithVecString component to flecs json string
     {
-        let str = e.get_ref::<&TypeWithVecString>().unwrap();
+        let str = e.get::<&TypeWithVecString>().unwrap();
         let json: String = world.to_json::<TypeWithVecString>(&str);
         assert_eq!(json, "{\"names\":[\"hello\", \"world\"]}");
     };

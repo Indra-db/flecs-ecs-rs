@@ -40,7 +40,7 @@ fn temp_test_hook() {
         assert_eq!(unsafe { COUNT_SET_POS }, 1);
 
         {
-            let pos = entity.get_ref::<&Position>().unwrap();
+            let pos = entity.get::<&Position>().unwrap();
             assert_eq!(pos.x, 10);
             assert_eq!(pos.y, 20);
         }
@@ -50,7 +50,7 @@ fn temp_test_hook() {
         assert_eq!(unsafe { COUNT_SET_POS }, 2);
 
         {
-            let pos = entity.get_ref::<&Position>().unwrap();
+            let pos = entity.get::<&Position>().unwrap();
             assert_eq!(pos.x, 10);
             assert_eq!(pos.y, 20);
         }
@@ -60,11 +60,11 @@ fn temp_test_hook() {
         assert_eq!(unsafe { COUNT_SET_POS }, 3);
 
         {
-            let pos_e2 = entity2.get_ref::<&Position>().unwrap();
+            let pos_e2 = entity2.get::<&Position>().unwrap();
             assert_eq!(pos_e2.x, 10);
             assert_eq!(pos_e2.y, 20);
 
-            let pos_e1 = entity.get_ref::<&Position>().unwrap();
+            let pos_e1 = entity.get::<&Position>().unwrap();
             assert_eq!(pos_e1.x, 10);
             assert_eq!(pos_e1.y, 20);
         }
@@ -76,7 +76,7 @@ fn temp_test_hook() {
         entity2.set(Velocity { x: 3, y: 5 });
 
         {
-            let vel_e2 = entity2.get_ref::<&Velocity>().unwrap();
+            let vel_e2 = entity2.get::<&Velocity>().unwrap();
             assert_eq!(vel_e2.x, 30);
             assert_eq!(vel_e2.y, 50);
         }
@@ -104,7 +104,7 @@ fn on_component_registration() {
         fn on_component_registration(world: WorldRef, component_id: Entity) {
             world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap()
                 .0 += 1;
 
@@ -124,7 +124,7 @@ fn on_component_registration() {
         fn on_component_registration(world: WorldRef, _component_id: Entity) {
             world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap()
                 .0 += 1;
         }
@@ -170,7 +170,7 @@ fn on_component_registration_named() {
         fn on_component_registration(world: WorldRef, component_id: Entity) {
             world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap()
                 .0 += 1;
 
@@ -190,7 +190,7 @@ fn on_component_registration_named() {
         fn on_component_registration(world: WorldRef, _component_id: Entity) {
             world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap()
                 .0 += 1;
         }

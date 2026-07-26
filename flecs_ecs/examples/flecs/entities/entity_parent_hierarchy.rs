@@ -33,7 +33,7 @@ fn iterate_tree(entity: EntityView, position_parent: &Position) {
 
     // Get the position of the entity through a guard, then compute the actual
     // position as an ordinary expression.
-    let position = entity.get_ref::<&Position>().unwrap();
+    let position = entity.get::<&Position>().unwrap();
     let actual_position = Position {
         x: position.x + position_parent.x,
         y: position.y + position_parent.y,

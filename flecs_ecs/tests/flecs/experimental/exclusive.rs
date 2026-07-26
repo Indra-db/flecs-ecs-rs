@@ -1,4 +1,4 @@
-//! Deliverable 2: exclusive register (`get_exclusive`, `each_exclusive`).
+//! Deliverable 2: exclusive register (`get_mut`, `each_exclusive`).
 
 use super::{Position, Velocity};
 use flecs_ecs::core::*;
@@ -7,43 +7,43 @@ use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::macros::query;
 
 #[test]
-fn get_exclusive_reads_and_writes() {
+fn get_mut_reads_and_writes() {
     let mut world = World::new();
     let e = world.entity().set(Position { x: 1, y: 2 }).id();
 
-    let p = world.get_exclusive::<Position>(e).unwrap();
+    let p = world.get_mut::<Position>(e).unwrap();
     assert_eq!((p.x, p.y), (1, 2));
     p.x += 40;
     // Reference dropped at end of statement below; re-borrow to confirm.
-    let p2 = world.get_exclusive::<Position>(e).unwrap();
+    let p2 = world.get_mut::<Position>(e).unwrap();
     assert_eq!(p2.x, 41);
 }
 
 #[test]
-fn get_exclusive_missing_is_none() {
+fn get_mut_missing_is_none() {
     let mut world = World::new();
     let e = world.entity().set(Position::default()).id();
-    assert!(world.get_exclusive::<Velocity>(e).is_none());
+    assert!(world.get_mut::<Velocity>(e).is_none());
 }
 
 #[test]
-fn get_exclusive_dead_is_none() {
+fn get_mut_dead_is_none() {
     let mut world = World::new();
     let e = world.entity().set(Position::default()).id();
     world.entity_from_id(e).destruct();
-    assert!(world.get_exclusive::<Position>(e).is_none());
+    assert!(world.get_mut::<Position>(e).is_none());
 }
 
 #[test]
-fn get_exclusive_takes_no_locks() {
+fn get_mut_takes_no_locks() {
     // Two sequential exclusive borrows of the same component in one scope must
     // both succeed: no runtime lock is registered, only the borrow checker
     // (which is satisfied because each reference is released at its last use).
     let mut world = World::new();
     let e = world.entity().set(Position { x: 0, y: 0 }).id();
-    world.get_exclusive::<Position>(e).unwrap().x = 1;
-    world.get_exclusive::<Position>(e).unwrap().x += 1;
-    assert_eq!(world.get_exclusive::<Position>(e).unwrap().x, 2);
+    world.get_mut::<Position>(e).unwrap().x = 1;
+    world.get_mut::<Position>(e).unwrap().x += 1;
+    assert_eq!(world.get_mut::<Position>(e).unwrap().x, 2);
 }
 
 #[test]

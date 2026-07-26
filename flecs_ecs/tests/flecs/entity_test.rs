@@ -108,7 +108,7 @@ fn new_set() {
 
     // Verify the component data
     {
-        let pos = entity.get_ref::<&Position>().unwrap();
+        let pos = entity.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -128,7 +128,7 @@ fn new_set_2() {
     assert!(entity.has(Velocity::id()));
 
     {
-        let (pos, vel) = entity.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (pos, vel) = entity.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
         assert_eq!(vel.x, 1);
@@ -174,7 +174,7 @@ fn set() {
     assert!(entity.has(Position::id()));
 
     {
-        let pos = entity.get_ref::<&Position>().unwrap();
+        let pos = entity.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -268,13 +268,13 @@ fn set_2() {
     assert!(entity.has(Velocity::id()));
 
     {
-        let pos = entity.get_ref::<&Position>().unwrap();
+        let pos = entity.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
 
     {
-        let vel = entity.get_ref::<&Velocity>().unwrap();
+        let vel = entity.get::<&Velocity>().unwrap();
         assert_eq!(vel.x, 1);
         assert_eq!(vel.y, 2);
     };
@@ -370,7 +370,7 @@ fn get_generic_mut() {
         .each_entity(|entity, _| {
             {
                 let w = entity.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.invoked += 1;
             };
         });
@@ -427,7 +427,7 @@ fn set_generic() {
     assert!(entity.has(position));
 
     {
-        let pos = entity.get_ref::<&Position>().unwrap();
+        let pos = entity.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -450,7 +450,7 @@ fn set_generic_no_size() {
     assert!(entity.has(position));
 
     {
-        let pos = entity.get_ref::<&Position>().unwrap();
+        let pos = entity.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -833,7 +833,7 @@ fn tag_has_size_zero() {
 
     let comp = world.component::<TagA>();
     {
-        let ptr = comp.get_ref::<&EcsComponent>().unwrap();
+        let ptr = comp.get::<&EcsComponent>().unwrap();
         assert_eq!(ptr.size, 0);
         assert_eq!(ptr.alignment, 0);
     };
@@ -1079,14 +1079,14 @@ fn set_no_copy() {
     let entity = world.entity().set(Pod::new(10));
 
     {
-        let pod = entity.get_ref::<&Pod>().unwrap();
+        let pod = entity.get::<&Pod>().unwrap();
         assert_eq!(pod.clone_count, 0);
     };
 
     assert!(entity.has(Pod::id()));
 
     {
-        let pod = entity.get_ref::<&Pod>().unwrap();
+        let pod = entity.get::<&Pod>().unwrap();
         assert_eq!(pod.value, 10);
     };
 }
@@ -1100,21 +1100,21 @@ fn set_copy() {
     let entity_dupl = entity.duplicate(true);
 
     {
-        let pod = entity_dupl.get_ref::<&Pod>().unwrap();
+        let pod = entity_dupl.get::<&Pod>().unwrap();
         assert_eq!(pod.clone_count, 1);
     };
 
     assert!(entity.has(Pod::id()));
 
     {
-        let pod = entity.get_ref::<&Pod>().unwrap();
+        let pod = entity.get::<&Pod>().unwrap();
         assert_eq!(pod.value, 10);
     };
 
     assert!(entity_dupl.has(Pod::id()));
 
     {
-        let pod = entity_dupl.get_ref::<&Pod>().unwrap();
+        let pod = entity_dupl.get::<&Pod>().unwrap();
         assert_eq!(pod.value, 10);
     };
 }
@@ -1128,7 +1128,7 @@ fn set_deduced() {
     assert!(entity.has(Position::id()));
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -1249,13 +1249,13 @@ fn set_auto_override() {
     assert!(entity.owns(Position::id()));
 
     {
-        let pos = entity.get_ref::<&Position>().unwrap();
+        let pos = entity.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
 
     {
-        let pos = base.get_ref::<&Position>().unwrap();
+        let pos = base.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -1279,13 +1279,13 @@ fn set_auto_override_lvalue() {
     assert!(entity.owns(Position::id()));
 
     {
-        let pos = entity.get_ref::<&Position>().unwrap();
+        let pos = entity.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
 
     {
-        let pos = base.get_ref::<&Position>().unwrap();
+        let pos = base.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -1309,13 +1309,13 @@ fn set_auto_override_pair() {
     assert!(entity.owns((Position::id(), TagA::id())));
 
     {
-        let pos = entity.get_ref::<&(Position, TagA)>().unwrap();
+        let pos = entity.get::<&(Position, TagA)>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
 
     {
-        let pos = base.get_ref::<&(Position, TagA)>().unwrap();
+        let pos = base.get::<&(Position, TagA)>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -1377,13 +1377,13 @@ fn set_auto_override_pair_w_rel_tag() {
     assert!(entity.owns((TagA::id(), Position::id())));
 
     {
-        let pos = entity.get_ref::<&(TagA, Position)>().unwrap();
+        let pos = entity.get::<&(TagA, Position)>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
 
     {
-        let pos = base.get_ref::<&(TagA, Position)>().unwrap();
+        let pos = base.get::<&(TagA, Position)>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -1537,7 +1537,7 @@ fn entityview_to_entity_to_entity_view() {
     assert_eq!(entity, entity_view);
 
     {
-        let p = entity_view.get_ref::<&Position>().unwrap();
+        let p = entity_view.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -1559,7 +1559,7 @@ fn entity_view_to_entity_world() {
 
     assert!(entity_view.has(Position::id()));
     {
-        let p = entity_view.get_ref::<&Position>().unwrap();
+        let p = entity_view.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -1584,7 +1584,7 @@ fn entity_view_to_entity_stage() {
     assert!(entity_view.has(Position::id()));
 
     {
-        let p = entity_view.get_ref::<&Position>().unwrap();
+        let p = entity_view.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -1605,7 +1605,7 @@ fn create_entity_view_from_stage() {
     assert!(entity_view.has(Position::id()));
 
     {
-        let p = entity_mut.get_ref::<&Position>().unwrap();
+        let p = entity_mut.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -1619,7 +1619,7 @@ fn set_template() {
     });
 
     {
-        let t = entity.get_ref::<&Template<Position>>().unwrap();
+        let t = entity.get::<&Template<Position>>().unwrap();
         assert_eq!(t.value.x, 10);
         assert_eq!(t.value.y, 20);
     };
@@ -1636,7 +1636,7 @@ fn get_1_component_w_callback() {
     let e_3 = world.entity().set(Velocity { x: 1, y: 2 });
 
     {
-        let r = e_1.get_ref::<&Position>();
+        let r = e_1.get::<&Position>();
         assert!(r.is_some());
         let p = r.unwrap();
         assert_eq!(p.x, 10);
@@ -1644,14 +1644,14 @@ fn get_1_component_w_callback() {
     }
 
     {
-        let r = e_2.get_ref::<&Position>();
+        let r = e_2.get::<&Position>();
         assert!(r.is_some());
         let p = r.unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     }
 
-    assert!(e_3.get_ref::<&Position>().is_none());
+    assert!(e_3.get::<&Position>().is_none());
 }
 
 #[test]
@@ -1665,7 +1665,7 @@ fn get_2_components_w_callback() {
     let e_3 = world.entity().set(Velocity { x: 1, y: 2 });
 
     {
-        let r = e_1.get_ref::<(&Position, &Velocity)>();
+        let r = e_1.get::<(&Position, &Velocity)>();
         assert!(r.is_some());
         let (p, v) = r.unwrap();
         assert_eq!(p.x, 10);
@@ -1675,14 +1675,14 @@ fn get_2_components_w_callback() {
     }
 
     {
-        let r = e_2.get_ref::<&Position>();
+        let r = e_2.get::<&Position>();
         assert!(r.is_some());
         let p = r.unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     }
 
-    assert!(e_3.get_ref::<(&Position, &Velocity)>().is_none());
+    assert!(e_3.get::<(&Position, &Velocity)>().is_none());
 }
 
 #[test]
@@ -1696,7 +1696,7 @@ fn get_mut_1_component_w_callback() {
     let e_3 = world.entity().set(Velocity { x: 1, y: 2 });
 
     {
-        let r = e_1.get_ref::<&mut Position>();
+        let r = e_1.get::<&mut Position>();
         assert!(r.is_some());
         let mut p = r.unwrap();
         assert_eq!(p.x, 10);
@@ -1706,7 +1706,7 @@ fn get_mut_1_component_w_callback() {
     }
 
     {
-        let r = e_2.get_ref::<(Option<&mut Position>,)>();
+        let r = e_2.get::<(Option<&mut Position>,)>();
         assert!(r.is_some());
         let (p,) = r.unwrap();
         assert!(p.is_some());
@@ -1717,16 +1717,16 @@ fn get_mut_1_component_w_callback() {
         p.y += 2;
     }
 
-    assert!(e_3.get_ref::<&Position>().is_none());
+    assert!(e_3.get::<&Position>().is_none());
 
     {
-        let p = e_1.get_ref::<&Position>().unwrap();
+        let p = e_1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = e_2.get_ref::<&Position>().unwrap();
+        let p = e_2.get::<&Position>().unwrap();
         assert_eq!(p.x, 12);
         assert_eq!(p.y, 24);
     };
@@ -1743,7 +1743,7 @@ fn get_mut_2_components_w_callback() {
     let e_3 = world.entity().set(Velocity { x: 1, y: 2 });
 
     {
-        let r = e_1.get_ref::<(&mut Position, &mut Velocity)>();
+        let r = e_1.get::<(&mut Position, &mut Velocity)>();
         assert!(r.is_some());
         let (mut p, mut v) = r.unwrap();
         assert_eq!(p.x, 10);
@@ -1757,7 +1757,7 @@ fn get_mut_2_components_w_callback() {
     }
 
     {
-        let r = e_2.get_ref::<(Option<&mut Position>, Option<&mut Velocity>)>();
+        let r = e_2.get::<(Option<&mut Position>, Option<&mut Velocity>)>();
         assert!(r.is_some());
         let (pos, vel) = r.unwrap();
         assert!(pos.is_some());
@@ -1769,10 +1769,10 @@ fn get_mut_2_components_w_callback() {
         pos.y += 2;
     }
 
-    assert!(e_3.get_ref::<(&mut Position, &mut Velocity)>().is_none());
+    assert!(e_3.get::<(&mut Position, &mut Velocity)>().is_none());
 
     {
-        let (p, v) = e_1.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e_1.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
         assert_eq!(v.x, 2);
@@ -1780,7 +1780,7 @@ fn get_mut_2_components_w_callback() {
     };
 
     {
-        let p = e_2.get_ref::<&Position>().unwrap();
+        let p = e_2.get::<&Position>().unwrap();
         assert_eq!(p.x, 12);
         assert_eq!(p.y, 24);
     };
@@ -1796,14 +1796,14 @@ fn get_component_w_callback_nested() {
         .set(Velocity { x: 1, y: 2 });
 
     {
-        let r = e.get_ref::<&Position>();
+        let r = e.get::<&Position>();
         assert!(r.is_some());
         let p = r.unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
 
         {
-            let r2 = e.get_ref::<&Velocity>();
+            let r2 = e.get::<&Velocity>();
             assert!(r2.is_some());
             let v = r2.unwrap();
             assert_eq!(v.x, 1);
@@ -1822,14 +1822,14 @@ fn get_mut_component_w_callback_nested() {
         .set(Velocity { x: 1, y: 2 });
 
     {
-        let r = e.get_ref::<&Position>();
+        let r = e.get::<&Position>();
         assert!(r.is_some());
         let p = r.unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
 
         {
-            let r2 = e.get_ref::<&Velocity>();
+            let r2 = e.get::<&Velocity>();
             assert!(r2.is_some());
             let v = r2.unwrap();
             assert_eq!(v.x, 1);
@@ -1855,7 +1855,7 @@ fn defer_set_1_component() {
     assert!(e.has(Position::id()));
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -1881,7 +1881,7 @@ fn defer_set_2_components() {
     assert!(e.has(Velocity::id()));
 
     {
-        let (v, p) = e.get_ref::<(&Velocity, &Position)>().unwrap();
+        let (v, p) = e.get::<(&Velocity, &Position)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 1);
@@ -1912,7 +1912,7 @@ fn defer_set_3_components() {
     assert!(e.has(Mass::id()));
 
     {
-        let (v, p, m) = e.get_ref::<(&Velocity, &Position, &Mass)>().unwrap();
+        let (v, p, m) = e.get::<(&Velocity, &Position, &Mass)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 1);
@@ -1936,7 +1936,7 @@ fn set_2_w_on_set() {
         .each_entity(|entity, p| {
             {
                 let w = entity.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.position_set += 1;
             };
             assert_eq!(p.x, 10);
@@ -1948,7 +1948,7 @@ fn set_2_w_on_set() {
         .each_entity(|entity, v| {
             {
                 let w = entity.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.velocity_set += 1;
             };
             assert_eq!(v.x, 1);
@@ -1967,7 +1967,7 @@ fn set_2_w_on_set() {
     }
 
     {
-        let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 1);
@@ -1990,7 +1990,7 @@ fn defer_set_2_w_on_set() {
         .each_entity(|e, p| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.position_set += 1;
             };
             assert_eq!(p.x, 10);
@@ -2002,7 +2002,7 @@ fn defer_set_2_w_on_set() {
         .each_entity(|e, v| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.velocity_set += 1;
             };
             assert_eq!(v.x, 1);
@@ -2030,7 +2030,7 @@ fn defer_set_2_w_on_set() {
     };
 
     {
-        let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 1);
@@ -2047,7 +2047,7 @@ fn set_2_after_set_1() {
     assert!(e.has(Position::id()));
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 5);
         assert_eq!(p.y, 10);
     };
@@ -2056,13 +2056,13 @@ fn set_2_after_set_1() {
     e.set(Velocity { x: 1, y: 2 });
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
 
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -2081,7 +2081,7 @@ fn set_2_after_set_2() {
     assert!(e.has(Velocity::id()));
 
     {
-        let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 5);
         assert_eq!(p.y, 10);
         assert_eq!(v.x, 1);
@@ -2092,7 +2092,7 @@ fn set_2_after_set_2() {
     e.set(Velocity { x: 3, y: 4 });
 
     {
-        let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 3);
@@ -2127,7 +2127,7 @@ fn with_self() {
         assert!(e.has(tag));
 
         {
-            let s = e.get_ref::<&SelfRef>().unwrap();
+            let s = e.get::<&SelfRef>().unwrap();
             assert_eq!(s.value, e);
         };
 
@@ -2161,7 +2161,7 @@ fn with_relation_type_self() {
         assert!(e.has((Likes::id(), bob)));
 
         {
-            let s = e.get_ref::<&SelfRef>().unwrap();
+            let s = e.get::<&SelfRef>().unwrap();
             assert_eq!(s.value, e);
         };
 
@@ -2195,7 +2195,7 @@ fn with_relation_self() {
         assert!(e.has((Likes::id(), bob)));
 
         {
-            let s = e.get_ref::<&SelfRef>().unwrap();
+            let s = e.get::<&SelfRef>().unwrap();
             assert_eq!(s.value, e);
         };
 
@@ -2295,7 +2295,7 @@ fn with_scope() {
         assert!(e.has((*flecs::ChildOf, parent)));
 
         {
-            let s = e.get_ref::<&SelfRef>().unwrap();
+            let s = e.get::<&SelfRef>().unwrap();
             assert_eq!(s.value, e);
         };
 
@@ -2585,19 +2585,19 @@ fn with_after_builder_method() {
         });
 
     {
-        let pos = a.get_ref::<&Position>().unwrap();
+        let pos = a.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
 
     {
-        let pos = b.get_ref::<&Position>().unwrap();
+        let pos = b.get::<&Position>().unwrap();
         assert_eq!(pos.x, 30);
         assert_eq!(pos.y, 40);
     };
 
     {
-        let pos = c.get_ref::<&Position>().unwrap();
+        let pos = c.get::<&Position>().unwrap();
         assert_eq!(pos.x, 50);
         assert_eq!(pos.y, 60);
     };
@@ -2638,19 +2638,19 @@ fn with_before_builder_method() {
         .set(Position { x: 50, y: 60 });
 
     {
-        let pos = a.get_ref::<&Position>().unwrap();
+        let pos = a.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
 
     {
-        let pos = b.get_ref::<&Position>().unwrap();
+        let pos = b.get::<&Position>().unwrap();
         assert_eq!(pos.x, 30);
         assert_eq!(pos.y, 40);
     };
 
     {
-        let pos = c.get_ref::<&Position>().unwrap();
+        let pos = c.get::<&Position>().unwrap();
         assert_eq!(pos.x, 50);
         assert_eq!(pos.y, 60);
     };
@@ -2703,7 +2703,7 @@ fn insert() {
     assert!(e.has(Position::id()));
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -3260,7 +3260,7 @@ fn clone() {
     assert!(dst.has(Position::id()));
 
     {
-        let pos = dst.get_ref::<&Position>().unwrap();
+        let pos = dst.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -3278,7 +3278,7 @@ fn clone_w_value() {
     assert!(dst.has(Position::id()));
 
     {
-        let pos = dst.get_ref::<&Position>().unwrap();
+        let pos = dst.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -3299,7 +3299,7 @@ fn clone_to_existing() {
     assert!(dst.has(Position::id()));
 
     {
-        let pos = dst.get_ref::<&Position>().unwrap();
+        let pos = dst.get::<&Position>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
     };
@@ -3858,7 +3858,7 @@ fn insert_w_observer() {
     assert!(e.has(Position::id()));
     assert!(e.has(Velocity::id()));
     {
-        let (pos, vel) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (pos, vel) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
         assert_eq!(vel.x, 1);
@@ -3898,7 +3898,7 @@ fn override_sparse() {
     assert!(e.owns(Velocity::id()));
 
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -3918,7 +3918,7 @@ fn delete_w_override_sparse() {
     assert!(e.owns(Velocity::id()));
 
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -3980,13 +3980,13 @@ fn on_replace_w_get_mut() {
     world.component::<Position>().on_replace(|e, _, _| {
         {
             let w = e.world();
-            let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+            let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
             flags.invoked += 1;
         };
     });
 
     let e = world.entity().add(Position::id());
-    let mut p = e.get_ref::<&mut Position>().unwrap();
+    let mut p = e.get::<&mut Position>().unwrap();
     p.x = 10;
     p.y = 20;
 }
@@ -4008,7 +4008,7 @@ fn on_replace_w_set() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4035,7 +4035,7 @@ fn on_replace_w_set() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4059,7 +4059,7 @@ fn on_replace_w_set_existing() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4089,7 +4089,7 @@ fn on_replace_w_set_existing() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 2) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -4113,7 +4113,7 @@ fn on_replace_w_assign() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4140,7 +4140,7 @@ fn on_replace_w_assign() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4164,7 +4164,7 @@ fn on_replace_w_assign_existing() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4194,7 +4194,7 @@ fn on_replace_w_assign_existing() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 2) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -4221,7 +4221,7 @@ fn defer_on_replace_w_set() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 10);
@@ -4246,7 +4246,7 @@ fn defer_on_replace_w_set() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 0) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4287,7 +4287,7 @@ fn defer_on_replace_w_set_twice() {
     world.defer_end();
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -4311,7 +4311,7 @@ fn defer_on_replace_w_set_existing() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4339,7 +4339,7 @@ fn defer_on_replace_w_set_existing() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4363,7 +4363,7 @@ fn defer_on_replace_w_set_existing_twice() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4393,7 +4393,7 @@ fn defer_on_replace_w_set_existing_twice() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 2) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -4428,7 +4428,7 @@ fn defer_on_replace_w_set_batched() {
     world.defer_end();
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4465,7 +4465,7 @@ fn defer_on_replace_w_set_batched_twice() {
     world.defer_end();
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -4531,7 +4531,7 @@ fn defer_on_replace_w_set_batched_existing() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4560,7 +4560,7 @@ fn defer_on_replace_w_set_batched_existing() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4585,7 +4585,7 @@ fn defer_on_replace_w_set_batched_existing_twice() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4616,7 +4616,7 @@ fn defer_on_replace_w_set_batched_existing_twice() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 2) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -4642,7 +4642,7 @@ fn defer_on_replace_w_assign() {
             p.y = 0;
         })
         .on_replace(|e, _prev, _next| {
-            { let w = e.world(); let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap(); flags.invoked += 1 };
+            { let w = e.world(); let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap(); flags.invoked += 1 };
         });
 
     let e = world.entity();
@@ -4669,7 +4669,7 @@ fn defer_on_replace_w_assign_existing() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4697,7 +4697,7 @@ fn defer_on_replace_w_assign_existing() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4721,7 +4721,7 @@ fn defer_on_replace_w_assign_existing_twice() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4751,7 +4751,7 @@ fn defer_on_replace_w_assign_existing_twice() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 2) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -4775,7 +4775,7 @@ fn defer_on_replace_w_assign_batched_existing() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4804,7 +4804,7 @@ fn defer_on_replace_w_assign_batched_existing() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -4829,7 +4829,7 @@ fn defer_on_replace_w_assign_batched_existing_twice() {
         .on_replace(|e, prev, next| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 match flags.invoked {
                     0 => {
                         assert_eq!(prev.x, 0);
@@ -4860,7 +4860,7 @@ fn defer_on_replace_w_assign_batched_existing_twice() {
     { let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap(); assert_eq!(f.invoked, 2) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -5017,7 +5017,7 @@ fn get_t() {
     let world = World::new();
     let e = world.entity().set(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5032,7 +5032,7 @@ fn get_n_t() {
         .set(Position { x: 10, y: 20 })
         .set(Velocity { x: 1, y: 2 });
     {
-        let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 1);
@@ -5063,7 +5063,7 @@ fn get_r_t_2() {
         .entity()
         .set_pair::<Position, TagA>(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&(Position, TagA)>().unwrap();
+        let p = e.get::<&(Position, TagA)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5089,7 +5089,7 @@ fn get_r_t_3() {
 fn get_t_not_found() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&Position>().is_none());
+    assert!(e.get::<&Position>().is_none());
 }
 
 // get_R_t_not_found — missing pair reads back as None
@@ -5098,7 +5098,7 @@ fn get_r_t_not_found() {
     let world = World::new();
     let tgt = world.entity();
     let e = world.entity();
-    assert!(e.get_ref::<&(Position, TagA)>().is_none());
+    assert!(e.get::<&(Position, TagA)>().is_none());
     let ptr = e.get_first_untyped::<Position>(tgt);
     assert!(ptr.is_null());
 }
@@ -5108,7 +5108,7 @@ fn get_r_t_not_found() {
 fn get_r_t_not_found_2() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&(Position, TagA)>().is_none());
+    assert!(e.get::<&(Position, TagA)>().is_none());
 }
 
 // get_r_T_not_found — panics if second pair missing — get returns null ptr (not panic)
@@ -5127,9 +5127,9 @@ fn get_r_t_not_found_3() {
 fn try_get_t() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&Position>().is_none());
+    assert!(e.get::<&Position>().is_none());
     e.set(Position { x: 10, y: 20 });
-    let r = e.get_ref::<&Position>();
+    let r = e.get::<&Position>();
     assert!(r.is_some());
     let p = r.unwrap();
     assert_eq!(p.x, 10);
@@ -5156,10 +5156,10 @@ fn try_get_w_id() {
 fn try_get_n_t() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<(&Position, &Velocity)>().is_none());
+    assert!(e.get::<(&Position, &Velocity)>().is_none());
     e.set(Position { x: 10, y: 20 });
     e.set(Velocity { x: 1, y: 2 });
-    let r = e.get_ref::<(&Position, &Velocity)>();
+    let r = e.get::<(&Position, &Velocity)>();
     assert!(r.is_some());
     {
         let (p, v) = r.unwrap();
@@ -5171,8 +5171,8 @@ fn try_get_n_t() {
 
     let e2 = world.entity();
     e2.set(Position { x: 1, y: 2 });
-    assert!(e2.get_ref::<(&Position, &Velocity)>().is_none());
-    let r2 = e2.get_ref::<(&Position, Option<&Velocity>)>();
+    assert!(e2.get::<(&Position, &Velocity)>().is_none());
+    let r2 = e2.get::<(&Position, Option<&Velocity>)>();
     assert!(r2.is_some());
     let (p, v) = r2.unwrap();
     assert_eq!(p.x, 1);
@@ -5201,9 +5201,9 @@ fn try_get_r_t() {
 fn try_get_r_t_2() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&(Position, TagA)>().is_none());
+    assert!(e.get::<&(Position, TagA)>().is_none());
     e.set_pair::<Position, TagA>(Position { x: 10, y: 20 });
-    let r = e.get_ref::<&(Position, TagA)>();
+    let r = e.get::<&(Position, TagA)>();
     assert!(r.is_some());
     let p = r.unwrap();
     assert_eq!(p.x, 10);
@@ -5248,7 +5248,7 @@ fn get_mut_t() {
     let world = World::new();
     let e = world.entity().set(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&mut Position>().unwrap();
+        let p = e.get::<&mut Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5263,12 +5263,12 @@ fn get_mut_n_t() {
         .set(Position { x: 10, y: 20 })
         .set(Velocity { x: 1, y: 2 });
     {
-        let (mut p, mut v) = e.get_ref::<(&mut Position, &mut Velocity)>().unwrap();
+        let (mut p, mut v) = e.get::<(&mut Position, &mut Velocity)>().unwrap();
         p.x += 15;
         v.y += 2;
     };
     {
-        let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 25);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 1);
@@ -5299,7 +5299,7 @@ fn get_mut_r_t_2() {
         .entity()
         .set_pair::<Position, TagA>(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&mut (Position, TagA)>().unwrap();
+        let p = e.get::<&mut (Position, TagA)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5325,7 +5325,7 @@ fn get_mut_r_t_3() {
 fn get_mut_t_not_found() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&mut Position>().is_none());
+    assert!(e.get::<&mut Position>().is_none());
 }
 
 // get_mut_R_t_not_found — missing pair reads back as None
@@ -5333,7 +5333,7 @@ fn get_mut_t_not_found() {
 fn get_mut_r_t_not_found() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&mut (Position, TagA)>().is_none());
+    assert!(e.get::<&mut (Position, TagA)>().is_none());
 }
 
 // get_mut_R_T_not_found — missing typed pair reads back as None
@@ -5341,7 +5341,7 @@ fn get_mut_r_t_not_found() {
 fn get_mut_r_t_not_found_2() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&mut (Position, TagA)>().is_none());
+    assert!(e.get::<&mut (Position, TagA)>().is_none());
 }
 
 // get_mut_r_T_not_found — returns null when not found (not a panic case in Rust)
@@ -5359,9 +5359,9 @@ fn get_mut_r_t_not_found_3() {
 fn try_get_mut_t() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&mut Position>().is_none());
+    assert!(e.get::<&mut Position>().is_none());
     e.set(Position { x: 10, y: 20 });
-    let r = e.get_ref::<&mut Position>();
+    let r = e.get::<&mut Position>();
     assert!(r.is_some());
     let p = r.unwrap();
     assert_eq!(p.x, 10);
@@ -5388,18 +5388,18 @@ fn try_get_mut_w_id() {
 fn try_get_mut_n_t() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<(&mut Position, &mut Velocity)>().is_none());
+    assert!(e.get::<(&mut Position, &mut Velocity)>().is_none());
     e.set(Position { x: 10, y: 20 });
     e.set(Velocity { x: 1, y: 2 });
     {
-        let r = e.get_ref::<(&mut Position, &mut Velocity)>();
+        let r = e.get::<(&mut Position, &mut Velocity)>();
         assert!(r.is_some());
         let (mut p, mut v) = r.unwrap();
         p.x += 15;
         v.y += 2;
     }
     {
-        let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
+        let (p, v) = e.get::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 25);
         assert_eq!(p.y, 20);
         assert_eq!(v.x, 1);
@@ -5428,9 +5428,9 @@ fn try_get_mut_r_t() {
 fn try_get_mut_r_t_2() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&mut (Position, TagA)>().is_none());
+    assert!(e.get::<&mut (Position, TagA)>().is_none());
     e.set_pair::<Position, TagA>(Position { x: 10, y: 20 });
-    let r = e.get_ref::<&mut (Position, TagA)>();
+    let r = e.get::<&mut (Position, TagA)>();
     assert!(r.is_some());
     let p = r.unwrap();
     assert_eq!(p.x, 10);
@@ -5474,17 +5474,17 @@ fn try_get_mut_r_t_4() {
 fn try_get_mut_pair_second_type() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&mut (TagA, Position)>().is_none());
+    assert!(e.get::<&mut (TagA, Position)>().is_none());
     e.set_pair::<TagA, Position>(Position { x: 10, y: 20 });
     {
-        let r = e.get_ref::<&mut (TagA, Position)>();
+        let r = e.get::<&mut (TagA, Position)>();
         assert!(r.is_some());
         let mut p = r.unwrap();
         p.x += 1;
         p.y += 2;
     }
     {
-        let p = e.get_ref::<&(TagA, Position)>().unwrap();
+        let p = e.get::<&(TagA, Position)>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -5519,22 +5519,22 @@ fn get_mut_pair_second_type() {
         .entity()
         .set_pair::<TagA, Position>(Position { x: 10, y: 20 });
     {
-        let mut p = e.get_ref::<&mut (TagA, Position)>().unwrap();
+        let mut p = e.get::<&mut (TagA, Position)>().unwrap();
         p.x += 5;
         p.y += 7;
     };
     {
-        let p = e.get_ref::<&(TagA, Position)>().unwrap();
+        let p = e.get::<&(TagA, Position)>().unwrap();
         assert_eq!(p.x, 15);
         assert_eq!(p.y, 27);
     };
 }
 
-// get_ref_pair_second_invalid_type
+// guard_get_pair_second_invalid_type
 #[test]
 #[should_panic]
 #[ignore = "Panic test: panics in C, which isn't captured by rust"]
-fn get_ref_pair_second_invalid_type() {
+fn guard_get_pair_second_invalid_type() {
     let world = World::new();
     let v = world.component::<Velocity>();
     let _r = world.entity().get_second_untyped::<Position>(v);
@@ -5608,7 +5608,7 @@ fn ensure_generic() {
         .each_entity(|e, _| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.invoked = true;
             };
         });
@@ -5639,7 +5639,7 @@ fn ensure_generic_w_id() {
         .each_entity(|e, _| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.invoked = true;
             };
         });
@@ -5671,7 +5671,7 @@ fn ensure_generic_w_id_t() {
         .each_entity(|e, _| {
             {
                 let w = e.world();
-                let mut flags = w.entity_from_id(Flags::entity_id(w)).get_ref::<&mut Flags>().unwrap();
+                let mut flags = w.entity_from_id(Flags::entity_id(w)).get::<&mut Flags>().unwrap();
                 flags.invoked = true;
             };
         });
@@ -5698,11 +5698,11 @@ fn ensure_component_w_callback_nested() {
     let e = world.entity().set(Position { x: 10, y: 20 });
     // Nested mutable borrow of the SAME component — safety locks must panic.
     {
-        let p = e.get_ref::<&mut Position>().unwrap();
+        let p = e.get::<&mut Position>().unwrap();
         assert_eq!(p.x, 10);
         // Re-borrowing Position mutably while it is already borrowed → panic
         {
-            let _ = e.get_ref::<&mut Position>().unwrap();};
+            let _ = e.get::<&mut Position>().unwrap();};
     };
 }
 
@@ -5722,7 +5722,7 @@ fn set_generic_w_id() {
     assert!(e.has(Position::id()));
     assert!(e.has(position));
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5744,7 +5744,7 @@ fn set_generic_w_id_t() {
     };
     assert!(e.has(Position::id()));
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5763,7 +5763,7 @@ fn set_generic_no_size_w_id() {
     };
     assert!(e.has(Position::id()));
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5783,7 +5783,7 @@ fn set_generic_no_size_w_id_t() {
     };
     assert!(e.has(Position::id()));
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5795,7 +5795,7 @@ fn set_t() {
     let world = World::new();
     let e = world.entity().set(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5824,7 +5824,7 @@ fn set_r_t_2() {
         .entity()
         .set_pair::<Position, TagA>(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&(Position, TagA)>().unwrap();
+        let p = e.get::<&(Position, TagA)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5871,7 +5871,7 @@ fn assign_t() {
     let e = world.entity().add(Position::id());
     e.assign(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5898,7 +5898,7 @@ fn assign_r_t_2() {
     let e = world.entity().add((Position::id(), TagA::id()));
     e.assign_pair::<Position, TagA>(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&(Position, TagA)>().unwrap();
+        let p = e.get::<&(Position, TagA)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -5976,7 +5976,7 @@ fn assign_w_on_set_hook() {
     world.component::<Position>().on_set(|e, p| {
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-        { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get_ref::<&mut InvokedCount>().unwrap(); c.0 += 1 };
+        { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get::<&mut InvokedCount>().unwrap(); c.0 += 1 };
     });
 
     let e = world.entity().add(Position::id());
@@ -5986,7 +5986,7 @@ fn assign_w_on_set_hook() {
     { let c = WorldSingletonExt::singleton::<InvokedCount>(&world).unwrap(); assert_eq!(c.0, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6006,7 +6006,7 @@ fn assign_w_on_set_hook_explicit_name() {
     world.component::<Position>().on_set(|e, p| {
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-        { let w = e.world(); let mut c = w.entity_from_id(InvokedCountNamed::entity_id(w)).get_ref::<&mut InvokedCountNamed>().unwrap(); c.0 += 1 };
+        { let w = e.world(); let mut c = w.entity_from_id(InvokedCountNamed::entity_id(w)).get::<&mut InvokedCountNamed>().unwrap(); c.0 += 1 };
     });
 
     let e = world.entity().add(Position::id());
@@ -6016,7 +6016,7 @@ fn assign_w_on_set_hook_explicit_name() {
     { let c = WorldSingletonExt::singleton::<InvokedCountNamed>(&world).unwrap(); assert_eq!(c.0, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6034,7 +6034,7 @@ fn assign_w_on_set_observer() {
         .each_entity(|e, p| {
             assert_eq!(p.x, 10);
             assert_eq!(p.y, 20);
-            { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get_ref::<&mut InvokedCount>().unwrap(); c.0 += 1 };
+            { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get::<&mut InvokedCount>().unwrap(); c.0 += 1 };
         });
 
     let e = world.entity().add(Position::id());
@@ -6044,7 +6044,7 @@ fn assign_w_on_set_observer() {
     { let c = WorldSingletonExt::singleton::<InvokedCount>(&world).unwrap(); assert_eq!(c.0, 1) };
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6072,7 +6072,7 @@ fn assign_w_change_detect() {
     assert!(!q.is_changed());
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6088,7 +6088,7 @@ fn defer_assign_w_on_set_hook() {
     world.component::<Position>().on_set(|e, p| {
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-        { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get_ref::<&mut InvokedCount>().unwrap(); c.0 += 1 };
+        { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get::<&mut InvokedCount>().unwrap(); c.0 += 1 };
     });
 
     let e = world.entity().add(Position::id());
@@ -6101,7 +6101,7 @@ fn defer_assign_w_on_set_hook() {
 
     { let c = WorldSingletonExt::singleton::<InvokedCount>(&world).unwrap(); assert_eq!(c.0, 1) };
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6119,7 +6119,7 @@ fn defer_assign_w_on_set_observer() {
         .each_entity(|e, p| {
             assert_eq!(p.x, 10);
             assert_eq!(p.y, 20);
-            { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get_ref::<&mut InvokedCount>().unwrap(); c.0 += 1 };
+            { let w = e.world(); let mut c = w.entity_from_id(InvokedCount::entity_id(w)).get::<&mut InvokedCount>().unwrap(); c.0 += 1 };
         });
 
     let e = world.entity().add(Position::id());
@@ -6132,7 +6132,7 @@ fn defer_assign_w_on_set_observer() {
 
     { let c = WorldSingletonExt::singleton::<InvokedCount>(&world).unwrap(); assert_eq!(c.0, 1) };
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6164,7 +6164,7 @@ fn defer_assign_w_change_detect() {
     assert!(!q.is_changed());
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6179,7 +6179,7 @@ fn assign_rvalue() {
     let e = world.entity().add(Position::id());
     e.assign(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6196,7 +6196,7 @@ fn assign_non_copy_assignable() {
     let e = world.entity().set(NonCopyAssignable { x: 0 });
     e.assign(NonCopyAssignable { x: 10 });
     {
-        let comp = e.get_ref::<&NonCopyAssignable>().unwrap();
+        let comp = e.get::<&NonCopyAssignable>().unwrap();
         assert_eq!(comp.x, 10);
     };
 }
@@ -6215,7 +6215,7 @@ fn assign_non_copy_assignable_w_move_assign() {
         .set(NonCopyAssignableWMove { x: 0, moved: 0 });
     e.assign(NonCopyAssignableWMove { x: 10, moved: 1 });
     {
-        let comp = e.get_ref::<&NonCopyAssignableWMove>().unwrap();
+        let comp = e.get::<&NonCopyAssignableWMove>().unwrap();
         assert_eq!(comp.x, 10);
         assert_eq!(comp.moved, 1);
     };
@@ -6231,7 +6231,7 @@ fn set_non_copy_assignable() {
     let world = World::new();
     let e = world.entity().set(NonCopyAssignable { x: 10 });
     {
-        let comp = e.get_ref::<&NonCopyAssignable>().unwrap();
+        let comp = e.get::<&NonCopyAssignable>().unwrap();
         assert_eq!(comp.x, 10);
     };
 }
@@ -6249,7 +6249,7 @@ fn set_non_copy_assignable_w_move_assign() {
         .entity()
         .set(NonCopyAssignableWMove { x: 10, moved: 1 });
     {
-        let comp = e.get_ref::<&NonCopyAssignableWMove>().unwrap();
+        let comp = e.get::<&NonCopyAssignableWMove>().unwrap();
         assert_eq!(comp.x, 10);
         assert_eq!(comp.moved, 1);
     };
@@ -6262,7 +6262,7 @@ fn set_lvalue_to_mutable() {
     let e = world.entity();
     e.set(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6276,7 +6276,7 @@ fn set_lvalue_to_const() {
     let src = Position { x: 10, y: 20 };
     e.set(src);
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6289,7 +6289,7 @@ fn set_rvalue() {
     let e = world.entity();
     e.set(Position { x: 10, y: 20 });
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6302,7 +6302,7 @@ fn emplace() {
     let e = world.entity().set(Position { x: 10, y: 20 });
     assert!(e.has(Position::id()));
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6319,7 +6319,7 @@ fn emplace_after_add() {
     assert!(e.has(Position::id()));
     assert!(e.has(Velocity::id()));
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 30);
         assert_eq!(v.y, 40);
     };
@@ -6337,7 +6337,7 @@ fn emplace_after_add_pair() {
     assert!(e.has((flecs::ChildOf::ID, dummy)));
     assert!(e.has(Velocity::id()));
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 30);
         assert_eq!(v.y, 40);
     };
@@ -6352,7 +6352,7 @@ fn emplace_pair() {
         .set_pair::<Position, TagA>(Position { x: 10, y: 20 });
     assert!(e.has((Position::id(), TagA::id())));
     {
-        let p = e.get_ref::<&(Position, TagA)>().unwrap();
+        let p = e.get::<&(Position, TagA)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6383,7 +6383,7 @@ fn emplace_pair_type() {
         .set_pair::<Position, TagA>(Position { x: 10, y: 20 });
     assert!(e.has((Position::id(), TagA::id())));
     {
-        let p = e.get_ref::<&(Position, TagA)>().unwrap();
+        let p = e.get::<&(Position, TagA)>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6418,7 +6418,7 @@ fn emplace_override() {
         .set_auto_override::<NoDefaultCtor>(NoDefaultCtor { x: 10 });
     assert!(e.has(NoDefaultCtor::id()));
     {
-        let p = e.get_ref::<&NoDefaultCtor>().unwrap();
+        let p = e.get::<&NoDefaultCtor>().unwrap();
         assert_eq!(p.x, 10);
     };
 }
@@ -6436,7 +6436,7 @@ fn emplace_override_pair() {
         .set_pair_override::<NoDefaultCtor, TagA>(NoDefaultCtor { x: 10 });
     assert!(e.has((NoDefaultCtor::id(), TagA::id())));
     {
-        let p = e.get_ref::<&(NoDefaultCtor, TagA)>().unwrap();
+        let p = e.get::<&(NoDefaultCtor, TagA)>().unwrap();
         assert_eq!(p.x, 10);
     };
 }
@@ -6449,7 +6449,7 @@ fn emplace_sparse() {
     let e = world.entity().set(Velocity { x: 1, y: 2 });
     assert!(e.has(Velocity::id()));
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -6469,12 +6469,12 @@ fn emplace_w_observer() {
     assert!(e.has(Position::id()));
     assert!(e.has(Velocity::id()));
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6488,7 +6488,7 @@ fn set_sparse() {
     let e = world.entity().set(Velocity { x: 1, y: 2 });
     assert!(e.has(Velocity::id()));
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -6505,7 +6505,7 @@ fn defer_ensure() {
         world.defer_end();
     }
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6968,9 +6968,9 @@ fn const_entity_set() {
     let world = World::new();
     let e = world.entity();
     e.set(Position { x: 10, y: 20 });
-    assert!(e.get_ref::<&Position>().is_some());
+    assert!(e.get::<&Position>().is_some());
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -6981,10 +6981,10 @@ fn const_entity_set() {
 fn const_entity_get_mut() {
     let world = World::new();
     let e = world.entity();
-    assert!(e.get_ref::<&mut Position>().is_none());
+    assert!(e.get::<&mut Position>().is_none());
     assert!(!e.has(Position::id()));
     e.add(Position::id());
-    assert!(e.get_ref::<&mut Position>().is_some());
+    assert!(e.get::<&mut Position>().is_some());
     assert!(e.has(Position::id()));
     e.modified(Position::id());
 }
@@ -7020,7 +7020,7 @@ fn const_entity_emit_after_build() {
     e.set(Position { x: 10, y: 20 });
     e.emit(&Velocity { x: 1, y: 2 });
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -7075,7 +7075,7 @@ fn entity_to_entity_view() {
     assert!(ev.id() != 0);
     assert_eq!(e, ev);
     {
-        let p = ev.get_ref::<&Position>().unwrap();
+        let p = ev.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -7089,7 +7089,7 @@ fn get_lambda_from_stage() {
     world.readonly_begin(false);
     let stage = world.stage(0);
     {
-        let p = e.mut_current_stage(stage).get_ref::<&Position>().unwrap();
+        let p = e.mut_current_stage(stage).get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
@@ -7153,7 +7153,7 @@ fn add_remove_enum_component() {
     // In Flecs, enums are stored as pairs (Color, ConstantEntity).
     // Use add_enum/has_enum/remove_enum — equivalent to C++ set<Color>/has<Color>/remove<Color>.
     // Enum read-back goes through the pair target: the constant entity converts
-    // back to the enum value. (`get_ref` on an enum component trips the debug
+    // back to the enum value. (`get` on an enum component trips the debug
     // storage-revalidation net: the guard caches a pointer into the CONSTANT
     // entity's storage but revalidates against the queried entity; see the
     // SW-9 report.)
@@ -7184,7 +7184,7 @@ fn on_replace_w_ensure() {
     world.component::<Position>().on_replace(|_, _, _| {});
     // The mutable resolve of a component with an on_replace hook aborts in C
     // before the presence check, so this cannot convert to an is_none assert.
-    let _ = world.entity().get_ref::<&mut Position>();
+    let _ = world.entity().get::<&mut Position>();
 }
 
 // on_replace_w_emplace
@@ -7252,7 +7252,7 @@ fn entity_with_parent() {
 
     assert!(e.has(id::<flecs::Parent>()));
     {
-        let parent = e.get_ref::<&flecs::Parent>().unwrap();
+        let parent = e.get::<&flecs::Parent>().unwrap();
         assert_eq!(parent.value, *p.id());
     };
 }
@@ -7267,7 +7267,7 @@ fn entity_w_parent_w_name() {
 
     assert!(e.has(id::<flecs::Parent>()));
     {
-        let parent = e.get_ref::<&flecs::Parent>().unwrap();
+        let parent = e.get::<&flecs::Parent>().unwrap();
         assert_eq!(parent.value, *p.id());
     };
     assert_eq!(e.name(), "Foo");
@@ -7292,7 +7292,7 @@ fn entity_w_parent_w_name_existing_w_name() {
     assert!(e.has((flecs::ChildOf::ID, p)));
     assert!(e.has(id::<flecs::Parent>()));
     {
-        let parent = e.get_ref::<&flecs::Parent>().unwrap();
+        let parent = e.get::<&flecs::Parent>().unwrap();
         assert_eq!(parent.value, *p.id());
     };
     assert_eq!(e.name(), "Foo");
@@ -7392,7 +7392,7 @@ fn set_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 }
@@ -7417,7 +7417,7 @@ fn defer_set_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 }
@@ -7437,7 +7437,7 @@ fn set_change_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 
@@ -7449,7 +7449,7 @@ fn set_change_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 2)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent_2.id());
     };
 }
@@ -7469,7 +7469,7 @@ fn defer_set_change_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 
@@ -7487,7 +7487,7 @@ fn defer_set_change_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 2)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent_2.id());
     };
 }
@@ -7507,7 +7507,7 @@ fn assign_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 
@@ -7519,7 +7519,7 @@ fn assign_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 2)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent_2.id());
     };
 }
@@ -7539,7 +7539,7 @@ fn defer_assign_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 
@@ -7557,7 +7557,7 @@ fn defer_assign_parent() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 2)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent_2.id());
     };
 }
@@ -7586,7 +7586,7 @@ fn set_parent_on_stage() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 }
@@ -7616,7 +7616,7 @@ fn assign_parent_on_stage() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 1)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent.id());
     };
 
@@ -7635,7 +7635,7 @@ fn assign_parent_on_stage() {
     assert!(child.has(ecs_value_pair(flecs::ParentDepth::ID, 2)));
 
     {
-        let p = child.get_ref::<&flecs::Parent>().unwrap();
+        let p = child.get::<&flecs::Parent>().unwrap();
         assert_eq!(p.value, *parent_2.id());
     };
 }

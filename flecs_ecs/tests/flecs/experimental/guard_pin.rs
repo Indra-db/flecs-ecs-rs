@@ -25,13 +25,13 @@ fn read_only_guard_scope_leaves_world_not_deferred() {
         .set(Velocity { x: 3, y: 4 });
     assert!(!world.is_deferred());
     {
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         assert!(
             !world.is_deferred(),
             "a read-only guard opens no defer level"
         );
         assert_eq!(g.x, 1);
-        let _g2 = e.get_ref::<&Velocity>().unwrap();
+        let _g2 = e.get::<&Velocity>().unwrap();
         assert!(
             !world.is_deferred(),
             "a second read-only guard still opens no level"
@@ -52,14 +52,14 @@ fn mid_acquire_panic_leaves_no_stale_pin() {
     // A duplicate-mutable request panics inside `create_ptrs`, before any pin is
     // taken. The pin state must be untouched afterwards.
     let r = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
-        let _g = e.get_ref::<(&mut Position, &mut Position)>();
+        let _g = e.get::<(&mut Position, &mut Position)>();
     }));
     assert!(r.is_err());
     assert!(!world.is_deferred(), "no stale pin/episode after the panic");
     // The pin machinery still counts correctly: a write under a fresh guard
     // defers and flushes at drop.
     {
-        let g = e.get_ref::<&Velocity>().unwrap();
+        let g = e.get::<&Velocity>().unwrap();
         e.set(Position { x: 9, y: 9 });
         assert!(
             world.is_deferred(),
@@ -68,7 +68,7 @@ fn mid_acquire_panic_leaves_no_stale_pin() {
         let _ = g.x;
     }
     assert!(!world.is_deferred(), "episode closed at last-guard-drop");
-    assert_eq!(e.get_ref::<&Position>().unwrap().x, 9);
+    assert_eq!(e.get::<&Position>().unwrap().x, 9);
 }
 
 #[test]
@@ -78,11 +78,11 @@ fn conflict_mid_tuple_rolls_back_pin() {
         .entity()
         .set(Position { x: 1, y: 1 })
         .set(Velocity { x: 2, y: 2 });
-    let w = e.get_ref::<&mut Velocity>().unwrap();
+    let w = e.get::<&mut Velocity>().unwrap();
     // Position's borrow + pin are taken, then Velocity conflicts and the whole
     // acquire rolls back: the Position pin must be released too, so the only
     // live pin is `w`.
-    assert!(e.try_get_ref::<(&Position, &mut Velocity)>().is_err());
+    assert!(e.try_get::<(&Position, &mut Velocity)>().is_err());
     // A write now defers behind exactly one pin (`w`)...
     e.set(Position { x: 5, y: 5 });
     assert!(world.is_deferred());
@@ -90,7 +90,7 @@ fn conflict_mid_tuple_rolls_back_pin() {
     // ...and dropping that one pin flushes it. If the rolled-back Position pin
     // had stuck, the episode would still be open here.
     assert!(!world.is_deferred(), "the rolled-back pin did not leak");
-    assert_eq!(e.get_ref::<&Position>().unwrap().x, 5);
+    assert_eq!(e.get::<&Position>().unwrap().x, 5);
 }
 
 // --- one write category per test: deferred under a live guard, applied and
@@ -108,7 +108,7 @@ fn set_under_live_guard_defers_until_drop() {
         });
     let e = world.entity().set(Position { x: 1, y: 2 });
     {
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         e.set(Velocity { x: 7, y: 8 });
         assert!(
             !e.has(Velocity::id()),
@@ -119,7 +119,7 @@ fn set_under_live_guard_defers_until_drop() {
     }
     assert!(e.has(Velocity::id()));
     assert_eq!(CNT.load(Ordering::Relaxed), 1);
-    assert_eq!(e.get_ref::<&Velocity>().unwrap().x, 7);
+    assert_eq!(e.get::<&Velocity>().unwrap().x, 7);
 }
 
 #[test]
@@ -127,7 +127,7 @@ fn add_under_live_guard_defers_until_drop() {
     let world = World::new();
     let e = world.entity().set(Position { x: 1, y: 2 });
     {
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         e.add(Tag::id());
         assert!(
             !e.has(Tag::id()),
@@ -155,7 +155,7 @@ fn remove_under_live_guard_defers_until_drop() {
     {
         // The read guard on Position would dangle if removing Velocity moved
         // the entity's table; the deferral keeps its pointer valid.
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         e.remove(Velocity::id());
         assert!(e.has(Velocity::id()), "deferred remove has not landed");
         assert_eq!(CNT.load(Ordering::Relaxed), 0, "on_remove waits for drop");
@@ -170,7 +170,7 @@ fn destruct_under_live_guard_defers_until_drop() {
     let world = World::new();
     let e = world.entity().set(Position { x: 1, y: 2 });
     {
-        let g = e.get_ref::<&Position>().unwrap();
+        let g = e.get::<&Position>().unwrap();
         e.destruct();
         assert!(
             e.is_alive(),
@@ -187,7 +187,7 @@ fn pair_set_under_live_guard_defers_until_drop() {
     let target = world.entity();
     let e = world.entity().set(Velocity { x: 3, y: 4 });
     {
-        let g = e.get_ref::<&Velocity>().unwrap();
+        let g = e.get::<&Velocity>().unwrap();
         // (Position, target) pair carrying Position data.
         e.set_first::<Position>(Position { x: 5, y: 6 }, target);
         assert!(
@@ -207,8 +207,8 @@ fn nested_guards_two_entities_share_one_episode() {
     let e1 = world.entity().set(Position { x: 1, y: 1 });
     let e2 = world.entity().set(Position { x: 2, y: 2 });
 
-    let g1 = e1.get_ref::<&Position>().unwrap();
-    let g2 = e2.get_ref::<&Position>().unwrap();
+    let g1 = e1.get::<&Position>().unwrap();
+    let g2 = e2.get::<&Position>().unwrap();
     assert!(!world.is_deferred(), "two read guards open no level");
 
     e1.set(Velocity { x: 10, y: 10 });
@@ -255,13 +255,13 @@ fn forgotten_guard_pin_leaks_but_world_destruction_is_safe() {
         });
     let e = world.entity().set(Position { x: 1, y: 1 });
 
-    let g = e.get_ref::<&Position>().unwrap();
+    let g = e.get::<&Position>().unwrap();
     core::mem::forget(g); // read borrow + pin leak; no defer level yet
 
     // Monotonic access denial: the leaked read borrow refuses a later write
     // borrow of the same storage forever, it never aliases.
     assert!(
-        e.try_get_ref::<&mut Position>().is_err(),
+        e.try_get::<&mut Position>().is_err(),
         "the leaked read borrow denies a conflicting write borrow"
     );
 

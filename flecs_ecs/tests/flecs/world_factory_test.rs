@@ -70,7 +70,7 @@ fn world_factory_system() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -99,7 +99,7 @@ fn world_factory_system_w_name() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -139,7 +139,7 @@ fn world_factory_system_w_expr() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -162,7 +162,7 @@ fn world_factory_query() {
     });
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -198,7 +198,7 @@ fn world_factory_query_w_expr() {
     });
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };

@@ -22,7 +22,7 @@ fn main() {
     let e = world.entity().set(TypeWithEntity { e: bar.into() });
 
     // Convert TypeWithEntity component to flecs expression string
-    let p = e.get_ref::<&TypeWithEntity>().unwrap();
+    let p = e.get::<&TypeWithEntity>().unwrap();
     let expr: String = world.to_expr(&*p);
     println!("TypeWithEntity: {expr}");
 

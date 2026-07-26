@@ -331,7 +331,7 @@ fn relationships_builtin_relationships_the_isa_relationship_component_sharing_24
     let frigate = world.entity().is_a(spaceship).set(Defense { value: 75 });
     // Obtain the inherited component from Spaceship
     let is_100 = {
-        let v = frigate.get_ref::<&MaxSpeed>().unwrap();
+        let v = frigate.get::<&MaxSpeed>().unwrap();
         v.value == 100 // True
     };
 }
@@ -345,7 +345,7 @@ fn relationships_builtin_relationships_the_isa_relationship_component_sharing_25
     let frigate = world.entity().is_a(spaceship).set(Defense { value: 75 });
     // Obtain the overridden component from Frigate
     let is_75 = {
-        let v = frigate.get_ref::<&mut Defense>().unwrap();
+        let v = frigate.get::<&mut Defense>().unwrap();
         v.value == 75 // True
     };
 }
@@ -361,13 +361,13 @@ fn relationships_builtin_relationships_the_isa_relationship_component_sharing_26
 
     // Obtain the overridden component from FastFrigate
     let is_200 = {
-        let v = fast_frigate.get_ref::<&mut MaxSpeed>().unwrap();
+        let v = fast_frigate.get::<&mut MaxSpeed>().unwrap();
         v.value == 200 // True
     };
 
     // Obtain the inherited component from Frigate
     let is_75 = {
-        let v = fast_frigate.get_ref::<&Defense>().unwrap();
+        let v = fast_frigate.get::<&Defense>().unwrap();
         v.value == 75 // True
     };
 }

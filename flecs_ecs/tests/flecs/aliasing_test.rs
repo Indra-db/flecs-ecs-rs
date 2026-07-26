@@ -90,11 +90,11 @@ fn query_multi_src_mut_mut_different_entities_allowed() {
     });
     assert_eq!(count, 1);
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.y, 21);
     };
 }
@@ -138,7 +138,7 @@ fn entity_get_duplicate_mut_mut_panics() {
     let entity = world.entity().set(Position { x: 1, y: 2 });
     {
         let (_a, _b) = entity
-            .get_ref::<(&mut Position, &mut Position)>()
+            .get::<(&mut Position, &mut Position)>()
             .unwrap();
     };
 }
@@ -149,7 +149,7 @@ fn entity_try_get_duplicate_mut_read_panics() {
     let world = World::new();
     let entity = world.entity().set(Position { x: 1, y: 2 });
     {
-        let (_a, _b) = entity.get_ref::<(&mut Position, &Position)>().unwrap();
+        let (_a, _b) = entity.get::<(&mut Position, &Position)>().unwrap();
     };
 }
 
@@ -159,7 +159,7 @@ fn entity_get_duplicate_read_read_allowed() {
     let entity = world.entity().set(Position { x: 1, y: 2 });
     let mut count = 0;
     {
-        let (a, b) = entity.get_ref::<(&Position, &Position)>().unwrap();
+        let (a, b) = entity.get::<(&Position, &Position)>().unwrap();
         assert_eq!(a.x, b.x);
         count += 1;
     };
@@ -173,5 +173,5 @@ fn world_get_duplicate_mut_read_panics() {
     world.set(Position { x: 1, y: 2 });
     world
         .entity_from_id(Position::entity_id(&world))
-        .get_ref::<(&mut Position, &Position)>();
+        .get::<(&mut Position, &Position)>();
 }

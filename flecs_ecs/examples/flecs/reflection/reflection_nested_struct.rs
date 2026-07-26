@@ -27,7 +27,7 @@ fn main() {
     });
 
     // Convert Line component to flecs expression string
-    let line = e.get_ref::<&mut Line>().unwrap();
+    let line = e.get::<&mut Line>().unwrap();
     // Convert component to string
     println!("{}", world.to_expr(&*line));
 

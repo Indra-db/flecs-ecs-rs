@@ -362,7 +362,7 @@ pub trait WorldBundleExt {
     ///
     /// let mut world = World::new();
     /// let e = world.spawn((Pos { x: 1 },));
-    /// let g = e.get_ref::<&Pos>().unwrap();      // borrows `world` shared
+    /// let g = e.get::<&Pos>().unwrap();      // borrows `world` shared
     /// let _ = world.spawn((Pos { x: 2 },));      // needs `&mut world`: conflict
     /// let _ = g.x;
     /// ```

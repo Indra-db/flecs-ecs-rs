@@ -170,7 +170,7 @@ fn entity_mut_of_existing_entity_mutates() {
     let id = world.entity_new().id();
     world.entity_mut(id).unwrap().set(Health(7));
     {
-        let h = world.entity_from_id(id).get_ref::<&Health>().unwrap();
+        let h = world.entity_from_id(id).get::<&Health>().unwrap();
         assert_eq!(*h, Health(7));
     };
 }
@@ -188,7 +188,7 @@ fn spawn_returns_entity_mut_and_chains() {
 
     let view = world.entity_from_id(e);
     {
-        let (p, v, h) = view.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
+        let (p, v, h) = view.get::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 1, y: 2 });
         assert_eq!(*v, Vel { x: 3, y: 4 });
         assert_eq!(*h, Health(9));

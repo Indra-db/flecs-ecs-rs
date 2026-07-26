@@ -44,7 +44,7 @@ fn spawn_creates_entity_with_all_components_and_values() {
     assert!(ev.has(Health::id()));
 
     {
-        let (p, v, h) = ev.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
+        let (p, v, h) = ev.get::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 1, y: 2 });
         assert_eq!(*v, Vel { x: 3, y: 4 });
         assert_eq!(*h, Health(100));
@@ -56,7 +56,7 @@ fn spawn_single_component_bundle() {
     let mut world = World::new();
     let e = world.spawn((Health(7),)).id();
     {
-        let h = world.entity_from_id(e).get_ref::<&Health>().unwrap();
+        let h = world.entity_from_id(e).get::<&Health>().unwrap();
         assert_eq!(*h, Health(7));
     };
 }
@@ -75,7 +75,7 @@ fn spawn_registers_unregistered_components() {
     assert!(ev.has(Fresh1::id()));
     assert!(ev.has(Fresh2::id()));
     {
-        let (a, b) = ev.get_ref::<(&Fresh1, &Fresh2)>().unwrap();
+        let (a, b) = ev.get::<(&Fresh1, &Fresh2)>().unwrap();
         assert_eq!(*a, Fresh1(11));
         assert_eq!(*b, Fresh2(22));
     };
@@ -90,7 +90,7 @@ fn spawn_with_zero_sized_tag() {
     assert!(ev.has(Tag::id()));
     assert!(ev.has(Marker::id()));
     {
-        let p = ev.get_ref::<&Pos>().unwrap();
+        let p = ev.get::<&Pos>().unwrap();
         assert_eq!(*p, Pos { x: 5, y: 6 });
     };
 }
@@ -243,7 +243,7 @@ fn spawn_batch_values_are_correct_across_rows() {
         assert!(ev.has(CPos::id()));
         assert!(ev.has(CHealth::id()));
         {
-            let (p, h) = ev.get_ref::<(&CPos, &CHealth)>().unwrap();
+            let (p, h) = ev.get::<(&CPos, &CHealth)>().unwrap();
             assert_eq!(*p, CPos { x: 7, y: 8 });
             assert_eq!(*h, CHealth(3));
         };
@@ -256,7 +256,7 @@ fn spawn_batch_count_one() {
     let ids = world.spawn_batch((CHealth(42),), 1);
     assert_eq!(ids.len(), 1);
     {
-        let h = world.entity_from_id(ids[0]).get_ref::<&CHealth>().unwrap();
+        let h = world.entity_from_id(ids[0]).get::<&CHealth>().unwrap();
         assert_eq!(*h, CHealth(42));
     };
 }
@@ -318,7 +318,7 @@ fn insert_adds_all_components_with_values() {
     assert!(e.has(Vel::id()));
     assert!(e.has(Health::id()));
     {
-        let (p, v, h) = e.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
+        let (p, v, h) = e.get::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 1, y: 2 });
         assert_eq!(*v, Vel { x: 3, y: 4 });
         assert_eq!(*h, Health(5));
@@ -334,7 +334,7 @@ fn insert_onto_entity_with_existing_components() {
     assert!(e.has(Vel::id()));
     assert!(e.has(Health::id()));
     {
-        let (p, v, h) = e.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
+        let (p, v, h) = e.get::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 9, y: 9 });
         assert_eq!(*v, Vel { x: 1, y: 1 });
         assert_eq!(*h, Health(3));
@@ -349,7 +349,7 @@ fn insert_with_tag() {
     assert!(e.has(Health::id()));
     assert!(e.has(Tag::id()));
     {
-        let h = e.get_ref::<&Health>().unwrap();
+        let h = e.get::<&Health>().unwrap();
         assert_eq!(*h, Health(7));
     };
 }
@@ -466,7 +466,7 @@ fn insert_in_deferred_context_merges() {
     assert!(e.has(Pos::id()));
     assert!(e.has(Health::id()));
     {
-        let (p, h) = e.get_ref::<(&Pos, &Health)>().unwrap();
+        let (p, h) = e.get::<(&Pos, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 4, y: 5 });
         assert_eq!(*h, Health(6));
     };
@@ -492,7 +492,7 @@ fn insert_drop_runs_exactly_once_per_value() {
         e.insert((InsertDropCounter(1), Health(2)));
         assert_eq!(INSERT_DROP_COUNT.load(SeqCst), 0);
         {
-            let c = e.get_ref::<&InsertDropCounter>().unwrap();
+            let c = e.get::<&InsertDropCounter>().unwrap();
             assert_eq!(c.0, 1);
         };
     }
@@ -526,7 +526,7 @@ fn insert_default_component_drops_transient_default_no_leak() {
         // was moved in.
         assert_eq!(INSERT_DEFAULT_DROP.load(SeqCst), 1);
         {
-            let c = e.get_ref::<&InsertDefaultDrop>().unwrap();
+            let c = e.get::<&InsertDefaultDrop>().unwrap();
             assert_eq!(c.0, 7);
         };
     }
@@ -585,7 +585,7 @@ mod live_guard {
         }
 
         {
-            let g = e.get_ref::<&Pos>().unwrap();
+            let g = e.get::<&Pos>().unwrap();
             e.insert((Vel { x: 3, y: 4 }, Health(5)));
 
             // Guard data stays valid and unmoved across the call.
@@ -605,7 +605,7 @@ mod live_guard {
         assert_eq!(on_add.load(SeqCst), 1, "OnAdd fires once after guard drop");
         assert_eq!(on_set.load(SeqCst), 1, "OnSet fires once after guard drop");
         {
-            let (v, h) = e.get_ref::<(&Vel, &Health)>().unwrap();
+            let (v, h) = e.get::<(&Vel, &Health)>().unwrap();
             assert_eq!(*v, Vel { x: 3, y: 4 });
             assert_eq!(*h, Health(5));
         };

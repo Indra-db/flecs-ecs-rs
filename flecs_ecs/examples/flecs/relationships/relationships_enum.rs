@@ -66,7 +66,7 @@ fn main() {
     ); // true
 
     // Get the current value of the enum
-    if let Ok(tile) = tile.try_get_ref::<&Tile>() {
+    if let Ok(tile) = tile.try_get::<&Tile>() {
         println!("is tile stone: {}", *tile == Tile::Stone); // true
     }
 

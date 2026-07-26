@@ -31,12 +31,12 @@ fn main() {
         // useful for tags, or when adding a component with its default value.
         .add(Walking);
 
-    // Get the value for the Position component. get_ref returns an RAII guard
+    // Get the value for the Position component. get returns an RAII guard
     // borrowed straight from storage instead of running a callback.
-    // - a required &Position returns None (via try_get_ref, an AccessError) when
+    // - a required &Position returns None (via try_get, an AccessError) when
     //   absent; wrapping the term in Option makes a missing component observable.
     // - a single Option term is spelled as a one-element tuple.
-    let (pos,) = bob.get_ref::<(Option<&Position>,)>().unwrap();
+    let (pos,) = bob.get::<(Option<&Position>,)>().unwrap();
     if let Some(pos) = &pos {
         println!("Bob's position: {pos:?}");
     }

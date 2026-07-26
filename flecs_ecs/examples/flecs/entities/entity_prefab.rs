@@ -97,9 +97,9 @@ fn main() {
     println!("Instance type: [{}]", inst.archetype());
 
     // Even though the instance doesn't have a private copy of ImpulseSpeed, we
-    // can still get it using the regular API (outputs 50). try_get_ref returns
+    // can still get it using the regular API (outputs 50). try_get returns
     // the missing-component case as an Err rather than panicking.
-    if let Ok(impulse_speed) = inst.try_get_ref::<&ImpulseSpeed>() {
+    if let Ok(impulse_speed) = inst.try_get::<&ImpulseSpeed>() {
         println!("ImpulseSpeed: {}", impulse_speed.value);
     }
 

@@ -341,7 +341,7 @@ macro_rules! owns_component_range {
 macro_rules! get_component_range {
         ($world:expr, $entity:expr, $component:ty, $start:expr, $end:expr) => {{
             seq!(P in $start..=$end {
-                core::hint::black_box($entity.get_ref::<(#(&$component~P,)*)>());
+                core::hint::black_box($entity.get::<(#(&$component~P,)*)>());
             });
         }}
     }
@@ -349,7 +349,7 @@ macro_rules! get_component_range {
 macro_rules! get_mut_component_range {
         ($world:expr, $entity:expr, $component:ty, $start:expr, $end:expr) => {{
             seq!(P in $start..=$end {
-                core::hint::black_box($entity.get_ref::<(#(&mut $component~P,)*)>());
+                core::hint::black_box($entity.get::<(#(&mut $component~P,)*)>());
             });
         }};
     }

@@ -29,7 +29,7 @@ fn component_array_growth_covers_high_type_index() {
 
     let e = world_b.entity().set(HighIndexComponent { value: 7 });
     {
-        let c = e.get_ref::<&HighIndexComponent>().unwrap();
+        let c = e.get::<&HighIndexComponent>().unwrap();
         assert_eq!(c.value, 7);
     };
 }

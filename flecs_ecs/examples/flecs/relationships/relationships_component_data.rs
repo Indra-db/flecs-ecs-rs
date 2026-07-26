@@ -42,9 +42,9 @@ fn main() {
         .entity()
         .set_pair::<Requires, Gigawatts>(Requires { amount: 1.21 });
 
-    // try_get_ref returns the missing-relationship case as an Err instead of
+    // try_get returns the missing-relationship case as an Err instead of
     // routing it through an Option inside a callback.
-    match e1.try_get_ref::<&(Requires, Gigawatts)>() {
+    match e1.try_get::<&(Requires, Gigawatts)>() {
         Ok(req) => println!("e1: requires: {}", req.amount),
         Err(_) => println!("e1: does not have a relationship with Requires, Gigawatts"),
     }
@@ -54,7 +54,7 @@ fn main() {
         .entity()
         .set_pair::<Gigawatts, Requires>(Requires { amount: 1.5 });
 
-    match e2.try_get_ref::<&(Gigawatts, Requires)>() {
+    match e2.try_get::<&(Gigawatts, Requires)>() {
         Ok(req) => println!("e2: requires: {}", req.amount),
         Err(_) => println!("e2: does not have a relationship with Gigawatts, Requires"),
     }
@@ -68,7 +68,7 @@ fn main() {
         .entity()
         .set_pair::<Expires, Position>(Expires { timeout: 0.5 });
 
-    if let Ok(expires) = e3.try_get_ref::<&(Expires, Position)>() {
+    if let Ok(expires) = e3.try_get::<&(Expires, Position)>() {
         println!("expires: {}", expires.timeout);
     }
 

@@ -45,8 +45,8 @@ fn bulk_entity_builder_simple_set() {
         let entity = world.entity_from_id(entity);
         assert!(entity.has(Position::id()));
         assert!(entity.has(Velocity::id()));
-        let position = entity.cloned_owned::<&Position>().unwrap();
-        let velocity = entity.cloned_owned::<&Velocity>().unwrap();
+        let position = entity.cloned::<&Position>().unwrap();
+        let velocity = entity.cloned::<&Velocity>().unwrap();
         assert_eq!(position.x, velocity.x / 2);
         assert_eq!(position.y, velocity.y / 2);
         assert_eq!(position.x, index as i32);
@@ -98,8 +98,8 @@ fn bulk_entity_builder_table() {
         assert!(!entity.has(Mass::id()));
         assert!(!entity.has(random_ent_id));
 
-        let position = entity.cloned_owned::<&Position>().unwrap();
-        let velocity = entity.cloned_owned::<&Velocity>().unwrap();
+        let position = entity.cloned::<&Position>().unwrap();
+        let velocity = entity.cloned::<&Velocity>().unwrap();
         assert_eq!(position.x, velocity.x / 2);
         assert_eq!(position.y, velocity.y / 2);
         assert_eq!(position.x, index as i32);
@@ -214,7 +214,7 @@ fn bulk_entity_builder_add_and_set() {
         let entity = world.entity_from_id(entity);
         assert!(entity.has(Position::id()));
         assert!(entity.has(Velocity::id()));
-        let position = entity.cloned_owned::<&Position>().unwrap();
+        let position = entity.cloned::<&Position>().unwrap();
         assert_eq!(position.x, position.y);
     }
 }
@@ -281,7 +281,7 @@ fn bulk_entity_builder_set_after_add() {
     for entity in entities {
         let entity = world.entity_from_id(entity);
         assert!(entity.has(Position::id()));
-        let position = entity.cloned_owned::<&Position>().unwrap();
+        let position = entity.cloned::<&Position>().unwrap();
         assert_eq!(position.x, position.y);
     }
 }
@@ -316,7 +316,7 @@ fn bulk_entity_builder_set_same_component_multiple_times() {
 
     for entity in entities {
         let entity = world.entity_from_id(entity);
-        let position = entity.cloned_owned::<&Position>().unwrap();
+        let position = entity.cloned::<&Position>().unwrap();
         assert_eq!(position.x, 2);
         assert_eq!(position.y, 2);
     }

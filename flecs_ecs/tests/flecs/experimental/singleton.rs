@@ -47,7 +47,7 @@ fn singleton_ref_conflicts_with_singleton_write_guard() {
     // on the same singleton storage.
     let _r = WorldSingletonExt::singleton::<Health>(&world).unwrap();
     let component = world.entity_from_id(Health::entity_id(&world));
-    let _w = component.get_ref::<&mut Health>();
+    let _w = component.get::<&mut Health>();
 }
 
 #[test]

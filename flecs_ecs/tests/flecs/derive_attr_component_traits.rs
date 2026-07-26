@@ -260,7 +260,7 @@ mod add_set_attributes {
 
         {
             let (set1, set2, setdef, setpair, setpair2) = c
-                .get_ref::<(
+                .get::<(
                     &CSet1F,
                     &CSet2F,
                     &CSetWDefault,
@@ -303,7 +303,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnAddHookCounter::entity_id(w))
-                .get_ref::<&mut OnAddHookCounter>()
+                .get::<&mut OnAddHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -320,7 +320,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnRemoveHookCounter::entity_id(w))
-                .get_ref::<&mut OnRemoveHookCounter>()
+                .get::<&mut OnRemoveHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -337,7 +337,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnSetHookCounter::entity_id(w))
-                .get_ref::<&mut OnSetHookCounter>()
+                .get::<&mut OnSetHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -354,7 +354,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnReplaceHookCounter::entity_id(w))
-                .get_ref::<&mut OnReplaceHookCounter>()
+                .get::<&mut OnReplaceHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -366,7 +366,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnAddHookCounter::entity_id(w))
-                .get_ref::<&mut OnAddHookCounter>()
+                .get::<&mut OnAddHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -377,7 +377,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnSetHookCounter::entity_id(w))
-                .get_ref::<&mut OnSetHookCounter>()
+                .get::<&mut OnSetHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -388,7 +388,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnRemoveHookCounter::entity_id(w))
-                .get_ref::<&mut OnRemoveHookCounter>()
+                .get::<&mut OnRemoveHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -399,7 +399,7 @@ mod component_hooks_attributes {
             let w = e.world();
             let mut counter = w
                 .entity_from_id(OnReplaceHookCounter::entity_id(w))
-                .get_ref::<&mut OnReplaceHookCounter>()
+                .get::<&mut OnReplaceHookCounter>()
                 .unwrap();
             counter.count += 1;
         }
@@ -447,17 +447,17 @@ mod component_hooks_attributes {
             .remove(OnRemoveHookFn::id())
             .remove(OnRemoveHookInline::id());
 
-        let c_add = world.entity_from_id(OnAddHookCounter::entity_id(&world)).cloned_owned::<&OnAddHookCounter>().unwrap();
+        let c_add = world.entity_from_id(OnAddHookCounter::entity_id(&world)).cloned::<&OnAddHookCounter>().unwrap();
         assert_eq!(c_add.count, 2, "Expected 2 OnAddHook calls");
-        let c_set = world.entity_from_id(OnSetHookCounter::entity_id(&world)).cloned_owned::<&OnSetHookCounter>().unwrap();
+        let c_set = world.entity_from_id(OnSetHookCounter::entity_id(&world)).cloned::<&OnSetHookCounter>().unwrap();
         assert_eq!(c_set.count, 2, "Expected 2 OnSetHook calls");
-        let c_remove = world.entity_from_id(OnRemoveHookCounter::entity_id(&world)).cloned_owned::<&OnRemoveHookCounter>().unwrap();
+        let c_remove = world.entity_from_id(OnRemoveHookCounter::entity_id(&world)).cloned::<&OnRemoveHookCounter>().unwrap();
         assert_eq!(c_remove.count, 2, "Expected 2 OnRemoveHook calls");
 
         e.set(OnReplaceHookFn::default())
             .set(OnReplaceHookInline::default());
 
-        let c_replace = world.entity_from_id(OnReplaceHookCounter::entity_id(&world)).cloned_owned::<&OnReplaceHookCounter>().unwrap();
+        let c_replace = world.entity_from_id(OnReplaceHookCounter::entity_id(&world)).cloned::<&OnReplaceHookCounter>().unwrap();
         assert_eq!(c_replace.count, 2, "Expected 2 OnReplaceHook calls");
     }
 }
@@ -490,7 +490,7 @@ mod multi_item_and_trailing_comma_attributes {
         assert!(c.has(flecs::Sparse));
         assert!(c.has(TTrail::id()));
         {
-            let v = c.get_ref::<&CTrail>().unwrap();
+            let v = c.get::<&CTrail>().unwrap();
             assert_eq!(v.value, 7);
         };
     }

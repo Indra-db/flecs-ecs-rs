@@ -182,7 +182,7 @@ fn query_handle_two_par_systems() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 1);
         assert_eq!(p.y, 2);
     };
@@ -214,7 +214,7 @@ fn query_handle_clone_inside_par_callback() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 1);
     };
 }
@@ -240,7 +240,7 @@ fn query_handle_in_single_threaded_system() {
     world.progress();
 
     {
-        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
+        let p = world.entity_from_id(e).get::<&Position>().unwrap();
         assert_eq!(p.x, 3);
     };
 }
@@ -434,7 +434,7 @@ fn query_run_sparse() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -460,7 +460,7 @@ fn query_each_sparse() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -498,12 +498,12 @@ fn query_each_sparse_many() {
     for i in 0..2000_i32 {
         let e = world.entity_from_id(entities[i as usize]);
         {
-            let p = e.get_ref::<&Position>().unwrap();
+            let p = e.get::<&Position>().unwrap();
             assert_eq!(p.x, 10 + i * 2);
             assert_eq!(p.y, 20 + i * 2);
         };
         {
-            let v = e.get_ref::<&Velocity>().unwrap();
+            let v = e.get::<&Velocity>().unwrap();
             assert_eq!(v.x, i);
             assert_eq!(v.y, i);
         };
@@ -1261,7 +1261,7 @@ fn query_find_w_entity() {
 
     let q = world.new_query::<&Position>();
     let r = q.find_entity(|e, p| {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         p.x == v.x && p.y == v.y
     });
     assert_eq!(r.unwrap(), e2);
@@ -1340,7 +1340,7 @@ fn query_run() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1371,7 +1371,7 @@ fn query_run_const() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1425,12 +1425,12 @@ fn query_run_shared() {
     });
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     };
@@ -1478,22 +1478,22 @@ fn query_run_optional() {
     });
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     };
     {
-        let p = e4.get_ref::<&Position>().unwrap();
+        let p = e4.get::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     };
@@ -1530,7 +1530,7 @@ fn query_run_sparse_w_with() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1565,7 +1565,7 @@ fn query_run_dont_fragment() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1604,7 +1604,7 @@ fn query_run_dont_fragment_w_with() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1641,7 +1641,7 @@ fn query_run_dont_fragment_add() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1681,7 +1681,7 @@ fn query_run_dont_fragment_add_remove() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1712,7 +1712,7 @@ fn query_run_dont_fragment_set() {
                 e.set(Velocity { x: 1, y: 2 });
                 assert!(e.has(Velocity::id()));
                 {
-                    let v = e.get_ref::<&Velocity>().unwrap();
+                    let v = e.get::<&Velocity>().unwrap();
                     assert_eq!(v.x, 1);
                     assert_eq!(v.y, 2);
                 };
@@ -1724,12 +1724,12 @@ fn query_run_dont_fragment_set() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let v = entity.get_ref::<&Velocity>().unwrap();
+        let v = entity.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -1754,7 +1754,7 @@ fn query_each() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1779,7 +1779,7 @@ fn query_each_const() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1815,17 +1815,17 @@ fn query_each_shared() {
     });
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     };
@@ -1863,22 +1863,22 @@ fn query_each_optional() {
     });
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     };
     {
-        let p = e4.get_ref::<&Position>().unwrap();
+        let p = e4.get::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     };
@@ -1907,7 +1907,7 @@ fn query_each_dont_fragment() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1953,7 +1953,7 @@ fn query_signature() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -1988,7 +1988,7 @@ fn query_signature_const() {
     });
 
     {
-        let p = entity.get_ref::<&Position>().unwrap();
+        let p = entity.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
@@ -2041,12 +2041,12 @@ fn query_signature_shared() {
     });
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     };
@@ -2098,22 +2098,22 @@ fn query_signature_optional() {
     });
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     };
     {
-        let p = e4.get_ref::<&Position>().unwrap();
+        let p = e4.get::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     };
@@ -2273,7 +2273,7 @@ fn query_expr_w_template() {
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
         {
-            let t = e.get_ref::<&Template<i32>>().unwrap();
+            let t = e.get::<&Template<i32>>().unwrap();
             assert_eq!(t.x, 30);
             assert_eq!(t.y, 40);
         };
@@ -2751,27 +2751,27 @@ fn query_instanced_query_w_singleton_each() {
     assert_eq!(count, 5);
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = e4.get_ref::<&Position>().unwrap();
+        let p = e4.get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = e5.get_ref::<&Position>().unwrap();
+        let p = e5.get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
@@ -2819,37 +2819,37 @@ fn query_instanced_query_w_base_each() {
     assert_eq!(count, 7);
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = e4.get_ref::<&Position>().unwrap();
+        let p = e4.get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = e5.get_ref::<&Position>().unwrap();
+        let p = e5.get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
     {
-        let p = e6.get_ref::<&Position>().unwrap();
+        let p = e6.get::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
     };
     {
-        let p = e7.get_ref::<&Position>().unwrap();
+        let p = e7.get::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
     };
@@ -2895,27 +2895,27 @@ fn query_instanced_query_w_singleton_iter() {
     assert_eq!(count, 5);
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = e4.get_ref::<&Position>().unwrap();
+        let p = e4.get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = e5.get_ref::<&Position>().unwrap();
+        let p = e5.get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
@@ -2976,37 +2976,37 @@ fn query_instanced_query_w_base_iter() {
     assert_eq!(count, 7);
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };
     {
-        let p = e3.get_ref::<&Position>().unwrap();
+        let p = e3.get::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
     };
     {
-        let p = e4.get_ref::<&Position>().unwrap();
+        let p = e4.get::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
     };
     {
-        let p = e5.get_ref::<&Position>().unwrap();
+        let p = e5.get::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
     };
     {
-        let p = e6.get_ref::<&Position>().unwrap();
+        let p = e6.get::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
     };
     {
-        let p = e7.get_ref::<&Position>().unwrap();
+        let p = e7.get::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
     };
@@ -3043,7 +3043,7 @@ fn query_query_each_from_component() {
 
     let mut count = 0;
     {
-        let qc = e_holder.get_ref::<&QueryComp>().unwrap();
+        let qc = e_holder.get::<&QueryComp>().unwrap();
         qc.q.as_ref().unwrap().each_shared(&world, |(_p, _v)| {
             count += 1;
         });
@@ -3082,7 +3082,7 @@ fn query_query_iter_from_component() {
 
     let mut count = 0;
     {
-        let qc = e_holder.get_ref::<&QueryIterComp>().unwrap();
+        let qc = e_holder.get::<&QueryIterComp>().unwrap();
         qc.q.as_ref().unwrap().run_shared(&world, |mut it| {
             while it.next() {
                 count += it.count();
@@ -3107,7 +3107,7 @@ fn query_query_each_w_func_ptr() {
     let q = world.new_query::<&mut Position>();
     q.each_entity_shared(&world, query_each_func);
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -3122,7 +3122,7 @@ fn query_query_each_w_func_no_ptr() {
     let q = world.new_query::<&mut Position>();
     q.each_entity_shared(&world, query_each_func);
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -3147,7 +3147,7 @@ fn query_query_iter_w_func_ptr() {
     let q = world.new_query::<&mut Position>();
     q.run_shared(&world, query_run_func);
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -3160,7 +3160,7 @@ fn query_query_iter_w_func_no_ptr() {
     let q = world.new_query::<&mut Position>();
     q.run_shared(&world, query_run_func);
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
@@ -3196,12 +3196,12 @@ fn query_query_each_w_iter() {
     assert_eq!(invoked, 2);
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 31);
     };
@@ -4004,12 +4004,12 @@ fn query_empty_tables_each() {
     });
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 22);
         assert_eq!(p.y, 33);
     };

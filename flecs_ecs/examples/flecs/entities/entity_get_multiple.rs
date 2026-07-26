@@ -34,7 +34,7 @@ fn main() {
     // Multiple components can be fetched mutably in a single get by using a
     // tuple of mutable references. Each column comes back as its own guard, so
     // the fields are mutated directly with no callback.
-    let (mut pos, mut mass) = e.get_ref::<(&mut Position, &mut Mass)>().unwrap();
+    let (mut pos, mut mass) = e.get::<(&mut Position, &mut Mass)>().unwrap();
     pos.x += 5.0;
     mass.value += 3.0;
     println!("Position: {{{}, {}}}", pos.x, pos.y);
@@ -47,7 +47,7 @@ fn main() {
 
     // The same works with immutable references, which do not allow the
     // components to be modified.
-    let (pos, mass) = e.get_ref::<(&Position, &Mass)>().unwrap();
+    let (pos, mass) = e.get::<(&Position, &Mass)>().unwrap();
     println!("Position: {{{}, {}}}", pos.x, pos.y);
     println!("Mass: {{{}}}", mass.value);
     drop((pos, mass));
@@ -56,7 +56,7 @@ fn main() {
 
     // A component that may be absent can be wrapped in an Option, which is
     // None when the entity does not have the component.
-    let (pos, velocity, mass) = e.get_ref::<(&Position, Option<&Velocity>, &Mass)>().unwrap();
+    let (pos, velocity, mass) = e.get::<(&Position, Option<&Velocity>, &Mass)>().unwrap();
     println!("Position: {{{}, {}}}", pos.x, pos.y);
     if let Some(velocity) = velocity {
         println!("Velocity: {{{}, {}}}", velocity.x, velocity.y);

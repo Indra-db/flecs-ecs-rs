@@ -254,7 +254,7 @@ fn entities_and_components_components_components_have_entity_handles_26() {
     let pos = world.component::<Position>();
     // Component entities have the Component component
     {
-        let comp_data = pos.get_ref::<&flecs::Component>().unwrap();
+        let comp_data = pos.get::<&flecs::Component>().unwrap();
         println!(
             "size: {}, alignment: {}",
             comp_data.size, comp_data.alignment

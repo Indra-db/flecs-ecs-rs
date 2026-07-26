@@ -24,7 +24,7 @@ fn n2_terms_on_add() {
             {
                 let mut count = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -60,7 +60,7 @@ fn n2_terms_on_remove() {
             {
                 let mut count = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -110,7 +110,7 @@ fn n2_terms_on_set() {
             {
                 let mut count = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -168,7 +168,7 @@ fn n10_terms() {
                     {
                         let mut count = world
                             .entity_from_id(Count::entity_id(world))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         count.0 += 1;
                     };
@@ -230,7 +230,7 @@ fn n16_terms() {
                     {
                         let mut count = world
                             .entity_from_id(Count::entity_id(world))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         count.0 += 1;
                     };
@@ -289,7 +289,7 @@ fn n2_entities_iter() {
                     {
                         let mut count = world
                             .entity_from_id(Count::entity_id(world))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         count.0 += 1;
                     };
@@ -306,7 +306,7 @@ fn n2_entities_iter() {
                     {
                         let mut last = world
                             .entity_from_id(LastEntity::entity_id(world))
-                            .get_ref::<&mut LastEntity>()
+                            .get::<&mut LastEntity>()
                             .unwrap();
                         last.0 = it.get_entity(i).unwrap().id();
                     };
@@ -361,7 +361,7 @@ fn n2_entities_table_column() {
                     {
                         let mut count = world
                             .entity_from_id(Count::entity_id(world))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         count.0 += 1;
                     };
@@ -378,7 +378,7 @@ fn n2_entities_table_column() {
                     {
                         let mut last = world
                             .entity_from_id(LastEntity::entity_id(world))
-                            .get_ref::<&mut LastEntity>()
+                            .get::<&mut LastEntity>()
                             .unwrap();
                         last.0 = it.get_entity(i).unwrap().id();
                     };
@@ -427,7 +427,7 @@ fn n2_entities_each() {
             {
                 let mut count = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -444,7 +444,7 @@ fn n2_entities_each() {
             {
                 let mut last = world
                     .entity_from_id(LastEntity::entity_id(world))
-                    .get_ref::<&mut LastEntity>()
+                    .get::<&mut LastEntity>()
                     .unwrap();
                 last.0 = e.id();
             };
@@ -488,7 +488,7 @@ fn create_w_no_template_args() {
             {
                 let mut count = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -527,7 +527,7 @@ fn yield_existing() {
                     {
                         let mut count = world
                             .entity_from_id(Count::entity_id(world))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         if e == e1_id {
                             count.0 += 1;
@@ -577,7 +577,7 @@ fn yield_existing_2_terms() {
             {
                 let mut count = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 if e == e1_id {
                     count.0 += 1;
@@ -607,7 +607,7 @@ fn on_add() {
             {
                 let mut count = world
                     .entity_from_id(Count::entity_id(world))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -632,7 +632,7 @@ fn on_remove() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -665,7 +665,7 @@ fn on_add_tag_action() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -692,7 +692,7 @@ fn on_add_tag_iter() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -719,7 +719,7 @@ fn on_add_tag_each() {
                         let w = it.world();
                         let mut count = w
                             .entity_from_id(Count::entity_id(w))
-                            .get_ref::<&mut Count>()
+                            .get::<&mut Count>()
                             .unwrap();
                         count.0 += 1;
                     };
@@ -746,7 +746,7 @@ fn on_add_expr() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -780,7 +780,7 @@ fn observer_w_filter_term() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -854,7 +854,7 @@ fn run_callback() {
                     let w = e.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -894,7 +894,7 @@ fn get_query() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(&world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -920,7 +920,7 @@ fn on_set_w_set() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -952,7 +952,7 @@ fn on_set_w_defer_set() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -999,7 +999,7 @@ fn on_set_w_set_sparse() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -1040,7 +1040,7 @@ fn on_add_singleton() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -1077,7 +1077,7 @@ fn on_add_pair_singleton() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -1113,7 +1113,7 @@ fn on_add_pair_wildcard_singleton() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -1154,7 +1154,7 @@ fn on_add_with_pair_singleton() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -1251,7 +1251,7 @@ fn register_twice_w_each() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -1269,7 +1269,7 @@ fn register_twice_w_each() {
             let w = e.world();
             let mut count = w
                 .entity_from_id(Count2::entity_id(w))
-                .get_ref::<&mut Count2>()
+                .get::<&mut Count2>()
                 .unwrap();
             count.b += 1;
         };
@@ -1297,7 +1297,7 @@ fn register_twice_w_run() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count2::entity_id(w))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     count.a += 1;
                 };
@@ -1317,7 +1317,7 @@ fn register_twice_w_run() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.b += 1;
             };
@@ -1346,7 +1346,7 @@ fn register_twice_w_run_each() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count2::entity_id(w))
-                        .get_ref::<&mut Count2>()
+                        .get::<&mut Count2>()
                         .unwrap();
                     count.a += 1;
                 };
@@ -1365,7 +1365,7 @@ fn register_twice_w_run_each() {
             let w = e.world();
             let mut count = w
                 .entity_from_id(Count2::entity_id(w))
-                .get_ref::<&mut Count2>()
+                .get::<&mut Count2>()
                 .unwrap();
             count.b += 1;
         };
@@ -1392,7 +1392,7 @@ fn register_twice_w_each_run() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -1411,7 +1411,7 @@ fn register_twice_w_each_run() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.b += 1;
             };
@@ -1449,7 +1449,7 @@ fn yield_existing_on_create_flag() {
         {
             let mut count = world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap();
             if e == e1_id {
                 count.0 += 1;
@@ -1497,7 +1497,7 @@ fn yield_existing_on_delete_flag() {
         {
             let mut count = world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap();
             if e == e1_id {
                 count.0 += 1;
@@ -1545,7 +1545,7 @@ fn yield_existing_on_create_delete_flag() {
         {
             let mut count = world
                 .entity_from_id(Count::entity_id(world))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap();
             if e == e1_id {
                 count.0 += 1;
@@ -1585,7 +1585,7 @@ fn default_ctor() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -1633,7 +1633,7 @@ fn term_index() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 c.a = it.term_index() as i32;
             };
@@ -1709,7 +1709,7 @@ fn on_set_singleton_set_component_named_entity() {
     world.set(MySingletonComponent { v: 1 });
 
     {
-        let c = world.entity_named("A").get_ref::<&MyComponent>().unwrap();
+        let c = world.entity_named("A").get::<&MyComponent>().unwrap();
         assert_eq!(c.v, 1);
     };
 }
@@ -1834,7 +1834,7 @@ fn lookup_and_update_each() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -1855,7 +1855,7 @@ fn lookup_and_update_each() {
             let w = e.world();
             let mut count = w
                 .entity_from_id(Count2::entity_id(w))
-                .get_ref::<&mut Count2>()
+                .get::<&mut Count2>()
                 .unwrap();
             count.b += 1;
         };
@@ -1882,7 +1882,7 @@ fn lookup_and_update_run() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.a += 1;
             };
@@ -1901,7 +1901,7 @@ fn lookup_and_update_run() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 count.b += 1;
             };
@@ -1934,7 +1934,7 @@ fn other_table() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -1970,7 +1970,7 @@ fn other_table_w_pair() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2007,7 +2007,7 @@ fn other_table_w_pair_wildcard() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2046,7 +2046,7 @@ fn on_add_inherited() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -2085,7 +2085,7 @@ fn on_set_inherited() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2121,7 +2121,7 @@ fn on_remove_inherited() {
                 let w = e.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2176,7 +2176,7 @@ fn on_set_after_remove_override() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2217,7 +2217,7 @@ fn on_set_after_remove_override_create_observer_before() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2259,7 +2259,7 @@ fn on_set_w_override_after_delete() {
                 let w = _it.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2293,7 +2293,7 @@ fn on_set_w_override_after_clear() {
                 let w = _it.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2330,13 +2330,13 @@ fn trigger_on_set_in_on_add_implicit_registration() {
     let e = world.entity().add(LocalTag::id());
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
 
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -2374,13 +2374,13 @@ fn trigger_on_set_in_on_add_implicit_registration_namespaced() {
     let e = world.entity().add(LocalTag::id());
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     };
 
     {
-        let v = e.get_ref::<&ns::NsVelocity>().unwrap();
+        let v = e.get::<&ns::NsVelocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     };
@@ -2410,7 +2410,7 @@ fn fixed_src_w_each() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -2462,7 +2462,7 @@ fn fixed_src_w_run() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -2502,7 +2502,7 @@ fn untyped_field() {
             let w = it.world();
             let mut c = w
                 .entity_from_id(Count2::entity_id(w))
-                .get_ref::<&mut Count2>()
+                .get::<&mut Count2>()
                 .unwrap();
             c.a += 1; // invoked count
         };
@@ -2511,7 +2511,7 @@ fn untyped_field() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count2::entity_id(w))
-                    .get_ref::<&mut Count2>()
+                    .get::<&mut Count2>()
                     .unwrap();
                 c.b += 1; // iteration count
             };
@@ -2557,7 +2557,7 @@ fn query_eval_w_component_that_triggered_observer() {
             let w = it.world();
             let mut c = w
                 .entity_from_id(Count::entity_id(w))
-                .get_ref::<&mut Count>()
+                .get::<&mut Count>()
                 .unwrap();
             if c.0 == 0 {
                 c.0 += 1;
@@ -2615,7 +2615,7 @@ fn query_eval_w_pair_first_var_that_triggered_observer() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 first = c.0 == 0;
                 c.0 += 1;
@@ -2676,7 +2676,7 @@ fn query_eval_w_pair_second_var_that_triggered_observer() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 first = c.0 == 0;
                 c.0 += 1;
@@ -2741,7 +2741,7 @@ fn query_eval_w_pair_both_vars_that_triggered_observer() {
                 let w = it.world();
                 let mut c = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 first = c.0 == 0;
                 c.0 += 1;
@@ -2833,7 +2833,7 @@ fn run_callback_w_1_field() {
                 let w = it.world();
                 let mut count = w
                     .entity_from_id(Count::entity_id(w))
-                    .get_ref::<&mut Count>()
+                    .get::<&mut Count>()
                     .unwrap();
                 count.0 += 1;
             };
@@ -2875,7 +2875,7 @@ fn run_callback_w_2_fields() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -2922,7 +2922,7 @@ fn run_callback_w_yield_existing_1_field() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };
@@ -2962,7 +2962,7 @@ fn run_callback_w_yield_existing_2_fields() {
                     let w = it.world();
                     let mut count = w
                         .entity_from_id(Count::entity_id(w))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += 1;
                 };

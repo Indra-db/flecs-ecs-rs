@@ -1647,7 +1647,7 @@ fn typed_term_at() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += it.count() as i32;
                 }
@@ -1684,7 +1684,7 @@ fn typed_term_at_indexed() {
                 {
                     let mut count = world
                         .entity_from_id(Count::entity_id(world))
-                        .get_ref::<&mut Count>()
+                        .get::<&mut Count>()
                         .unwrap();
                     count.0 += it.count() as i32;
                 }
@@ -1964,7 +1964,7 @@ fn n2_subsequent_args() {
                     let w = it.real_world();
                     let mut f = w
                         .entity_from_id(Flags::entity_id(w))
-                        .get_ref::<&mut Flags>()
+                        .get::<&mut Flags>()
                         .unwrap();
                     f.count += it.count();
                 }
@@ -3552,7 +3552,7 @@ fn builder_force_assign_operator() {
 
     let mut count = 0;
     {
-        let wrapper = f.get_ref::<&QueryWrapper>().unwrap();
+        let wrapper = f.get::<&QueryWrapper>().unwrap();
         let query = world.query_from(wrapper.query_entity);
         query.each_entity_shared(&world, |e, _| {
             assert_eq!(e, e1);
@@ -4110,13 +4110,13 @@ fn iter_column_w_const_as_array() {
     assert_eq!(count, 2);
 
     {
-        let p = e1.get_ref::<&Position>().unwrap();
+        let p = e1.get::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     };
 
     {
-        let p = e2.get_ref::<&Position>().unwrap();
+        let p = e2.get::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
     };

@@ -106,7 +106,7 @@ fn batches_conflicts_with_live_write_guard() {
 
     // A live write guard on Position must make the batch's read borrow of the
     // same column report a conflict (shared-register contract).
-    let _w = e.get_ref::<&mut Position>().unwrap();
+    let _w = e.get::<&mut Position>().unwrap();
     let mut cursor = q.batches(&world);
     while cursor.next().is_some() {}
 }
@@ -119,7 +119,7 @@ fn batches_read_read_coexists_with_live_read_guard() {
     let q = query!(world, &Position).build();
 
     // A live read guard coexists with the batch's read borrows.
-    let r = e.get_ref::<&Position>().unwrap();
+    let r = e.get::<&Position>().unwrap();
     assert_eq!(r.x, 5);
     let mut rows = 0;
     let mut cursor = q.batches(&world);

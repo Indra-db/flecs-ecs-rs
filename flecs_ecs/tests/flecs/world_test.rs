@@ -82,36 +82,36 @@ fn multi_world_component() {
         .set(Mass { value: 100 });
 
     {
-        let p = w1_e.get_ref::<&Position>().unwrap();
+        let p = w1_e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     }
 
     {
-        let v = w1_e.get_ref::<&Velocity>().unwrap();
+        let v = w1_e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     }
 
     {
-        let m = w1_e.get_ref::<&Mass>().unwrap();
+        let m = w1_e.get::<&Mass>().unwrap();
         assert_eq!(m.value, 100);
     }
 
     {
-        let p = w2_e.get_ref::<&Position>().unwrap();
+        let p = w2_e.get::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
     }
 
     {
-        let v = w2_e.get_ref::<&Velocity>().unwrap();
+        let v = w2_e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     }
 
     {
-        let m = w2_e.get_ref::<&Mass>().unwrap();
+        let m = w2_e.get::<&Mass>().unwrap();
         assert_eq!(m.value, 100);
     }
 }
@@ -255,7 +255,7 @@ fn register_short_template() {
     assert_eq!(c.name(), "Tmp<Test>");
 
     {
-        let ptr = c.get_ref::<&EcsComponent>().unwrap();
+        let ptr = c.get::<&EcsComponent>().unwrap();
         assert_eq!(ptr.size, core::mem::size_of::<Tmp<Test>>() as i32);
         assert_eq!(ptr.alignment, core::mem::align_of::<Tmp<Test>>() as i32);
     }
@@ -326,7 +326,7 @@ fn implicit_register_w_new_world() {
         let e = world.entity().set(Position { x: 10, y: 20 });
         assert!(e.has(Position::id()));
         {
-            let p = e.get_ref::<&Position>().unwrap();
+            let p = e.get::<&Position>().unwrap();
             assert_eq!(p.x, 10);
             assert_eq!(p.y, 20);
         }
@@ -338,7 +338,7 @@ fn implicit_register_w_new_world() {
         let e = world.entity().set(Position { x: 10, y: 20 });
         assert!(e.has(Position::id()));
         {
-            let p = e.get_ref::<&Position>().unwrap();
+            let p = e.get::<&Position>().unwrap();
             assert_eq!(p.x, 10);
             assert_eq!(p.y, 20);
         }
@@ -553,7 +553,7 @@ fn with_tag() {
         .each_entity(|e, _| {
             assert!(e.has(tag.id()));
             {
-                let s = e.get_ref::<&SelfRef>().unwrap();
+                let s = e.get::<&SelfRef>().unwrap();
                 assert_eq!(s.value, e.id());
             }
             count += 1;
@@ -585,7 +585,7 @@ fn with_tag_type() {
         .each_entity(|e, _| {
             assert!(e.has(Tag::id()));
             {
-                let s = e.get_ref::<&SelfRef>().unwrap();
+                let s = e.get::<&SelfRef>().unwrap();
                 assert_eq!(s.value, e.id());
             }
             count += 1;
@@ -620,7 +620,7 @@ fn with_relation() {
         .each_entity(|e, _| {
             assert!(e.has((likes.id(), bob.id())));
             {
-                let s = e.get_ref::<&SelfRef>().unwrap();
+                let s = e.get::<&SelfRef>().unwrap();
                 assert_eq!(s.value, e.id());
             }
             count += 1;
@@ -654,7 +654,7 @@ fn with_relation_type() {
         .each_entity(|e, _| {
             assert!(e.has((Likes::id(), bob.id())));
             {
-                let s = e.get_ref::<&SelfRef>().unwrap();
+                let s = e.get::<&SelfRef>().unwrap();
                 assert_eq!(s.value, e.id());
             }
             count += 1;
@@ -686,7 +686,7 @@ fn with_relation_object_type() {
         .each_entity(|e, _| {
             assert!(e.has((Likes::id(), Bob::id())));
             {
-                let s = e.get_ref::<&SelfRef>().unwrap();
+                let s = e.get::<&SelfRef>().unwrap();
                 assert_eq!(s.value, e.id());
             }
             count += 1;
@@ -740,7 +740,7 @@ fn with_scope() {
         .each_entity(|e, _| {
             assert!(e.has((flecs::ChildOf::ID, parent.id())));
             {
-                let s = e.get_ref::<&SelfRef>().unwrap();
+                let s = e.get::<&SelfRef>().unwrap();
                 assert_eq!(s.value, e.id());
             }
             count += 1;
@@ -1667,7 +1667,7 @@ fn component_w_low_id() {
 }
 
 #[test]
-fn get_ref() {
+fn get() {
     #[derive(Component)]
     struct Space {
         v: i32,
@@ -1903,7 +1903,7 @@ fn get_mut_rel_type() {
 
     let has = world
         .entity_from_id(Position::entity_id(&world))
-        .get_ref::<&mut (Position, Tgt)>()
+        .get::<&mut (Position, Tgt)>()
         .is_some();
     assert!(!has);
 
@@ -1911,7 +1911,7 @@ fn get_mut_rel_type() {
     {
         let pos = world
             .entity_from_id(Position::entity_id(&world))
-            .get_ref::<&mut (Position, Tgt)>()
+            .get::<&mut (Position, Tgt)>()
             .unwrap();
         assert_eq!(pos.x, 10);
         assert_eq!(pos.y, 20);
@@ -2338,13 +2338,13 @@ fn entity_with_component() {
     assert!(e.has(Velocity::id()));
 
     {
-        let p = e.get_ref::<&Position>().unwrap();
+        let p = e.get::<&Position>().unwrap();
         assert_eq!(p.x, 5);
         assert_eq!(p.y, 10);
     }
 
     {
-        let v = e.get_ref::<&Velocity>().unwrap();
+        let v = e.get::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     }
