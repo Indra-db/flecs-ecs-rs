@@ -3,6 +3,7 @@
 use flecs_ecs::macros::*;
 
 mod batches;
+mod bundle;
 mod chunks;
 mod disjoint;
 #[cfg(feature = "flecs_safety_locks")]

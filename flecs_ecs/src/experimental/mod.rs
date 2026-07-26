@@ -8,16 +8,19 @@
 //!   unique access to the whole world at the type level, so no runtime lock is
 //!   needed and plain `&T` / `&mut T` can be returned. The borrow checker then
 //!   forbids every other world access for as long as the reference is live.
-//!   See [`WorldExclusiveExt::get_exclusive`] and
-//!   [`QueryExclusiveExt::each_exclusive`].
+//!   See
+//!   [`WorldExclusiveExt::get_exclusive`](crate::experimental::exclusive::WorldExclusiveExt::get_exclusive)
+//!   and
+//!   [`QueryExclusiveExt::each_exclusive`](crate::experimental::exclusive::QueryExclusiveExt::each_exclusive).
 //!
 //! * **Shared register** — `&World` and the Copy views (`EntityView`, query
 //!   iteration) only prove shared access, so returns are RAII guards
-//!   ([`Ref`] / [`Mut`]) backed by the per-stage lock maps in
+//!   ([`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut)) backed by the per-stage lock maps in
 //!   [`safety_map`](crate::core). A conflicting borrow panics like a `RefCell`;
-//!   the `try_*` entry points return the conflict as an [`AccessError`].
+//!   the `try_*` entry points return the conflict as an
+//!   [`AccessError`](crate::experimental::AccessError).
 //!
-//! # Tier-0 disjointness (see [`disjoint`])
+//! # Tier-0 disjointness (see [`disjoint`](crate::experimental::disjoint))
 //!
 //! A query whose terms provably cannot alias can skip the intra-query per-term
 //! borrow bookkeeping. Crucially this is only *sound where no outside borrow
@@ -34,7 +37,7 @@
 //!   ([`acquire_batch_locks`](crate::core)) already skips for an empty map.
 //!   So on the shared path tier-0 buys nothing beyond what batching already
 //!   does, and this prototype does not ship a shared-path skip. See
-//!   [`disjoint::is_proven_disjoint`] for the (conservative) analysis and the
+//!   [`disjoint::is_proven_disjoint`](crate::experimental::disjoint::is_proven_disjoint) for the (conservative) analysis and the
 //!   adversarial cases it rejects.
 
 #[cfg(feature = "flecs_safety_locks")]
@@ -48,11 +51,13 @@ pub use entity_access::{EntityGuardExt, GuardElement, GuardTuple};
 pub use guard::{AccessError, Mut, Ref};
 
 pub mod batches;
+pub mod bundle;
 pub mod chunks;
 pub mod disjoint;
 pub mod exclusive;
 
 pub use batches::{LockedBatches, QueryBatchesExt};
+pub use bundle::{Bundle, EntityBundleExt, WorldBundleExt};
 pub use chunks::{ChunkCursor, EachCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
@@ -146,6 +151,7 @@ pub mod prelude {
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::entity_access::{EntityGuardExt, GuardTuple};
     pub use super::batches::QueryBatchesExt;
+    pub use super::bundle::{Bundle, EntityBundleExt, WorldBundleExt};
     pub use super::chunks::QueryChunksExt;
     pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
     #[cfg(feature = "flecs_safety_locks")]

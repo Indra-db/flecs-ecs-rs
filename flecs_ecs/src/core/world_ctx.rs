@@ -11,10 +11,24 @@ use alloc::sync::Arc;
 use alloc::vec;
 use std::sync::Mutex;
 
+/// Per-world cache mapping a [`Bundle`](crate::experimental::Bundle) type to the
+/// sorted, de-duplicated component id array used to resolve its target table.
+///
+/// Keyed by the bundle's `TypeId` (the §8.2 per-world identity machinery). The
+/// stored value is the SORTED id array, never a table pointer: tables can be
+/// deleted, component ids cannot.
+#[cfg(feature = "flecs_experimental")]
+pub(crate) type BundleIdCache = core::cell::RefCell<
+    hashbrown::HashMap<core::any::TypeId, alloc::boxed::Box<[u64]>, super::NoOpHash>,
+>;
+
 pub(crate) struct WorldCtx {
     query_ref_count: Cell<i32>,
     pub(crate) components: FlecsIdMap,
     pub(crate) components_array: FlecsArray,
+    // Bundle-type -> sorted component id array (spec §4.11).
+    #[cfg(feature = "flecs_experimental")]
+    pub(crate) bundle_ids: BundleIdCache,
     // Atomic because `QueryHandle::drop` reads it from other threads.
     is_panicking: core::sync::atomic::AtomicBool,
     owning_thread: std::thread::ThreadId,
@@ -34,6 +48,8 @@ impl WorldCtx {
             query_ref_count: Cell::new(0),
             components: Default::default(),
             components_array: vec![0; 500],
+            #[cfg(feature = "flecs_experimental")]
+            bundle_ids: core::cell::RefCell::new(hashbrown::HashMap::default()),
             is_panicking: core::sync::atomic::AtomicBool::new(false),
             owning_thread: std::thread::current().id(),
             world_dead: Arc::new(Mutex::new(false)),

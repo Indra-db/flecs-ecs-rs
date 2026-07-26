@@ -170,6 +170,15 @@ impl StageLocks {
         self.pin += 1;
     }
 
+    /// Whether any shared-register guard is currently live on this stage
+    /// (`pin > 0`). Used by operations that cannot run under a live storage pin
+    /// (e.g. bundle `spawn`, whose `ecs_bulk_init` can reallocate a pinned
+    /// table's columns) to refuse instead of dangling the guard.
+    #[inline(always)]
+    pub(crate) fn has_live_pin(&self) -> bool {
+        self.pin > 0
+    }
+
     /// Release one live guard. If it was the last (`pin` reaches zero) and a
     /// write episode's defer level is open, close it with a single
     /// `ecs_defer_end`; otherwise no FFI (the read-only drop path). `world` must
@@ -388,12 +397,6 @@ pub(crate) fn ensure_write_episode(world: &WorldRef) {
     // SAFETY: the stage map is owned by the calling thread.
     unsafe { (*locks.as_ptr()).open_episode(world.raw_world.as_ptr()) };
 }
-
-/// No-op without the safety-lock bookkeeping: no guards exist, so no pin can be
-/// live and shared-register writes keep their immediate semantics.
-#[cfg(not(feature = "flecs_safety_locks"))]
-#[inline(always)]
-pub(crate) fn ensure_write_episode(_world: &super::WorldRef) {}
 
 #[cfg(feature = "flecs_safety_locks")]
 #[cold]

@@ -9,6 +9,7 @@ pub use seq_macro::seq;
 pub mod common_bench;
 
 mod add_remove_bench;
+mod bundle_bench;
 mod commands_bench;
 mod create_delete_bench;
 mod parenting_names_bench;
@@ -20,6 +21,7 @@ mod query_bench;
 mod set_bench;
 
 use add_remove_bench::*;
+use bundle_bench::*;
 use commands_bench::*;
 use create_delete_bench::*;
 
@@ -52,7 +54,17 @@ criterion_main!(
     g_has,
     g_set,
     g_observers,
-    g_query
+    g_query,
+    g_bundle
+);
+
+criterion_group!(
+    name = g_bundle;
+    config = ecs_default_criterion();
+    targets =
+    bundle_spawn,
+    bundle_spawn_batch,
+    bundle_insert
 );
 
 criterion_group!(
