@@ -47,10 +47,12 @@ pub use entity_access::{EntityGuardExt, GuardElement, GuardTuple};
 #[cfg(feature = "flecs_safety_locks")]
 pub use guard::{AccessError, Mut, Ref};
 
+pub mod bundle;
 pub mod chunks;
 pub mod disjoint;
 pub mod exclusive;
 
+pub use bundle::Bundle;
 pub use chunks::{ChunkCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
@@ -143,6 +145,7 @@ macro_rules! each {
 pub mod prelude {
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::entity_access::{EntityGuardExt, GuardTuple};
+    pub use super::bundle::Bundle;
     pub use super::chunks::QueryChunksExt;
     pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
     #[cfg(feature = "flecs_safety_locks")]
