@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use crate::common_test::*;
 use flecs_ecs::experimental::{QueryExclusiveExt, QuerySharedExt};
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[test]
 fn term_each_component() {
@@ -568,7 +569,7 @@ fn find_w_entity() {
 
     let q = world.new_query::<&Position>();
 
-    let result = q.find_entity(|e, p| e.get::<&Velocity>(|v| p.x == v.x && p.y == v.y));
+    let result = q.find_entity(|e, p| { let v = e.get_ref::<&Velocity>().unwrap(); p.x == v.x && p.y == v.y });
 
     assert_eq!(result.unwrap(), e2);
 }
@@ -820,9 +821,9 @@ fn each_pair_type() {
 
     assert_eq!(count, 1);
 
-    e1.get::<&(Eats, Apples)>(|v| {
+    { let v = e1.get_ref::<&(Eats, Apples)>().unwrap();
         assert_eq!(v.amount, 11);
-    });
+    };
 }
 
 #[test]
@@ -844,10 +845,10 @@ fn each_no_entity_1_comp() {
 
     assert_eq!(count, 1);
 
-    e.get::<&Position>(|pos| {
+    { let pos = e.get_ref::<&Position>().unwrap();
         assert_eq!(pos.x, 2);
         assert_eq!(pos.y, 4);
-    });
+    };
 }
 
 #[test]
@@ -876,12 +877,12 @@ fn each_no_entity_2_comps() {
 
     assert_eq!(count, 1);
 
-    e.get::<(&Position, &Velocity)>(|(p, v)| {
+    { let (p, v) = e.get_ref::<(&Position, &Velocity)>().unwrap();
         assert_eq!(p.x, 2);
         assert_eq!(p.y, 4);
         assert_eq!(v.x, 11);
         assert_eq!(v.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -916,26 +917,26 @@ fn instanced_query_w_singleton_each() {
 
     assert_eq!(count, 5);
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    { let p = e4.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    { let p = e5.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
+    };
 }
 
 #[test]
@@ -985,34 +986,34 @@ fn instanced_query_w_base_each() {
 
     assert_eq!(count, 7);
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    { let p = e4.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    { let p = e5.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
-    e6.get::<&Position>(|p| {
+    };
+    { let p = e6.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
-    });
-    e7.get::<&Position>(|p| {
+    };
+    { let p = e7.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
-    });
+    };
 }
 
 #[test]
@@ -1037,11 +1038,11 @@ fn query_each_from_component() {
     let e = world.entity().set(QueryComponent { q });
 
     let mut count = 0;
-    e.get::<&QueryComponent>(|qc| {
+    { let qc = e.get_ref::<&QueryComponent>().unwrap();
         qc.q.each_shared(&world, |(_p, _v)| {
             count += 1;
         });
-    });
+    };
 
     assert_eq!(count, 2);
 }
@@ -1065,10 +1066,10 @@ fn query_each_w_func_ptr() {
 
     INVOKED.with(|c| assert_eq!(c.get(), 1));
 
-    e.get::<&Position>(|p| {
+    { let p = e.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
+    };
 }
 
 #[test]
@@ -1110,26 +1111,26 @@ fn instanced_query_w_singleton_iter() {
     });
 
     assert_eq!(count, 5);
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    { let p = e4.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    { let p = e5.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
+    };
 }
 
 #[test]
@@ -1191,34 +1192,34 @@ fn instanced_query_w_base_iter() {
     });
 
     assert_eq!(count, 7);
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 42);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    { let p = e4.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 41);
         assert_eq!(p.y, 52);
-    });
-    e5.get::<&Position>(|p| {
+    };
+    { let p = e5.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 62);
-    });
-    e6.get::<&Position>(|p| {
+    };
+    { let p = e6.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 62);
         assert_eq!(p.y, 73);
-    });
-    e7.get::<&Position>(|p| {
+    };
+    { let p = e7.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 74);
         assert_eq!(p.y, 85);
-    });
+    };
 }
 
 #[test]
@@ -1243,13 +1244,13 @@ fn query_iter_from_component() {
     let e = world.entity().set(QueryComponent2 { q });
 
     let mut count = 0;
-    e.get::<&QueryComponent2>(|qc| {
+    { let qc = e.get_ref::<&QueryComponent2>().unwrap();
         qc.q.run_shared(&world, |mut it| {
             while it.next() {
                 count += it.count();
             }
         });
-    });
+    };
 
     assert_eq!(count, 2);
 }
@@ -1275,10 +1276,10 @@ fn query_iter_w_func_ptr() {
     });
 
     INVOKED2.with(|c| assert_eq!(c.get(), 1));
-    e.get::<&Position>(|p| {
+    { let p = e.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
+    };
 }
 
 #[test]
@@ -1296,10 +1297,10 @@ fn query_each_w_func_no_ptr() {
     q.each_entity_shared(&world, each_func_no_ptr);
 
     INVOKED3.with(|c| assert_eq!(c.get(), 1));
-    e.get::<&Position>(|p| {
+    { let p = e.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
+    };
 }
 
 #[test]
@@ -1322,10 +1323,10 @@ fn query_iter_w_func_no_ptr() {
     });
 
     INVOKED4.with(|c| assert_eq!(c.get(), 1));
-    e.get::<&Position>(|p| {
+    { let p = e.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
+    };
 }
 
 #[test]
@@ -1351,14 +1352,14 @@ fn query_each_w_iter() {
     });
 
     assert_eq!(invoked, 2);
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 31);
-    });
+    };
 }
 
 #[test]
@@ -1881,10 +1882,10 @@ fn run() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -1909,10 +1910,10 @@ fn run_const() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -1960,14 +1961,14 @@ fn run_shared() {
         }
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
-    });
+    };
 }
 
 #[test]
@@ -2009,22 +2010,22 @@ fn run_optional() {
         }
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    { let p = e4.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
-    });
+    };
 }
 
 #[test]
@@ -2051,10 +2052,10 @@ fn run_sparse() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2085,10 +2086,10 @@ fn run_sparse_w_with() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2117,10 +2118,10 @@ fn run_dont_fragment() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2153,10 +2154,10 @@ fn run_dont_fragment_w_with() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2187,10 +2188,10 @@ fn run_dont_fragment_add() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
     assert!(entity.has(Velocity::id()));
 }
 
@@ -2224,10 +2225,10 @@ fn run_dont_fragment_add_remove() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
     assert!(!entity.has(Velocity::id()));
 }
 
@@ -2252,10 +2253,10 @@ fn run_dont_fragment_set() {
                 let e = it.get_entity(i).unwrap();
                 e.set(Velocity { x: 1, y: 2 });
                 assert!(e.has(Velocity::id()));
-                e.get::<&Velocity>(|v| {
+                { let v = e.get_ref::<&Velocity>().unwrap();
                     assert_eq!(v.x, 1);
                     assert_eq!(v.y, 2);
-                });
+                };
                 let mut p = it.field_at_mut::<Position>(0, i);
                 p.x += 1;
                 p.y += 2;
@@ -2263,14 +2264,14 @@ fn run_dont_fragment_set() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    entity.get::<&Velocity>(|v| {
+    };
+    { let v = entity.get_ref::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -2289,10 +2290,10 @@ fn each() {
         p.y += v.y;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2311,10 +2312,10 @@ fn each_const() {
         p.y += v.y;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2346,18 +2347,18 @@ fn each_shared() {
         p.y += v.y;
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
-    });
+    };
 }
 
 #[test]
@@ -2389,22 +2390,22 @@ fn each_optional() {
         }
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    { let p = e4.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
-    });
+    };
 }
 
 #[test]
@@ -2425,10 +2426,10 @@ fn each_sparse() {
         p.y += v.y;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2455,10 +2456,10 @@ fn each_sparse_w_with() {
         p.y += v.y;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2489,14 +2490,14 @@ fn each_sparse_many() {
 
     for i in 0..2000i32 {
         let e = world.entity_from_id(entities[i as usize]);
-        e.get::<&Position>(|p| {
+        { let p = e.get_ref::<&Position>().unwrap();
             assert_eq!(p.x, 10 + i * 2);
             assert_eq!(p.y, 20 + i * 2);
-        });
-        e.get::<&Velocity>(|v| {
+        };
+        { let v = e.get_ref::<&Velocity>().unwrap();
             assert_eq!(v.x, i);
             assert_eq!(v.y, i);
-        });
+        };
     }
 }
 
@@ -2519,10 +2520,10 @@ fn each_dont_fragment() {
         p.y += v.y;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2551,10 +2552,10 @@ fn each_dont_fragment_w_with() {
         p.y += v.y;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2587,14 +2588,14 @@ fn each_dont_fragment_many() {
 
     for i in 0..2000i32 {
         let e = world.entity_from_id(entities[i as usize]);
-        e.get::<&Position>(|p| {
+        { let p = e.get_ref::<&Position>().unwrap();
             assert_eq!(p.x, 10 + i * 2);
             assert_eq!(p.y, 20 + i * 2);
-        });
-        e.get::<&Velocity>(|v| {
+        };
+        { let v = e.get_ref::<&Velocity>().unwrap();
             assert_eq!(v.x, i);
             assert_eq!(v.y, i);
-        });
+        };
     }
 }
 
@@ -2620,10 +2621,10 @@ fn each_dont_fragment_add() {
         p.y += 2;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
     assert!(entity.has(Velocity::id()));
 }
 
@@ -2651,10 +2652,10 @@ fn each_dont_fragment_add_remove() {
         p.y += 2;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
     assert!(!entity.has(Velocity::id()));
 }
 
@@ -2676,22 +2677,22 @@ fn each_dont_fragment_set() {
     q.each_entity_shared(&world, |e, p| {
         e.set(Velocity { x: 1, y: 2 });
         assert!(e.has(Velocity::id()));
-        e.get::<&Velocity>(|v| {
+        { let v = e.get_ref::<&Velocity>().unwrap();
             assert_eq!(v.x, 1);
             assert_eq!(v.y, 2);
-        });
+        };
         p.x += 1;
         p.y += 2;
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    entity.get::<&Velocity>(|v| {
+    };
+    { let v = entity.get_ref::<&Velocity>().unwrap();
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
-    });
+    };
 }
 
 #[test]
@@ -2729,10 +2730,10 @@ fn signature() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2761,10 +2762,10 @@ fn signature_const() {
         }
     });
 
-    entity.get::<&Position>(|p| {
+    { let p = entity.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -2812,14 +2813,14 @@ fn signature_shared() {
         }
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
-    });
+    };
 }
 
 #[test]
@@ -2865,22 +2866,22 @@ fn signature_optional() {
         }
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
-    });
-    e3.get::<&Position>(|p| {
+    };
+    { let p = e3.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
-    });
-    e4.get::<&Position>(|p| {
+    };
+    { let p = e4.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
-    });
+    };
 }
 
 #[test]
@@ -2973,10 +2974,10 @@ fn expr_w_template() {
     q.each_entity_exclusive(&mut world, |e, p| {
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-        e.get::<&Template<i32>>(|t| {
+        { let t = e.get_ref::<&Template<i32>>().unwrap();
             assert_eq!(t.x, 30);
             assert_eq!(t.y, 40);
-        });
+        };
         count += 1;
     });
 
@@ -3176,9 +3177,9 @@ fn iter_pair_type() {
 
     assert_eq!(count, 1);
 
-    e1.get::<&(EatsData2, ApplesTag2)>(|v| {
+    { let v = e1.get_ref::<&(EatsData2, ApplesTag2)>().unwrap();
         assert_eq!(v.amount, 10);
-    });
+    };
 }
 
 #[test]
@@ -3217,9 +3218,9 @@ fn term_pair_type() {
 
     assert_eq!(count, 1);
 
-    e1.get::<&(EatsData3, ApplesTag3)>(|v| {
+    { let v = e1.get_ref::<&(EatsData3, ApplesTag3)>().unwrap();
         assert_eq!(v.amount, 11);
-    });
+    };
 }
 
 #[test]
@@ -3725,14 +3726,14 @@ fn empty_tables_each() {
         p.y += v.y;
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 22);
         assert_eq!(p.y, 33);
-    });
+    };
 }
 
 #[test]
@@ -3762,14 +3763,14 @@ fn empty_tables_each_w_entity() {
         p.y += v.y;
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 22);
         assert_eq!(p.y, 33);
-    });
+    };
 }
 
 #[test]
@@ -3799,14 +3800,14 @@ fn empty_tables_each_w_iter() {
         p.y += v.y;
     });
 
-    e1.get::<&Position>(|p| {
+    { let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
-    e2.get::<&Position>(|p| {
+    };
+    { let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 22);
         assert_eq!(p.y, 33);
-    });
+    };
 }
 
 #[test]
@@ -4244,10 +4245,10 @@ fn each_mutable() {
         assert_eq!(p.y, 20);
     });
 
-    e.get::<&Position>(|p| {
+    { let p = e.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 10);
         assert_eq!(p.y, 20);
-    });
+    };
 }
 
 #[test]
@@ -4506,10 +4507,10 @@ fn sparse_query_each() {
     assert_eq!(count, 1);
     assert_eq!(q.count(), 1);
 
-    e1.get::<&PositionDfOr>(|p| {
+    { let p = e1.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
     assert!(e2.is_alive());
     assert!(e3.is_alive());
@@ -4613,10 +4614,10 @@ fn world_each_sparse() {
 
     assert_eq!(count, 1);
 
-    e1.get::<&PositionDfOr>(|p| {
+    { let p = e1.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -4711,14 +4712,14 @@ fn sparse_query_each_on_instantiate_override() {
     assert_eq!(count, 2);
     assert_eq!(q.count(), 2);
 
-    e1.get::<&PositionDfOr>(|p| {
+    { let p = e1.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
-    e2.get::<&PositionDfOr>(|p| {
+    };
+    { let p = e2.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 41);
-    });
+    };
 
     assert!(e3.is_alive());
 }
@@ -4750,14 +4751,14 @@ fn sparse_query_each_on_instantiate_dont_inherit() {
     assert_eq!(count, 2);
     assert_eq!(q.count(), 2);
 
-    e1.get::<&PositionDfDi>(|p| {
+    { let p = e1.get_ref::<&PositionDfDi>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
-    e2.get::<&PositionDfDi>(|p| {
+    };
+    { let p = e2.get_ref::<&PositionDfDi>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 41);
-    });
+    };
 }
 
 #[test]
@@ -4786,10 +4787,10 @@ fn sparse_query_each_on_instantiate_mixed_terms() {
     assert_eq!(count, 1);
     assert_eq!(q.count(), 1);
 
-    e1.get::<&PositionDfOr>(|p| {
+    { let p = e1.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
     assert!(e2.is_alive());
     assert!(e3.is_alive());
@@ -4943,14 +4944,14 @@ fn each_dont_fragment_trait() {
 
     assert_eq!(count, 2);
 
-    e1.get::<&PositionDfOr>(|p| {
+    { let p = e1.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 21);
-    });
-    e2.get::<&PositionDfOr>(|p| {
+    };
+    { let p = e2.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 31);
         assert_eq!(p.y, 41);
-    });
+    };
 }
 
 #[test]
@@ -4969,10 +4970,10 @@ fn each_dont_fragment_trait_mixed() {
         p.y += v.y;
     });
 
-    entity.get::<&PositionDfOr>(|p| {
+    { let p = entity.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -5002,10 +5003,10 @@ fn each_dont_fragment_trait_shared() {
 
     assert_eq!(count, 1);
 
-    entity.get::<&PositionDfOr>(|p| {
+    { let p = entity.get_ref::<&PositionDfOr>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]

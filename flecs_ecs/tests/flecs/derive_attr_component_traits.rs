@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 mod component_traits_attributes {
     use super::*;
@@ -257,20 +258,23 @@ mod add_set_attributes {
         assert!(c.has(CAdd::id()));
         assert!(c.has((TAdd::id(), CAdd::id())));
 
-        c.get::<(
-            &CSet1F,
-            &CSet2F,
-            &CSetWDefault,
-            &(CSet1F, CSet2F),
-            &(TAdd, CSet1F),
-        )>(|(set1, set2, setdef, setpair, setpair2)| {
+        {
+            let (set1, set2, setdef, setpair, setpair2) = c
+                .get_ref::<(
+                    &CSet1F,
+                    &CSet2F,
+                    &CSetWDefault,
+                    &(CSet1F, CSet2F),
+                    &(TAdd, CSet1F),
+                )>()
+                .unwrap();
             assert_eq!(set1.value, 1);
             assert_eq!(set2.value, 2);
             assert_eq!(set2.other, 3);
             assert_eq!(setdef.value, 0);
             assert_eq!(setpair.value, 4);
             assert_eq!(setpair2.value, 5);
-        });
+        };
 
         //internally it does
         // world
@@ -295,9 +299,14 @@ mod component_hooks_attributes {
 
     #[derive(Default, Component)]
     #[flecs(hooks(on_add(|e, _c| {
-        e.world().get::<&mut OnAddHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnAddHookCounter::entity_id(w))
+                .get_ref::<&mut OnAddHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     })))]
     struct OnAddHookInline(i32);
 
@@ -307,9 +316,14 @@ mod component_hooks_attributes {
 
     #[derive(Default, Component)]
     #[flecs(hooks(on_remove(|e, _c| {
-        e.world().get::<&mut OnRemoveHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnRemoveHookCounter::entity_id(w))
+                .get_ref::<&mut OnRemoveHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     })))]
     struct OnRemoveHookInline(i32);
 
@@ -319,9 +333,14 @@ mod component_hooks_attributes {
 
     #[derive(Default, Component)]
     #[flecs(hooks(on_set(|e, _c| {
-        e.world().get::<&mut OnSetHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnSetHookCounter::entity_id(w))
+                .get_ref::<&mut OnSetHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     })))]
     struct OnSetHookInline(i32);
 
@@ -331,34 +350,59 @@ mod component_hooks_attributes {
 
     #[derive(Default, Component)]
     #[flecs(hooks(on_replace(|e, _p,_n| {
-        e.world().get::<&mut OnReplaceHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnReplaceHookCounter::entity_id(w))
+                .get_ref::<&mut OnReplaceHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     })))]
     struct OnReplaceHookInline(i32);
 
     fn on_add_hook(e: EntityView<'_>, _c: &mut OnAddHookFn) {
-        e.world().get::<&mut OnAddHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnAddHookCounter::entity_id(w))
+                .get_ref::<&mut OnAddHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     }
 
     fn on_set_hook(e: EntityView<'_>, _c: &mut OnSetHookFn) {
-        e.world().get::<&mut OnSetHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnSetHookCounter::entity_id(w))
+                .get_ref::<&mut OnSetHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     }
 
     fn on_remove_hook(e: EntityView<'_>, _c: &mut OnRemoveHookFn) {
-        e.world().get::<&mut OnRemoveHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnRemoveHookCounter::entity_id(w))
+                .get_ref::<&mut OnRemoveHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     }
 
     fn on_replace_hook(e: EntityView<'_>, _p: &mut OnReplaceHookFn, _n: &mut OnReplaceHookFn) {
-        e.world().get::<&mut OnReplaceHookCounter>(|counter| {
+        {
+            let w = e.world();
+            let mut counter = w
+                .entity_from_id(OnReplaceHookCounter::entity_id(w))
+                .get_ref::<&mut OnReplaceHookCounter>()
+                .unwrap();
             counter.count += 1;
-        });
+        }
     }
 
     #[derive(Component, Clone, Default)]
@@ -403,17 +447,17 @@ mod component_hooks_attributes {
             .remove(OnRemoveHookFn::id())
             .remove(OnRemoveHookInline::id());
 
-        let c_add = world.cloned::<&OnAddHookCounter>();
+        let c_add = world.entity_from_id(OnAddHookCounter::entity_id(&world)).cloned_owned::<&OnAddHookCounter>().unwrap();
         assert_eq!(c_add.count, 2, "Expected 2 OnAddHook calls");
-        let c_set = world.cloned::<&OnSetHookCounter>();
+        let c_set = world.entity_from_id(OnSetHookCounter::entity_id(&world)).cloned_owned::<&OnSetHookCounter>().unwrap();
         assert_eq!(c_set.count, 2, "Expected 2 OnSetHook calls");
-        let c_remove = world.cloned::<&OnRemoveHookCounter>();
+        let c_remove = world.entity_from_id(OnRemoveHookCounter::entity_id(&world)).cloned_owned::<&OnRemoveHookCounter>().unwrap();
         assert_eq!(c_remove.count, 2, "Expected 2 OnRemoveHook calls");
 
         e.set(OnReplaceHookFn::default())
             .set(OnReplaceHookInline::default());
 
-        let c_replace = world.cloned::<&OnReplaceHookCounter>();
+        let c_replace = world.entity_from_id(OnReplaceHookCounter::entity_id(&world)).cloned_owned::<&OnReplaceHookCounter>().unwrap();
         assert_eq!(c_replace.count, 2, "Expected 2 OnReplaceHook calls");
     }
 }
@@ -445,6 +489,9 @@ mod multi_item_and_trailing_comma_attributes {
         assert!(c.has(flecs::Transitive));
         assert!(c.has(flecs::Sparse));
         assert!(c.has(TTrail::id()));
-        c.get::<&CTrail>(|v| assert_eq!(v.value, 7));
+        {
+            let v = c.get_ref::<&CTrail>().unwrap();
+            assert_eq!(v.value, 7);
+        };
     }
 }

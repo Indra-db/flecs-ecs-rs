@@ -4,6 +4,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[test]
 fn relationships_introduction_01() {
@@ -329,9 +330,10 @@ fn relationships_builtin_relationships_the_isa_relationship_component_sharing_24
     let spaceship = world.entity().set(MaxSpeed { value: 100 }).set(Defense { value: 50 });
     let frigate = world.entity().is_a(spaceship).set(Defense { value: 75 });
     // Obtain the inherited component from Spaceship
-    let is_100 = frigate.get::<&MaxSpeed>(|v| {
+    let is_100 = {
+        let v = frigate.get_ref::<&MaxSpeed>().unwrap();
         v.value == 100 // True
-    });
+    };
 }
 
 #[test]
@@ -342,9 +344,10 @@ fn relationships_builtin_relationships_the_isa_relationship_component_sharing_25
     let spaceship = world.entity().set(MaxSpeed { value: 100 }).set(Defense { value: 50 });
     let frigate = world.entity().is_a(spaceship).set(Defense { value: 75 });
     // Obtain the overridden component from Frigate
-    let is_75 = frigate.get::<&mut Defense>(|v| {
+    let is_75 = {
+        let v = frigate.get_ref::<&mut Defense>().unwrap();
         v.value == 75 // True
-    });
+    };
 }
 
 #[test]
@@ -357,14 +360,16 @@ fn relationships_builtin_relationships_the_isa_relationship_component_sharing_26
     let fast_frigate = world.entity().is_a(frigate).set(MaxSpeed { value: 200 });
 
     // Obtain the overridden component from FastFrigate
-    let is_200 = fast_frigate.get::<&mut MaxSpeed>(|v| {
+    let is_200 = {
+        let v = fast_frigate.get_ref::<&mut MaxSpeed>().unwrap();
         v.value == 200 // True
-    });
+    };
 
     // Obtain the inherited component from Frigate
-    let is_75 = fast_frigate.get::<&Defense>(|v| {
+    let is_75 = {
+        let v = fast_frigate.get_ref::<&Defense>().unwrap();
         v.value == 75 // True
-    });
+    };
 }
 
 #[test]

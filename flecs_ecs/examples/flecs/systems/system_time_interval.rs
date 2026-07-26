@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::WorldSingletonExt;
 use flecs_ecs::prelude::*;
 // This example shows how to run a system at a specified time interval.
 
@@ -36,7 +37,11 @@ fn main() {
     world.set_target_fps(60.0);
 
     while world.progress() {
-        if world.get::<&Timeout>(|timeout| timeout.value <= 0.0) {
+        let timed_out = {
+            let timeout = WorldSingletonExt::singleton::<Timeout>(&world).unwrap();
+            timeout.value <= 0.0
+        };
+        if timed_out {
             println!("Timed out!");
             break;
         }

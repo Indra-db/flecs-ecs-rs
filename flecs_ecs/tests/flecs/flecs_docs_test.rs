@@ -2644,7 +2644,7 @@ fn flecs_docs_component_traits_compile_test() {
     let inst = world.entity().is_a(base); // Mass is copied to inst
 
     assert!(inst.owns(Mass::id()));
-    assert!(base.cloned::<&Mass>() != inst.cloned::<&Mass>());
+    assert!(base.cloned_owned::<&Mass>().unwrap() != inst.cloned_owned::<&Mass>().unwrap());
 
     // Register component with trait
     world
@@ -2656,7 +2656,7 @@ fn flecs_docs_component_traits_compile_test() {
 
     assert!(inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(base.cloned::<&Mass>() != inst.cloned::<&Mass>());
+    assert!(base.cloned_owned::<&Mass>().unwrap() != inst.cloned_owned::<&Mass>().unwrap());
 
     // Register component with trait
     world

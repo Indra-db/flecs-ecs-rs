@@ -89,7 +89,14 @@ impl<'a> ScriptEntityView<'a> {
     ///
     /// * C API: `script_ast_to_buf`
     pub fn ast(&mut self) -> Option<String> {
-        let script = self.get::<&flecs::Script>(|script| script.script);
+        let script_ptr = self.get_untyped(flecs::Script::id()) as *const flecs::Script;
+        assert!(
+            !script_ptr.is_null(),
+            "entity does not have a flecs::Script component"
+        );
+        // SAFETY: script_ptr is a valid, non-null pointer to the entity's
+        // flecs::Script component, checked above.
+        let script = unsafe { (*script_ptr).script };
 
         let ast = unsafe { sys::ecs_script_ast_to_str(script, false) };
 

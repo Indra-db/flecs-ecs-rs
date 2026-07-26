@@ -169,9 +169,10 @@ fn entity_mut_of_existing_entity_mutates() {
     let mut world = World::new();
     let id = world.entity_new().id();
     world.entity_mut(id).unwrap().set(Health(7));
-    world
-        .entity_from_id(id)
-        .get::<&Health>(|h| assert_eq!(*h, Health(7)));
+    {
+        let h = world.entity_from_id(id).get_ref::<&Health>().unwrap();
+        assert_eq!(*h, Health(7));
+    };
 }
 
 #[test]
@@ -186,11 +187,12 @@ fn spawn_returns_entity_mut_and_chains() {
         .id();
 
     let view = world.entity_from_id(e);
-    view.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
+    {
+        let (p, v, h) = view.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 1, y: 2 });
         assert_eq!(*v, Vel { x: 3, y: 4 });
         assert_eq!(*h, Health(9));
-    });
+    };
 }
 
 #[test]

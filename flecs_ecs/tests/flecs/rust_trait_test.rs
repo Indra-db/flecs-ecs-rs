@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::macros::*;
 
 pub trait Shapes {
@@ -85,9 +86,10 @@ fn rust_trait_cast_mut_mutates_component() {
         }
     });
 
-    entity.get::<&Circle>(|circle| {
+    {
+        let circle = entity.get_ref::<&Circle>().unwrap();
         assert_eq!(circle.value, 6);
-    });
+    };
 }
 
 #[test]

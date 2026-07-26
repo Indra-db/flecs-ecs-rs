@@ -1,4 +1,5 @@
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 fn cloned_tuple_is_nameable_outside_the_crate<T: flecs_ecs::core::ClonedTuple>() {}
 
@@ -88,8 +89,14 @@ fn query_multi_src_mut_mut_different_entities_allowed() {
         count += 1;
     });
     assert_eq!(count, 1);
-    e1.get::<&Position>(|p| assert_eq!(p.x, 11));
-    e2.get::<&Position>(|p| assert_eq!(p.y, 21));
+    {
+        let p = e1.get_ref::<&Position>().unwrap();
+        assert_eq!(p.x, 11);
+    };
+    {
+        let p = e2.get_ref::<&Position>().unwrap();
+        assert_eq!(p.y, 21);
+    };
 }
 
 #[test]
@@ -129,7 +136,11 @@ fn query_duplicate_mut_sparse_terms_panics() {
 fn entity_get_duplicate_mut_mut_panics() {
     let world = World::new();
     let entity = world.entity().set(Position { x: 1, y: 2 });
-    entity.get::<(&mut Position, &mut Position)>(|(_a, _b)| {});
+    {
+        let (_a, _b) = entity
+            .get_ref::<(&mut Position, &mut Position)>()
+            .unwrap();
+    };
 }
 
 #[test]
@@ -137,7 +148,9 @@ fn entity_get_duplicate_mut_mut_panics() {
 fn entity_try_get_duplicate_mut_read_panics() {
     let world = World::new();
     let entity = world.entity().set(Position { x: 1, y: 2 });
-    entity.try_get::<(&mut Position, &Position)>(|(_a, _b)| {});
+    {
+        let (_a, _b) = entity.get_ref::<(&mut Position, &Position)>().unwrap();
+    };
 }
 
 #[test]
@@ -145,10 +158,11 @@ fn entity_get_duplicate_read_read_allowed() {
     let world = World::new();
     let entity = world.entity().set(Position { x: 1, y: 2 });
     let mut count = 0;
-    entity.get::<(&Position, &Position)>(|(a, b)| {
+    {
+        let (a, b) = entity.get_ref::<(&Position, &Position)>().unwrap();
         assert_eq!(a.x, b.x);
         count += 1;
-    });
+    };
     assert_eq!(count, 1);
 }
 
@@ -157,5 +171,7 @@ fn entity_get_duplicate_read_read_allowed() {
 fn world_get_duplicate_mut_read_panics() {
     let world = World::new();
     world.set(Position { x: 1, y: 2 });
-    world.get::<(&mut Position, &Position)>(|(_a, _b)| {});
+    world
+        .entity_from_id(Position::entity_id(&world))
+        .get_ref::<(&mut Position, &Position)>();
 }

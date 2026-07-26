@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 // Local enum for Table_get_T_enum test
 #[repr(C)]
@@ -201,7 +202,7 @@ fn table_multi_get() {
         .set(Velocity { x: 0, y: 0 });
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
-    let found = e1.try_get::<(&Position, &Velocity)>(|(_p, _v)| {
+    let found = e1.get_ref::<(&Position, &Velocity)>().map(|(_p, _v)| {
         e2.add(Mass::id());
     });
     assert!(found.is_some());
@@ -221,12 +222,14 @@ fn table_multi_get_locked() {
         .set(Velocity { x: 0, y: 0 });
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
-    // rw_locking uses defer_begin/end so structural changes are queued, not immediate.
-    e1.get::<(&Position, &Velocity)>(|(_p, _v)| {
+    // A shared-register write issued while a guard is live is queued, not
+    // immediate; it flushes when the guard drops at the end of the block.
+    {
+        let (_p, _v) = e1.get_ref::<(&Position, &Velocity)>().unwrap();
         e2.add(Velocity::id());
-    });
+    }
 
-    // After callback returns, deferred commands are flushed — e2 should now have Velocity.
+    // After the guard drops, deferred commands are flushed — e2 should now have Velocity.
     assert!(e2.has(Velocity::id()));
 }
 
@@ -243,9 +246,10 @@ fn table_multi_set() {
         .set(Velocity { x: 0, y: 0 });
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
-    e1.get::<(&mut Position, &mut Velocity)>(|(_p, _v)| {
+    {
+        let (_p, _v) = e1.get_ref::<(&mut Position, &mut Velocity)>().unwrap();
         e2.add(Mass::id());
-    });
+    }
 
     assert!(e2.has(Mass::id()));
 }
@@ -262,12 +266,14 @@ fn table_multi_set_locked() {
         .set(Velocity { x: 0, y: 0 });
     let e2 = world.entity().set(Position { x: 0, y: 0 });
 
-    // rw_locking uses defer_begin/end so structural changes are queued, not immediate.
-    e1.get::<(&mut Position, &mut Velocity)>(|(_p, _v)| {
+    // A shared-register write issued while a guard is live is queued, not
+    // immediate; it flushes when the guard drops at the end of the block.
+    {
+        let (_p, _v) = e1.get_ref::<(&mut Position, &mut Velocity)>().unwrap();
         e2.add(Velocity::id());
-    });
+    }
 
-    // After callback returns, deferred commands are flushed.
+    // After the guard drops, deferred commands are flushed.
     assert!(e2.has(Velocity::id()));
 }
 

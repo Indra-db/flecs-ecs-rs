@@ -4,6 +4,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldSingletonExt};
 
 #[test]
 fn entities_and_components_entities_creation_01() {
@@ -252,12 +253,13 @@ fn entities_and_components_components_components_have_entity_handles_26() {
     // Get the entity for the Position component
     let pos = world.component::<Position>();
     // Component entities have the Component component
-    pos.get::<&flecs::Component>(|comp_data| {
+    {
+        let comp_data = pos.get_ref::<&flecs::Component>().unwrap();
         println!(
             "size: {}, alignment: {}",
             comp_data.size, comp_data.alignment
         );
-    });
+    };
 }
 
 #[test]
@@ -335,7 +337,10 @@ fn entities_and_components_components_singletons_32() {
     world.set(TimeOfDay(0.5));
 
     // Get singleton
-    world.get::<&TimeOfDay>(|time| println!("{}", time.0));
+    {
+        let time = WorldSingletonExt::singleton::<TimeOfDay>(&world).unwrap();
+        println!("{}", time.0);
+    };
 }
 
 #[test]

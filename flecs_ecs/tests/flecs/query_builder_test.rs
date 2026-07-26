@@ -3,6 +3,7 @@ use core::cell::Cell;
 use core::ffi::c_void;
 
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldSingletonExt};
 use flecs_ecs::experimental::{QueryExclusiveExt, QuerySharedExt};
 use flecs_ecs::sys;
 
@@ -1643,9 +1644,13 @@ fn typed_term_at() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Count>(|count| {
+                {
+                    let mut count = world
+                        .entity_from_id(Count::entity_id(world))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
                     count.0 += it.count() as i32;
-                });
+                }
             }
         });
 
@@ -1654,9 +1659,10 @@ fn typed_term_at() {
 
     s.run();
 
-    world.get::<&Count>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(count.0, 1);
-    });
+    };
 }
 
 #[test]
@@ -1675,9 +1681,13 @@ fn typed_term_at_indexed() {
         .run(|mut it| {
             let world = it.world();
             while it.next() {
-                world.get::<&mut Count>(|count| {
+                {
+                    let mut count = world
+                        .entity_from_id(Count::entity_id(world))
+                        .get_ref::<&mut Count>()
+                        .unwrap();
                     count.0 += it.count() as i32;
-                });
+                }
             }
         });
 
@@ -1686,9 +1696,10 @@ fn typed_term_at_indexed() {
 
     s.run();
 
-    world.get::<&Count>(|count| {
+    {
+        let count = WorldSingletonExt::singleton::<Count>(&world).unwrap();
         assert_eq!(count.0, 1);
-    });
+    };
 }
 
 #[test]
@@ -1949,7 +1960,14 @@ fn n2_subsequent_args() {
         .term_at(1)
         .run(|mut it| {
             while it.next() {
-                it.real_world().get::<&mut Flags>(|f| f.count += it.count());
+                {
+                    let w = it.real_world();
+                    let mut f = w
+                        .entity_from_id(Flags::entity_id(w))
+                        .get_ref::<&mut Flags>()
+                        .unwrap();
+                    f.count += it.count();
+                }
             }
         });
 
@@ -1958,7 +1976,10 @@ fn n2_subsequent_args() {
 
     s.run();
 
-    world.get::<&Flags>(|f| assert_eq!(f.count, 1));
+    {
+        let f = WorldSingletonExt::singleton::<Flags>(&world).unwrap();
+        assert_eq!(f.count, 1);
+    };
 }
 
 #[test]
@@ -3530,13 +3551,14 @@ fn builder_force_assign_operator() {
     });
 
     let mut count = 0;
-    f.get::<&QueryWrapper>(|wrapper| {
+    {
+        let wrapper = f.get_ref::<&QueryWrapper>().unwrap();
         let query = world.query_from(wrapper.query_entity);
         query.each_entity_shared(&world, |e, _| {
             assert_eq!(e, e1);
             count += 1;
         });
-    });
+    };
 
     assert_eq!(count, 1);
 }
@@ -4087,15 +4109,17 @@ fn iter_column_w_const_as_array() {
 
     assert_eq!(count, 2);
 
-    e1.get::<&Position>(|p| {
+    {
+        let p = e1.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 
-    e2.get::<&Position>(|p| {
+    {
+        let p = e2.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 21);
         assert_eq!(p.y, 32);
-    });
+    };
 }
 
 #[test]

@@ -10,6 +10,7 @@
 use core::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::macros::*;
 
 #[derive(Component)]
@@ -37,9 +38,10 @@ fn each_with_delivers_stage_and_defers() {
 
     world.progress();
 
-    world
-        .entity_from_id(e)
-        .get::<&Value>(|v| assert_eq!(v.0, 42));
+    {
+        let v = world.entity_from_id(e).get_ref::<&Value>().unwrap();
+        assert_eq!(v.0, 42);
+    };
 }
 
 /// `each_entity_with` also hands the row's `EntityView`; a deferred structural
@@ -123,7 +125,7 @@ fn each_entity_with_registers_write_term_lock() {
         .each_entity_with(|entity, _v, _stage| {
             let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
                 // read guard on Value vs the batch's write term on Value
-                entity.get::<&Value>(|_| {});
+                let _ = entity.get_ref::<&Value>().unwrap();
             }));
             if result.is_err() {
                 CONFLICTED.store(true, Ordering::Relaxed);
@@ -149,7 +151,8 @@ fn each_entity_with_disjoint_guard_ok() {
         .system::<&mut Value>()
         .each_entity_with(|entity, _v, _stage| {
             // Spawned is disjoint from the Value write term: no conflict.
-            entity.get::<&mut Spawned>(|s| s.0 += 1);
+            let mut s = entity.get_ref::<&mut Spawned>().unwrap();
+            s.0 += 1;
         });
 
     world.progress();

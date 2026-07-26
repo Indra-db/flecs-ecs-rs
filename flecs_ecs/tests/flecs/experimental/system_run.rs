@@ -15,6 +15,7 @@ use core::sync::atomic::{AtomicI32, Ordering};
 
 use flecs_ecs::addons::system::{RunArgs, System, WorkerSpan};
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::macros::*;
 
 #[derive(Component)]
@@ -42,9 +43,10 @@ fn run_with_runs_the_system() {
     sys.run_with(&mut world, RunArgs::default());
     sys.run_with(&mut world, RunArgs::default());
 
-    world
-        .entity_from_id(e)
-        .get::<&Counter>(|c| assert_eq!(c.0, 2));
+    {
+        let c = world.entity_from_id(e).get_ref::<&Counter>().unwrap();
+        assert_eq!(c.0, 2);
+    };
 }
 
 #[test]
@@ -93,9 +95,10 @@ fn run_with_and_progress_mix_in_one_frame() {
     world.progress();
     sys.run_with(&mut world, RunArgs::default());
 
-    world
-        .entity_from_id(e)
-        .get::<&Counter>(|c| assert_eq!(c.0, 2));
+    {
+        let c = world.entity_from_id(e).get_ref::<&Counter>().unwrap();
+        assert_eq!(c.0, 2);
+    };
 }
 
 #[test]

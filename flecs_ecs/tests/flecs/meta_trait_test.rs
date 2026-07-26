@@ -101,17 +101,16 @@ fn test_enum() {
         .add_enum(Color::Green)
         .set(TypeWithEnum { color: Color::Blue });
 
-    // SW-15/SW-17: kept on the CPS `get`. `add_enum` stores the enum as a
-    // relationship target, which the experimental read surface cannot yet serve
-    // (`get_ref`'s pin revalidation rejects the target pointer, `get_exclusive`
-    // forbids a mutable enum get, and `cloned_owned` cannot resolve the pair).
-    // Convert TypeWithEnum component to flecs expression string
-    e.get::<(&Color, &TypeWithEnum)>(|(color, type_enum)| {
-        let expr: String = world.to_expr(color);
+    // Convert TypeWithEnum component to flecs expression string. The enum read
+    // goes through the guard surface now that pin revalidation resolves an
+    // `add_enum` relationship target correctly.
+    {
+        let (color, type_enum) = e.get_ref::<(&Color, &TypeWithEnum)>().unwrap();
+        let expr: String = world.to_expr(&*color);
         assert_eq!(expr, "Green");
-        let expr = world.to_expr(type_enum);
+        let expr = world.to_expr(&*type_enum);
         assert_eq!(expr, "{color: Blue}");
-    });
+    }
 }
 
 #[derive(Debug, Component)]

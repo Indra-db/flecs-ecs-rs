@@ -5,7 +5,7 @@
 //! guard drops. Writes issued under a live guard therefore defer and apply
 //! (observers included) at last-guard-drop.
 
-use super::{Health, Position, Velocity};
+use super::{Position, Velocity};
 use core::sync::atomic::{AtomicU32, Ordering};
 use flecs_ecs::core::*;
 use flecs_ecs::experimental::prelude::*;
@@ -235,45 +235,11 @@ fn nested_guards_two_entities_share_one_episode() {
     assert!(e1.has(Velocity::id()) && e2.has(Velocity::id()));
 }
 
-// --- episode composes with an open legacy closure-`get` scope (spec §7.1) ---
-
-#[test]
-fn episode_composes_with_open_legacy_get_scope() {
-    use flecs_ecs::prelude::EntityViewGet;
-    static CNT: AtomicU32 = AtomicU32::new(0);
-    CNT.store(0, Ordering::Relaxed);
-    let world = World::new();
-    world
-        .observer::<flecs::OnSet, &Velocity>()
-        .each_entity(|_e, _v| {
-            CNT.fetch_add(1, Ordering::Relaxed);
-        });
-    let e = world.entity().set(Position { x: 1, y: 1 }).set(Health(5));
-
-    e.get::<&Health>(|_h| {
-        assert!(
-            world.is_deferred(),
-            "legacy closure get opens a real defer level"
-        );
-        let g = e.get_ref::<&mut Position>().unwrap();
-        e.set(Velocity { x: 2, y: 2 });
-        assert!(!e.has(Velocity::id()), "write deferred behind both levels");
-        assert_eq!(CNT.load(Ordering::Relaxed), 0);
-        drop(g);
-        assert!(
-            world.is_deferred(),
-            "closing the episode leaves the legacy level open"
-        );
-        assert!(
-            !e.has(Velocity::id()),
-            "write still deferred under the legacy level"
-        );
-        assert_eq!(CNT.load(Ordering::Relaxed), 0);
-    });
-
-    assert!(e.has(Velocity::id()), "flushed when the legacy scope closes");
-    assert_eq!(CNT.load(Ordering::Relaxed), 1);
-}
+// Deleted: episode_composes_with_open_legacy_get_scope pinned the interaction
+// between the new guard episode and an OPEN legacy closure-`get` defer scope.
+// The legacy closure-CPS `EntityViewGet::get` is removed in this flip, so there
+// is no legacy scope left to compose with. The standalone episode open/close
+// semantics stay covered by the sibling tests in this file.
 
 // --- mem::forget contract (spec §7.2): leak fails safe, never wedges ---
 

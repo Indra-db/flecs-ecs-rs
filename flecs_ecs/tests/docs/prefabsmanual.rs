@@ -4,6 +4,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[test]
 fn prefabs_introduction_01() {
@@ -22,9 +23,10 @@ fn prefabs_introduction_01() {
     let inst_2 = world.entity().is_a(spaceship);
 
     // Get instantiated component
-    inst_1.get::<&Defense>(|defense| {
+    {
+    let defense = inst_1.get_ref::<&Defense>().unwrap();
     println!("Defense value: {}", defense.value);
-    });
+    };
 }
 
 #[test]
@@ -83,14 +85,16 @@ fn prefabs_component_inheritance_06() {
     let inst = world.entity().is_a(spaceship);
 
     // Component is retrieved from instance
-    inst.get::<&Health>(|health| {
+    {
+    let health = inst.get_ref::<&Health>().unwrap();
     println!("Health value: {}", health.value);
-    });
+    };
 
     // Component is retrieved from prefab
-    inst.get::<&Defense>(|defense| {
+    {
+    let defense = inst.get_ref::<&Defense>().unwrap();
     println!("Defense value: {}", defense.value);
-    });
+    };
 }
 
 #[test]
@@ -183,12 +187,14 @@ fn prefabs_prefab_variants_12() {
 
     // Create prefab instance
     let inst = world.entity().is_a(freighter);
-    inst.get::<&Health>(|health| {
+    {
+    let health = inst.get_ref::<&Health>().unwrap();
     println!("Health value: {}", health.value); // 150
-    });
-    inst.get::<&Defense>(|defense| {
+    };
+    {
+    let defense = inst.get_ref::<&Defense>().unwrap();
     println!("Defense value: {}", defense.value); // 50
-    });
+    };
 
 }
 

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::prelude::*;
 
 #[test]
@@ -68,10 +69,11 @@ fn world_factory_system() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -96,10 +98,11 @@ fn world_factory_system_w_name() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -135,10 +138,11 @@ fn world_factory_system_w_expr() {
 
     world.progress();
 
-    world.entity_from_id(e).get::<&Position>(|p| {
+    {
+        let p = world.entity_from_id(e).get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -157,10 +161,11 @@ fn world_factory_query() {
         p.y += v.y;
     });
 
-    e.get::<&Position>(|p| {
+    {
+        let p = e.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[test]
@@ -192,10 +197,11 @@ fn world_factory_query_w_expr() {
         }
     });
 
-    e.get::<&Position>(|p| {
+    {
+        let p = e.get_ref::<&Position>().unwrap();
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
-    });
+    };
 }
 
 #[derive(Component)]

@@ -2953,17 +2953,17 @@ fn interval_tick_source() {
     });
 
     world.progress_time(1.0);
-    let c = world.cloned::<&Count2>();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
     assert_eq!(c.a, 0);
     assert_eq!(c.b, 0);
 
     world.progress_time(1.0);
-    let c = world.cloned::<&Count2>();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
     assert_eq!(c.a, 0);
     assert_eq!(c.b, 0);
 
     world.progress_time(1.0);
-    let c = world.cloned::<&Count2>();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
     assert_eq!(c.a, 1);
     assert_eq!(c.b, 1);
 }
@@ -3003,17 +3003,17 @@ fn rate_tick_source() {
     });
 
     world.progress_time(1.0);
-    let c = world.cloned::<&Count2>();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
     assert_eq!(0, c.a);
     assert_eq!(0, c.b);
 
     world.progress_time(1.0);
-    let c = world.cloned::<&Count2>();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
     assert_eq!(0, c.a);
     assert_eq!(0, c.b);
 
     world.progress_time(1.0);
-    let c = world.cloned::<&Count2>();
+    let c = world.entity_from_id(Count2::entity_id(&world)).cloned_owned::<&Count2>().unwrap();
     assert_eq!(1, c.a);
     assert_eq!(1, c.b);
 }
@@ -3196,7 +3196,7 @@ fn randomize_timers() {
         .run(|mut it| while it.next() {});
 
     {
-        let t = s1.try_cloned::<&flecs::timer::Timer>();
+        let t = s1.cloned_owned::<&flecs::timer::Timer>();
         assert!(t.is_some());
         assert_eq!(t.unwrap().time, 0.0);
     }
@@ -3209,13 +3209,13 @@ fn randomize_timers() {
         .run(|mut it| while it.next() {});
 
     {
-        let t = s1.try_cloned::<&flecs::timer::Timer>();
+        let t = s1.cloned_owned::<&flecs::timer::Timer>();
         assert!(t.is_some());
         assert_ne!(t.unwrap().time, 0.0);
     }
 
     {
-        let t = s2.try_cloned::<&flecs::timer::Timer>();
+        let t = s2.cloned_owned::<&flecs::timer::Timer>();
         assert!(t.is_some());
         assert_ne!(t.unwrap().time, 0.0);
     }

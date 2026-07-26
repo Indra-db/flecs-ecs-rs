@@ -1,11 +1,13 @@
-//! Pins the defer semantics of the `get` access scope: operations performed
-//! inside the callback are queued and applied after the callback returns, so
-//! the borrowed component pointers stay valid and observers never run while
-//! the borrow is live.
+//! Pins the write-episode defer semantics of a live shared-register guard
+//! (spec §7.1): a structural mutation issued while a `Ref`/`Mut` guard is live
+//! is queued and applied only when the last guard drops, so the borrowed
+//! component pointer stays valid and observers never run while the borrow is
+//! live.
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::macros::*;
 
 #[derive(Component)]
@@ -14,9 +16,9 @@ struct Foo(i32);
 #[derive(Component, Default)]
 struct Bar(i32);
 
-/// A `set` inside a `get` callback is deferred: no observer fires while the
-/// callback's borrow is live, the component is not yet visible inside the
-/// callback, and both the value and its observer land after `get` returns.
+/// A `set` issued while a guard is live is deferred: no observer fires while the
+/// guard's borrow is live, the component is not yet visible, and both the value
+/// and its observer land after the guard drops.
 #[test]
 fn mutation_in_get_callback_is_deferred_and_observers_fire_after() {
     static ON_SET_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -32,29 +34,31 @@ fn mutation_in_get_callback_is_deferred_and_observers_fire_after() {
 
     let e = world.entity().set(Foo(1));
 
-    e.get::<&mut Foo>(|foo| {
+    {
+        let mut foo = e.get_ref::<&mut Foo>().unwrap();
         e.set(Bar(42));
         assert_eq!(
             ON_SET_COUNT.load(Ordering::Relaxed),
             0,
-            "observers must not run while the get borrow is live"
+            "observers must not run while the guard borrow is live"
         );
         assert!(
             !e.has(Bar::id()),
-            "deferred set must not be visible inside the callback"
+            "deferred set must not be visible while the guard is live"
         );
         foo.0 += 1;
-    });
+    }
 
     assert_eq!(ON_SET_COUNT.load(Ordering::Relaxed), 1);
     assert!(e.has(Bar::id()));
-    e.get::<(&Foo, &Bar)>(|(foo, bar)| {
+    {
+        let (foo, bar) = e.get_ref::<(&Foo, &Bar)>().unwrap();
         assert_eq!(foo.0, 2);
         assert_eq!(bar.0, 42);
-    });
+    }
 }
 
-/// Same guarantee for `try_get`.
+/// Same guarantee for a singleton guard taken on the component's own entity.
 #[test]
 fn mutation_in_try_get_callback_is_deferred() {
     static ON_SET_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -69,19 +73,20 @@ fn mutation_in_try_get_callback_is_deferred() {
 
     let e = world.entity().set(Foo(1));
 
-    let ran = e.try_get::<&mut Foo>(|foo| {
+    {
+        let mut foo = e.get_ref::<&mut Foo>().unwrap();
         e.set(Bar(42));
         assert_eq!(ON_SET_COUNT.load(Ordering::Relaxed), 0);
         assert!(!e.has(Bar::id()));
         foo.0 += 1;
-    });
+    }
 
-    assert!(ran.is_some());
     assert_eq!(ON_SET_COUNT.load(Ordering::Relaxed), 1);
     assert!(e.has(Bar::id()));
 }
 
-/// Same guarantee for the singleton `world.get`.
+/// Same guarantee for a singleton write guard: `world.set` issued while a `Mut`
+/// guard on the singleton entity is live is deferred until the guard drops.
 #[test]
 fn mutation_in_world_get_callback_is_deferred() {
     static ON_SET_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -96,89 +101,99 @@ fn mutation_in_world_get_callback_is_deferred() {
 
     world.set(Foo(1));
 
-    world.get::<&mut Foo>(|foo| {
+    let foo_e = world.entity_from_id(Foo::entity_id(&world));
+    {
+        let mut foo = foo_e.get_ref::<&mut Foo>().unwrap();
         world.set(Bar(42));
         assert_eq!(
             ON_SET_COUNT.load(Ordering::Relaxed),
             0,
-            "observers must not run while the singleton borrow is live"
+            "observers must not run while the singleton guard is live"
         );
         foo.0 += 1;
-    });
+    }
 
     assert_eq!(ON_SET_COUNT.load(Ordering::Relaxed), 1);
-    world.get::<(&Foo, &Bar)>(|(foo, bar)| {
-        assert_eq!(foo.0, 2);
-        assert_eq!(bar.0, 42);
-    });
+    let foo = foo_e.get_ref::<&Foo>().unwrap();
+    let bar = world
+        .entity_from_id(Bar::entity_id(&world))
+        .get_ref::<&Bar>()
+        .unwrap();
+    assert_eq!(foo.0, 2);
+    assert_eq!(bar.0, 42);
 }
 
 #[derive(Component)]
 struct MoveTag;
 
-/// The staleness case from the pre-defer days: an archetype move of the
-/// borrowed entity inside its own `get` callback. The move is deferred, the
-/// borrow stays valid, and the value written through it survives the table
-/// move at flush.
+/// An archetype move of the guarded entity issued while its own guard is live.
+/// The move is deferred, the borrow stays valid, and the value written through
+/// it survives the table move at flush.
 #[test]
 fn archetype_move_in_own_get_callback_keeps_borrow_valid() {
     let world = World::new();
     let e = world.entity().set(Foo(1));
 
-    e.get::<&mut Foo>(|foo| {
+    {
+        let mut foo = e.get_ref::<&mut Foo>().unwrap();
         e.add(MoveTag::id());
         assert!(
             !e.has(MoveTag::id()),
-            "deferred add must not be visible inside the callback"
+            "deferred add must not be visible while the guard is live"
         );
         foo.0 = 99;
-    });
+    }
 
     assert!(e.has(MoveTag::id()));
-    e.get::<&Foo>(|foo| {
+    {
+        let foo = e.get_ref::<&Foo>().unwrap();
         assert_eq!(
             foo.0, 99,
             "value written through the borrow must survive the move"
         );
-    });
+    }
 }
 
-/// Deleting the borrowed entity inside its own `get` callback is deferred:
-/// the borrow stays valid for the rest of the callback, the deletion lands
-/// after.
+/// Deleting the guarded entity while its own guard is live is deferred: the
+/// borrow stays valid for the rest of the scope, the deletion lands after.
 #[test]
 fn destruct_in_own_get_callback_is_deferred() {
     let world = World::new();
     let e = world.entity().set(Foo(1));
 
-    e.get::<&mut Foo>(|foo| {
+    {
+        let mut foo = e.get_ref::<&mut Foo>().unwrap();
         e.destruct();
-        assert!(e.is_alive(), "deferred destruct must not land mid-callback");
+        assert!(e.is_alive(), "deferred destruct must not land while guard is live");
         foo.0 = 5;
-    });
+    }
 
     assert!(!e.is_alive());
 }
 
-/// Spawning entities into the borrowed entity's own table inside the callback
+/// Spawning entities into the guarded entity's own table while the guard is live
 /// (which would reallocate the column) is deferred, so the borrow stays valid.
 #[test]
 fn same_table_spawns_in_get_callback_are_deferred() {
     let world = World::new();
     let e = world.entity().set(Foo(1));
 
-    e.get::<&mut Foo>(|foo| {
+    {
+        let mut foo = e.get_ref::<&mut Foo>().unwrap();
         for i in 0..64 {
             world.entity().set(Foo(i));
         }
         foo.0 = 7;
-    });
+    }
 
-    e.get::<&Foo>(|foo| assert_eq!(foo.0, 7));
+    {
+        let foo = e.get_ref::<&Foo>().unwrap();
+        assert_eq!(foo.0, 7);
+    }
 }
 
-/// `remove` inside a `get` callback: the `on_remove` observer runs after the
-/// callback returns, never while the borrow is live.
+/// `remove` issued while a guard is live: the `on_remove` observer runs after
+/// the guard drops, never while the borrow is live.
 #[test]
 fn remove_in_get_callback_fires_observer_after() {
     static ON_REMOVE_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -193,7 +208,8 @@ fn remove_in_get_callback_fires_observer_after() {
 
     let e = world.entity().set(Foo(1)).set(Bar(42));
 
-    e.get::<&mut Foo>(|foo| {
+    {
+        let mut foo = e.get_ref::<&mut Foo>().unwrap();
         e.remove(Bar::id());
         assert_eq!(
             ON_REMOVE_COUNT.load(Ordering::Relaxed),
@@ -202,12 +218,15 @@ fn remove_in_get_callback_fires_observer_after() {
         );
         assert!(
             e.has(Bar::id()),
-            "deferred remove must not land mid-callback"
+            "deferred remove must not land while the guard is live"
         );
         foo.0 += 1;
-    });
+    }
 
     assert_eq!(ON_REMOVE_COUNT.load(Ordering::Relaxed), 1);
     assert!(!e.has(Bar::id()));
-    e.get::<&Foo>(|foo| assert_eq!(foo.0, 2));
+    {
+        let foo = e.get_ref::<&Foo>().unwrap();
+        assert_eq!(foo.0, 2);
+    }
 }

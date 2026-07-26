@@ -9,6 +9,7 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
 
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::prelude::*;
 
 #[derive(Component)]
@@ -72,9 +73,11 @@ fn non_send_component_access_from_worker_thread_panics() {
 
             let world = entity.world();
             let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                world.get::<&NonSendSingleton>(|singleton| {
-                    core::hint::black_box(&singleton.value);
-                });
+                let singleton = world
+                    .entity_from_id(NonSendSingleton::entity_id(world))
+                    .get_ref::<&NonSendSingleton>()
+                    .unwrap();
+                core::hint::black_box(&singleton.value);
             }));
 
             if result.is_err() {
@@ -175,13 +178,15 @@ fn non_send_component_set_and_get() {
         value: shared.clone(),
     });
 
-    entity.get::<&NonSendHandle>(|handle| {
+    {
+        let handle = entity.get_ref::<&NonSendHandle>().unwrap();
         assert_eq!(*handle.value.borrow(), 42);
-    });
+    };
 
-    entity.get::<&mut NonSendHandle>(|handle| {
+    {
+        let handle = entity.get_ref::<&mut NonSendHandle>().unwrap();
         *handle.value.borrow_mut() = 7;
-    });
+    };
 
     assert_eq!(*shared.borrow(), 7);
 }

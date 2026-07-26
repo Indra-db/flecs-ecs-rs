@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs_derive::Component;
 
 #[repr(C)]
@@ -114,9 +115,10 @@ fn enum_standard_enum_reflection() {
     assert!(entity.is_valid());
     //let enum_comp = entity.get::<StandardEnum>().unwrap();
     entity2.set(StandardEnum::Red);
-    entity2.try_get::<&StandardEnum>(|enum_comp2| {
+    {
+        let enum_comp2 = entity2.get_ref::<&StandardEnum>().unwrap();
         assert_eq!(*enum_comp2, StandardEnum::Red);
-    });
+    };
     //assert!(*enum_comp == StandardEnum::Red);
     assert_eq!(entity.to_constant::<StandardEnum>(), StandardEnum::Red);
 
@@ -251,17 +253,19 @@ fn enum_get_constant() {
     let e = world.entity().add_enum(StandardEnum::Red);
     assert!(e.has_enum(StandardEnum::Red));
 
-    // get_enum_constant not available; use try_get instead
-    e.get::<&StandardEnum>(|v| {
+    // get_enum_constant not available; use get_ref instead
+    {
+        let v = e.get_ref::<&StandardEnum>().unwrap();
         assert_eq!(*v, StandardEnum::Red);
-    });
+    };
 
     e.add_enum(StandardEnum::Green);
     assert!(e.has_enum(StandardEnum::Green));
 
-    e.get::<&StandardEnum>(|v| {
+    {
+        let v = e.get_ref::<&StandardEnum>().unwrap();
         assert_eq!(*v, StandardEnum::Green);
-    });
+    };
 }
 
 #[test]
@@ -297,9 +301,10 @@ fn enum_enum_as_component() {
     e.set(StandardEnum::Green);
     assert!(e.has(StandardEnum::id()));
 
-    e.get::<&StandardEnum>(|v| {
+    {
+        let v = e.get_ref::<&StandardEnum>().unwrap();
         assert_eq!(*v, StandardEnum::Green);
-    });
+    };
 }
 
 #[test]

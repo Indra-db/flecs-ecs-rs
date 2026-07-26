@@ -43,20 +43,22 @@ fn spawn_creates_entity_with_all_components_and_values() {
     assert!(ev.has(Vel::id()));
     assert!(ev.has(Health::id()));
 
-    ev.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
+    {
+        let (p, v, h) = ev.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 1, y: 2 });
         assert_eq!(*v, Vel { x: 3, y: 4 });
         assert_eq!(*h, Health(100));
-    });
+    };
 }
 
 #[test]
 fn spawn_single_component_bundle() {
     let mut world = World::new();
     let e = world.spawn((Health(7),)).id();
-    world
-        .entity_from_id(e)
-        .get::<&Health>(|h| assert_eq!(*h, Health(7)));
+    {
+        let h = world.entity_from_id(e).get_ref::<&Health>().unwrap();
+        assert_eq!(*h, Health(7));
+    };
 }
 
 #[test]
@@ -72,10 +74,11 @@ fn spawn_registers_unregistered_components() {
     let ev = world.entity_from_id(e);
     assert!(ev.has(Fresh1::id()));
     assert!(ev.has(Fresh2::id()));
-    ev.get::<(&Fresh1, &Fresh2)>(|(a, b)| {
+    {
+        let (a, b) = ev.get_ref::<(&Fresh1, &Fresh2)>().unwrap();
         assert_eq!(*a, Fresh1(11));
         assert_eq!(*b, Fresh2(22));
-    });
+    };
 }
 
 #[test]
@@ -86,7 +89,10 @@ fn spawn_with_zero_sized_tag() {
     assert!(ev.has(Pos::id()));
     assert!(ev.has(Tag::id()));
     assert!(ev.has(Marker::id()));
-    ev.get::<&Pos>(|p| assert_eq!(*p, Pos { x: 5, y: 6 }));
+    {
+        let p = ev.get_ref::<&Pos>().unwrap();
+        assert_eq!(*p, Pos { x: 5, y: 6 });
+    };
 }
 
 #[test]
@@ -236,10 +242,11 @@ fn spawn_batch_values_are_correct_across_rows() {
         let ev = world.entity_from_id(e);
         assert!(ev.has(CPos::id()));
         assert!(ev.has(CHealth::id()));
-        ev.get::<(&CPos, &CHealth)>(|(p, h)| {
+        {
+            let (p, h) = ev.get_ref::<(&CPos, &CHealth)>().unwrap();
             assert_eq!(*p, CPos { x: 7, y: 8 });
             assert_eq!(*h, CHealth(3));
-        });
+        };
     }
 }
 
@@ -248,9 +255,10 @@ fn spawn_batch_count_one() {
     let mut world = World::new();
     let ids = world.spawn_batch((CHealth(42),), 1);
     assert_eq!(ids.len(), 1);
-    world
-        .entity_from_id(ids[0])
-        .get::<&CHealth>(|h| assert_eq!(*h, CHealth(42)));
+    {
+        let h = world.entity_from_id(ids[0]).get_ref::<&CHealth>().unwrap();
+        assert_eq!(*h, CHealth(42));
+    };
 }
 
 static BATCH_ZERO_DROP: AtomicUsize = AtomicUsize::new(0);
@@ -309,11 +317,12 @@ fn insert_adds_all_components_with_values() {
     assert!(e.has(Pos::id()));
     assert!(e.has(Vel::id()));
     assert!(e.has(Health::id()));
-    e.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
+    {
+        let (p, v, h) = e.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 1, y: 2 });
         assert_eq!(*v, Vel { x: 3, y: 4 });
         assert_eq!(*h, Health(5));
-    });
+    };
 }
 
 #[test]
@@ -324,11 +333,12 @@ fn insert_onto_entity_with_existing_components() {
     assert!(e.has(Pos::id()));
     assert!(e.has(Vel::id()));
     assert!(e.has(Health::id()));
-    e.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
+    {
+        let (p, v, h) = e.get_ref::<(&Pos, &Vel, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 9, y: 9 });
         assert_eq!(*v, Vel { x: 1, y: 1 });
         assert_eq!(*h, Health(3));
-    });
+    };
 }
 
 #[test]
@@ -338,7 +348,10 @@ fn insert_with_tag() {
     e.insert((Health(7), Tag));
     assert!(e.has(Health::id()));
     assert!(e.has(Tag::id()));
-    e.get::<&Health>(|h| assert_eq!(*h, Health(7)));
+    {
+        let h = e.get_ref::<&Health>().unwrap();
+        assert_eq!(*h, Health(7));
+    };
 }
 
 #[test]
@@ -452,10 +465,11 @@ fn insert_in_deferred_context_merges() {
     // Merged at the sync point.
     assert!(e.has(Pos::id()));
     assert!(e.has(Health::id()));
-    e.get::<(&Pos, &Health)>(|(p, h)| {
+    {
+        let (p, h) = e.get_ref::<(&Pos, &Health)>().unwrap();
         assert_eq!(*p, Pos { x: 4, y: 5 });
         assert_eq!(*h, Health(6));
-    });
+    };
 }
 
 static INSERT_DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -477,7 +491,10 @@ fn insert_drop_runs_exactly_once_per_value() {
         let e = world.entity();
         e.insert((InsertDropCounter(1), Health(2)));
         assert_eq!(INSERT_DROP_COUNT.load(SeqCst), 0);
-        e.get::<&InsertDropCounter>(|c| assert_eq!(c.0, 1));
+        {
+            let c = e.get_ref::<&InsertDropCounter>().unwrap();
+            assert_eq!(c.0, 1);
+        };
     }
     assert_eq!(INSERT_DROP_COUNT.load(SeqCst), 1);
 }
@@ -508,7 +525,10 @@ fn insert_default_component_drops_transient_default_no_leak() {
         // The default constructed by the commit was dropped when the real value
         // was moved in.
         assert_eq!(INSERT_DEFAULT_DROP.load(SeqCst), 1);
-        e.get::<&InsertDefaultDrop>(|c| assert_eq!(c.0, 7));
+        {
+            let c = e.get_ref::<&InsertDefaultDrop>().unwrap();
+            assert_eq!(c.0, 7);
+        };
     }
     // Plus the stored value at world teardown.
     assert_eq!(INSERT_DEFAULT_DROP.load(SeqCst), 2);
@@ -584,9 +604,10 @@ mod live_guard {
         assert!(e.has(Health::id()));
         assert_eq!(on_add.load(SeqCst), 1, "OnAdd fires once after guard drop");
         assert_eq!(on_set.load(SeqCst), 1, "OnSet fires once after guard drop");
-        e.get::<(&Vel, &Health)>(|(v, h)| {
+        {
+            let (v, h) = e.get_ref::<(&Vel, &Health)>().unwrap();
             assert_eq!(*v, Vel { x: 3, y: 4 });
             assert_eq!(*h, Health(5));
-        });
+        };
     }
 }

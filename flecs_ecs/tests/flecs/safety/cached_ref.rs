@@ -1,9 +1,10 @@
 //! `CachedRef` accesses register in the same mut-alias tracking as
-//! `EntityView::get` and query iteration.
+//! `EntityView::get`/`get_mut` and query iteration.
 
 use flecs_ecs::core::*;
-use flecs_ecs::macros::*;
 use flecs_ecs::experimental::QuerySharedExt;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldEntityRefExt};
+use flecs_ecs::macros::*;
 
 #[derive(Component)]
 struct Pos(i32);
@@ -17,12 +18,11 @@ fn nested_ref_ref_same_component_panics() {
     let world = World::new();
     let e = world.entity().set(Pos(1));
 
-    let mut r1 = e.cached_ref(Pos::id());
-    let mut r2 = e.cached_ref(Pos::id());
+    let mut r1 = world.entity_ref::<Pos>(e.id()).unwrap();
+    let mut r2 = world.entity_ref::<Pos>(e.id()).unwrap();
 
-    r1.get(|_outer| {
-        r2.get(|_inner| {});
-    });
+    let _outer = r1.get_mut(&world).unwrap();
+    let _inner = r2.get_mut(&world).unwrap();
 }
 
 #[test]
@@ -31,11 +31,10 @@ fn ref_nested_in_entity_get_panics() {
     let world = World::new();
     let e = world.entity().set(Pos(1));
 
-    let mut r = e.cached_ref(Pos::id());
+    let mut r = world.entity_ref::<Pos>(e.id()).unwrap();
 
-    e.get::<&mut Pos>(|_outer| {
-        r.get(|_inner| {});
-    });
+    let _outer = e.get_ref::<&mut Pos>().unwrap();
+    let _inner = r.get_mut(&world).unwrap();
 }
 
 #[test]
@@ -45,11 +44,11 @@ fn ref_nested_in_query_iteration_panics() {
     let e = world.entity().set(Pos(1));
     world.entity().set(Pos(2));
 
-    let mut r = e.cached_ref(Pos::id());
+    let mut r = world.entity_ref::<Pos>(e.id()).unwrap();
 
     let q = world.new_query::<&mut Pos>();
     q.each_shared(&world, |_pos| {
-        r.get(|_inner| {});
+        r.get_mut(&world).unwrap();
     });
 }
 
@@ -58,15 +57,16 @@ fn refs_to_different_components_do_not_conflict() {
     let world = World::new();
     let e = world.entity().set(Pos(1)).set(Vel(2));
 
-    let mut rp = e.cached_ref(Pos::id());
-    let mut rv = e.cached_ref(Vel::id());
+    let mut rp = world.entity_ref::<Pos>(e.id()).unwrap();
+    let mut rv = world.entity_ref::<Vel>(e.id()).unwrap();
 
-    rp.get(|pos| {
-        rv.get(|vel| {
-            pos.0 += vel.0;
-        });
-    });
-    rp.get(|pos| assert_eq!(pos.0, 3));
+    {
+        let mut pos = rp.get_mut(&world).unwrap();
+        let vel = rv.get_mut(&world).unwrap();
+        pos.0 += vel.0;
+    }
+    let pos = rp.get(&world).unwrap();
+    assert_eq!(pos.0, 3);
 }
 
 #[test]
@@ -74,21 +74,29 @@ fn ref_key_refreshes_after_archetype_move() {
     let world = World::new();
     let e = world.entity().set(Pos(1));
 
-    let mut r = e.cached_ref(Pos::id());
-    r.get(|pos| pos.0 += 1);
+    let mut r = world.entity_ref::<Pos>(e.id()).unwrap();
+    {
+        let mut pos = r.get_mut(&world).unwrap();
+        pos.0 += 1;
+    }
 
     // move the entity to another table; the cached lock key must refresh so
     // conflicts are still detected against the new storage
     e.set(Vel(0));
 
-    r.get(|pos| pos.0 += 1);
-    r.get(|pos| assert_eq!(pos.0, 3));
+    {
+        let mut pos = r.get_mut(&world).unwrap();
+        pos.0 += 1;
+    }
+    {
+        let pos = r.get(&world).unwrap();
+        assert_eq!(pos.0, 3);
+    }
 
     let result = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
-        let mut r2 = e.cached_ref(Pos::id());
-        r.get(|_outer| {
-            r2.get(|_inner| {});
-        });
+        let mut r2 = world.entity_ref::<Pos>(e.id()).unwrap();
+        let _outer = r.get_mut(&world).unwrap();
+        let _inner = r2.get_mut(&world).unwrap();
     }));
     assert!(
         result.is_err(),
@@ -100,15 +108,19 @@ fn ref_key_refreshes_after_archetype_move() {
 fn structural_change_in_ref_callback_is_deferred() {
     let world = World::new();
     let e = world.entity().set(Pos(1));
-    let mut r = e.cached_ref(Pos::id());
+    let mut r = world.entity_ref::<Pos>(e.id()).unwrap();
 
-    // spawning entities into Pos tables inside the callback must not
-    // invalidate the borrowed component (ops are deferred to scope end)
-    r.get(|pos| {
+    // spawning entities into Pos tables while the guard is live must not
+    // invalidate the borrowed component (ops are deferred to guard drop)
+    {
+        let mut pos = r.get_mut(&world).unwrap();
         for _ in 0..64 {
             world.entity().set(Pos(9));
         }
         pos.0 += 1;
-    });
-    r.get(|pos| assert_eq!(pos.0, 2));
+    }
+    {
+        let pos = r.get(&world).unwrap();
+        assert_eq!(pos.0, 2);
+    }
 }

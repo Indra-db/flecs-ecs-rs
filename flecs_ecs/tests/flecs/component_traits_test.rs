@@ -2,6 +2,7 @@
 //! Ported from test/cpp/src/ComponentTraits.cpp
 
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[derive(Component)]
 #[flecs(traits(DontFragment))]
@@ -241,17 +242,19 @@ fn sparse_get_get_mut() {
 
     let e = world.entity().set(TraitSparse { x: 10.0, y: 20.0 });
 
-    e.get::<&TraitSparse>(|v| {
+    {
+        let v = e.get_ref::<&TraitSparse>().unwrap();
         assert_eq!(v.x, 10.0);
         assert_eq!(v.y, 20.0);
-    });
+    };
 
-    e.get::<&mut TraitSparse>(|mv| {
+    {
+        let mut mv = e.get_ref::<&mut TraitSparse>().unwrap();
         mv.x = 30.0;
         mv.y = 40.0;
-    });
+    };
 
-    let found = e.try_get::<&TraitSparse>(|p| {
+    let found = e.get_ref::<&TraitSparse>().map(|p| {
         assert_eq!(p.x, 30.0);
         assert_eq!(p.y, 40.0);
     });
@@ -265,8 +268,8 @@ fn sparse_try_get_not_found() {
     world.component::<TraitSparse>();
 
     let e = world.entity();
-    assert!(e.try_get::<&TraitSparse>(|_| {}).is_none());
-    assert!(e.try_get::<&mut TraitSparse>(|_| {}).is_none());
+    assert!(e.get_ref::<&TraitSparse>().is_none());
+    assert!(e.get_ref::<&mut TraitSparse>().is_none());
 }
 
 #[test]
@@ -275,17 +278,19 @@ fn dont_fragment_get_get_mut() {
 
     let e = world.entity().set(TraitDontFragment { x: 10.0, y: 20.0 });
 
-    e.get::<&TraitDontFragment>(|v| {
+    {
+        let v = e.get_ref::<&TraitDontFragment>().unwrap();
         assert_eq!(v.x, 10.0);
         assert_eq!(v.y, 20.0);
-    });
+    };
 
-    e.get::<&mut TraitDontFragment>(|mv| {
+    {
+        let mut mv = e.get_ref::<&mut TraitDontFragment>().unwrap();
         mv.x = 30.0;
         mv.y = 40.0;
-    });
+    };
 
-    let found = e.try_get::<&TraitDontFragment>(|p| {
+    let found = e.get_ref::<&TraitDontFragment>().map(|p| {
         assert_eq!(p.x, 30.0);
         assert_eq!(p.y, 40.0);
     });
@@ -294,7 +299,7 @@ fn dont_fragment_get_get_mut() {
     assert!(
         world
             .entity()
-            .try_get::<&TraitDontFragment>(|_| {})
+            .get_ref::<&TraitDontFragment>()
             .is_none()
     );
 }
@@ -307,17 +312,19 @@ fn on_instantiate_override_get_get_mut() {
         .entity()
         .set(TraitOnInstantiateOverride { x: 10.0, y: 20.0 });
 
-    e.get::<&TraitOnInstantiateOverride>(|v| {
+    {
+        let v = e.get_ref::<&TraitOnInstantiateOverride>().unwrap();
         assert_eq!(v.x, 10.0);
         assert_eq!(v.y, 20.0);
-    });
+    };
 
-    e.get::<&mut TraitOnInstantiateOverride>(|mv| {
+    {
+        let mut mv = e.get_ref::<&mut TraitOnInstantiateOverride>().unwrap();
         mv.x = 30.0;
         mv.y = 40.0;
-    });
+    };
 
-    let found = e.try_get::<&TraitOnInstantiateOverride>(|p| {
+    let found = e.get_ref::<&TraitOnInstantiateOverride>().map(|p| {
         assert_eq!(p.x, 30.0);
         assert_eq!(p.y, 40.0);
     });
@@ -326,7 +333,7 @@ fn on_instantiate_override_get_get_mut() {
     assert!(
         world
             .entity()
-            .try_get::<&TraitOnInstantiateOverride>(|_| {})
+            .get_ref::<&TraitOnInstantiateOverride>()
             .is_none()
     );
 }
@@ -339,17 +346,19 @@ fn on_instantiate_dont_inherit_get_get_mut() {
         .entity()
         .set(TraitOnInstantiateDontInherit { x: 10.0, y: 20.0 });
 
-    e.get::<&TraitOnInstantiateDontInherit>(|v| {
+    {
+        let v = e.get_ref::<&TraitOnInstantiateDontInherit>().unwrap();
         assert_eq!(v.x, 10.0);
         assert_eq!(v.y, 20.0);
-    });
+    };
 
-    e.get::<&mut TraitOnInstantiateDontInherit>(|mv| {
+    {
+        let mut mv = e.get_ref::<&mut TraitOnInstantiateDontInherit>().unwrap();
         mv.x = 30.0;
         mv.y = 40.0;
-    });
+    };
 
-    let found = e.try_get::<&TraitOnInstantiateDontInherit>(|p| {
+    let found = e.get_ref::<&TraitOnInstantiateDontInherit>().map(|p| {
         assert_eq!(p.x, 30.0);
         assert_eq!(p.y, 40.0);
     });
@@ -365,16 +374,13 @@ fn on_instantiate_inherit_get_inherited() {
         .set(TraitOnInstantiateInherit { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    let found = inst.try_get::<&TraitOnInstantiateInherit>(|p| {
+    let found = inst.get_ref::<&TraitOnInstantiateInherit>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    assert!(
-        inst.try_get::<&mut TraitOnInstantiateInherit>(|_| {})
-            .is_none()
-    );
+    assert!(inst.get_ref::<&mut TraitOnInstantiateInherit>().is_none());
 }
 
 #[test]
@@ -388,13 +394,13 @@ fn no_traits_get_inherited() {
     let base = world.prefab().set(TraitNone { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    let found = inst.try_get::<&TraitNone>(|p| {
+    let found = inst.get_ref::<&TraitNone>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    assert!(inst.try_get::<&mut TraitNone>(|_| {}).is_none());
+    assert!(inst.get_ref::<&mut TraitNone>().is_none());
 }
 
 // C++ get_dispatch checks compile-time type traits used for get dispatch;
@@ -410,17 +416,20 @@ fn dynamic_inherit_dense_owned() {
 
     let e = world.entity().set(TraitNone { x: 10.0, y: 20.0 });
 
-    let found = e.try_get::<&TraitNone>(|p| {
+    let found = e.get_ref::<&TraitNone>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    let found = e.try_get::<&mut TraitNone>(|mp| {
+    let found = e.get_ref::<&mut TraitNone>().map(|mut mp| {
         mp.x = 30.0;
     });
     assert!(found.is_some());
-    e.get::<&TraitNone>(|p| assert_eq!(p.x, 30.0));
+    {
+        let p = e.get_ref::<&TraitNone>().unwrap();
+        assert_eq!(p.x, 30.0);
+    };
 }
 
 #[test]
@@ -434,13 +443,13 @@ fn dynamic_inherit_dense_inherited() {
     let base = world.prefab().set(TraitNone { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    let found = inst.try_get::<&TraitNone>(|p| {
+    let found = inst.get_ref::<&TraitNone>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    assert!(inst.try_get::<&mut TraitNone>(|_| {}).is_none());
+    assert!(inst.get_ref::<&mut TraitNone>().is_none());
 }
 
 #[test]
@@ -457,17 +466,20 @@ fn static_inherit_dense_owned() {
         .entity()
         .set(TraitOnInstantiateInherit { x: 10.0, y: 20.0 });
 
-    let found = e.try_get::<&TraitOnInstantiateInherit>(|p| {
+    let found = e.get_ref::<&TraitOnInstantiateInherit>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    let found = e.try_get::<&mut TraitOnInstantiateInherit>(|mp| {
+    let found = e.get_ref::<&mut TraitOnInstantiateInherit>().map(|mut mp| {
         mp.x = 30.0;
     });
     assert!(found.is_some());
-    e.get::<&TraitOnInstantiateInherit>(|p| assert_eq!(p.x, 30.0));
+    {
+        let p = e.get_ref::<&TraitOnInstantiateInherit>().unwrap();
+        assert_eq!(p.x, 30.0);
+    };
 }
 
 #[test]
@@ -479,16 +491,13 @@ fn static_inherit_dense_inherited() {
         .set(TraitOnInstantiateInherit { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    let found = inst.try_get::<&TraitOnInstantiateInherit>(|p| {
+    let found = inst.get_ref::<&TraitOnInstantiateInherit>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    assert!(
-        inst.try_get::<&mut TraitOnInstantiateInherit>(|_| {})
-            .is_none()
-    );
+    assert!(inst.get_ref::<&mut TraitOnInstantiateInherit>().is_none());
 }
 
 #[test]
@@ -502,17 +511,20 @@ fn static_inherit_sparse_owned() {
 
     let e = world.entity().set(TraitSparseInherit { x: 10.0, y: 20.0 });
 
-    let found = e.try_get::<&TraitSparseInherit>(|p| {
+    let found = e.get_ref::<&TraitSparseInherit>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    let found = e.try_get::<&mut TraitSparseInherit>(|mp| {
+    let found = e.get_ref::<&mut TraitSparseInherit>().map(|mut mp| {
         mp.x = 30.0;
     });
     assert!(found.is_some());
-    e.get::<&TraitSparseInherit>(|p| assert_eq!(p.x, 30.0));
+    {
+        let p = e.get_ref::<&TraitSparseInherit>().unwrap();
+        assert_eq!(p.x, 30.0);
+    };
 }
 
 #[test]
@@ -522,13 +534,13 @@ fn static_inherit_sparse_inherited() {
     let base = world.prefab().set(TraitSparseInherit { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    let found = inst.try_get::<&TraitSparseInherit>(|p| {
+    let found = inst.get_ref::<&TraitSparseInherit>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    assert!(inst.try_get::<&mut TraitSparseInherit>(|_| {}).is_none());
+    assert!(inst.get_ref::<&mut TraitSparseInherit>().is_none());
 }
 
 #[test]
@@ -544,17 +556,20 @@ fn static_inherit_dont_fragment_owned() {
         .entity()
         .set(TraitDontFragmentInherit { x: 10.0, y: 20.0 });
 
-    let found = e.try_get::<&TraitDontFragmentInherit>(|p| {
+    let found = e.get_ref::<&TraitDontFragmentInherit>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    let found = e.try_get::<&mut TraitDontFragmentInherit>(|mp| {
+    let found = e.get_ref::<&mut TraitDontFragmentInherit>().map(|mut mp| {
         mp.x = 30.0;
     });
     assert!(found.is_some());
-    e.get::<&TraitDontFragmentInherit>(|p| assert_eq!(p.x, 30.0));
+    {
+        let p = e.get_ref::<&TraitDontFragmentInherit>().unwrap();
+        assert_eq!(p.x, 30.0);
+    };
 }
 
 #[test]
@@ -566,16 +581,13 @@ fn static_inherit_dont_fragment_inherited() {
         .set(TraitDontFragmentInherit { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    let found = inst.try_get::<&TraitDontFragmentInherit>(|p| {
+    let found = inst.get_ref::<&TraitDontFragmentInherit>().map(|p| {
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
     });
     assert!(found.is_some());
 
-    assert!(
-        inst.try_get::<&mut TraitDontFragmentInherit>(|_| {})
-            .is_none()
-    );
+    assert!(inst.get_ref::<&mut TraitDontFragmentInherit>().is_none());
 }
 
 // Like C++, the compile-time sparse get fast path cannot handle dynamically
@@ -595,7 +607,9 @@ fn dynamic_inherit_sparse_owned() {
 
     let e = world.entity().set(TraitSparse { x: 10.0, y: 20.0 });
 
-    e.try_get::<&TraitSparse>(|_| {});
+    {
+        let _ = e.get_ref::<&TraitSparse>().unwrap();
+    };
 }
 
 #[test]
@@ -611,7 +625,9 @@ fn dynamic_inherit_sparse_owned_get_mut() {
 
     let e = world.entity().set(TraitSparse { x: 10.0, y: 20.0 });
 
-    e.try_get::<&mut TraitSparse>(|_| {});
+    {
+        let _ = e.get_ref::<&mut TraitSparse>().unwrap();
+    };
 }
 
 #[test]
@@ -628,7 +644,9 @@ fn dynamic_inherit_sparse_inherited() {
     let base = world.prefab().set(TraitSparse { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    inst.try_get::<&TraitSparse>(|_| {});
+    {
+        let _ = inst.get_ref::<&TraitSparse>().unwrap();
+    };
 }
 
 #[test]
@@ -644,7 +662,9 @@ fn dynamic_inherit_dont_fragment_owned() {
 
     let e = world.entity().set(TraitDontFragment { x: 10.0, y: 20.0 });
 
-    e.try_get::<&TraitDontFragment>(|_| {});
+    {
+        let _ = e.get_ref::<&TraitDontFragment>().unwrap();
+    };
 }
 
 #[test]
@@ -660,7 +680,9 @@ fn dynamic_inherit_dont_fragment_owned_get_mut() {
 
     let e = world.entity().set(TraitDontFragment { x: 10.0, y: 20.0 });
 
-    e.try_get::<&mut TraitDontFragment>(|_| {});
+    {
+        let _ = e.get_ref::<&mut TraitDontFragment>().unwrap();
+    };
 }
 
 #[test]
@@ -677,5 +699,7 @@ fn dynamic_inherit_dont_fragment_inherited() {
     let base = world.prefab().set(TraitDontFragment { x: 10.0, y: 20.0 });
     let inst = world.entity().is_a(base);
 
-    inst.try_get::<&TraitDontFragment>(|_| {});
+    {
+        let _ = inst.get_ref::<&TraitDontFragment>().unwrap();
+    };
 }

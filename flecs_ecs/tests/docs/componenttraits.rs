@@ -4,6 +4,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[test]
 fn component_traits_cantoggle_trait_01() {
@@ -201,7 +202,7 @@ fn component_traits_oninstantiate_trait_override_16() {
     let inst = world.entity().is_a(base); // Mass is copied to inst
 
     assert!(inst.owns(Mass::id()));
-    assert!(base.cloned::<&Mass>() == inst.cloned::<&Mass>());
+    assert!(base.cloned_owned::<&Mass>().unwrap() == inst.cloned_owned::<&Mass>().unwrap());
 }
 
 #[test]
@@ -217,7 +218,7 @@ fn component_traits_oninstantiate_trait_inherit_17() {
 
     assert!(inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(base.cloned::<&Mass>() == inst.cloned::<&Mass>());
+    assert!(base.cloned_owned::<&Mass>().unwrap() == inst.cloned_owned::<&Mass>().unwrap());
 }
 
 #[test]
@@ -233,7 +234,7 @@ fn component_traits_oninstantiate_trait_dontinherit_18() {
 
     assert!(!inst.has(Mass::id()));
     assert!(!inst.owns(Mass::id()));
-    assert!(inst.try_get::<&Mass>(|mass| {}).is_none());
+    assert!(inst.get_ref::<&Mass>().is_none());
 }
 
 #[test]
@@ -269,13 +270,15 @@ fn component_traits_pairistag_trait_20() {
     // has a value of type Position
 
     // Gets value from Position component
-    e.get::<&Position>(|pos| {
+    {
+        let pos = e.get_ref::<&Position>().unwrap();
         println!("Position: ({}, {})", pos.x, pos.y);
-    });
+    };
     // Gets (unintended) value from (Serializable, Position) pair
-    e.get::<&(Serializable, Position)>(|pos| {
+    {
+        let pos = e.get_ref::<&(Serializable, Position)>().unwrap();
         println!("Serializable Position: ({}, {})", pos.x, pos.y);
-    });
+    };
 }
 
 #[test]

@@ -7,6 +7,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
 use flecs_ecs::experimental::QuerySharedExt;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[derive(Component)]
 struct SparseCounter(u64);
@@ -135,32 +136,16 @@ fn conflict_detection_still_active_after_multithreaded_run() {
     // nested mutable access to the same sparse component on the same stage
     // must still panic
     let e = world.entity_from_id(e);
-    e.get::<&mut SparseCounter>(|_outer| {
-        e.get::<&mut SparseCounter>(|_inner| {});
-    });
+    let _outer = e.get_ref::<&mut SparseCounter>().unwrap();
+    let _inner = e.get_ref::<&mut SparseCounter>().unwrap();
 }
 
-#[test]
-fn par_each_entity_cached_ref_preserves_worker_stage() {
-    let mut world = World::new();
-    spawn_across_tables(&world, |entity| {
-        entity.set(DenseCounter(0)).set(StageProbe(0));
-    });
-    world.set_threads(4);
-
-    world
-        .system::<&mut DenseCounter>()
-        .par_each_entity(move |entity, _| {
-            let mut cached = entity.cached_ref(StageProbe::id());
-            let cached_stage = cached.world().stage_id();
-            cached.get(|probe| {
-                assert_eq!(cached_stage, entity.world().stage_id());
-                probe.0 += 1;
-            });
-        });
-
-    world.progress();
-}
+// Deleted: par_each_entity_cached_ref_preserves_worker_stage pinned the legacy
+// `EntityView::cached_ref` construction inside a worker plus its `.world()`
+// stage accessor. The redesigned `CachedRef` is built via `World::entity_ref`
+// (needing a `&World`) and exposes no `.world()`, so this legacy-only path has
+// no equivalent on the new surface. Per-worker stage isolation stays covered by
+// par_each_iter_entity_preserves_worker_stage below.
 
 #[test]
 fn par_each_iter_entity_preserves_worker_stage() {

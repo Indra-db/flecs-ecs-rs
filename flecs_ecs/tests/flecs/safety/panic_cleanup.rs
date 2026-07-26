@@ -6,6 +6,7 @@ use alloc::sync::Arc;
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
 use flecs_ecs::experimental::{QueryExclusiveExt, QuerySharedExt};
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldEntityRefExt};
 
 #[derive(Component)]
 struct Foo(i32);
@@ -58,27 +59,41 @@ fn entity_get_panic_releases_safety_scope() {
     let entity = world.entity().set(Foo(1));
 
     let result = catch_unwind(AssertUnwindSafe(|| {
-        entity.get::<&mut Foo>(|_| panic!("expected"));
+        let _foo = entity.get_ref::<&mut Foo>().unwrap();
+        panic!("expected");
     }));
 
     assert!(result.is_err());
-    entity.get::<&mut Foo>(|foo| foo.0 += 1);
-    entity.get::<&Foo>(|foo| assert_eq!(foo.0, 2));
+    {
+        let mut foo = entity.get_ref::<&mut Foo>().unwrap();
+        foo.0 += 1;
+    }
+    {
+        let foo = entity.get_ref::<&Foo>().unwrap();
+        assert_eq!(foo.0, 2);
+    }
 }
 
 #[test]
 fn cached_ref_panic_releases_safety_scope() {
     let world = World::new();
     let entity = world.entity().set(Foo(1));
-    let mut cached = entity.cached_ref(Foo::id());
+    let mut cached = world.entity_ref::<Foo>(entity.id()).unwrap();
 
     let result = catch_unwind(AssertUnwindSafe(|| {
-        cached.get(|_| panic!("expected"));
+        let _g = cached.get_mut(&world).unwrap();
+        panic!("expected");
     }));
 
     assert!(result.is_err());
-    cached.get(|foo| foo.0 += 1);
-    cached.get(|foo| assert_eq!(foo.0, 2));
+    {
+        let mut foo = cached.get_mut(&world).unwrap();
+        foo.0 += 1;
+    }
+    {
+        let foo = cached.get(&world).unwrap();
+        assert_eq!(foo.0, 2);
+    }
 }
 
 #[test]
@@ -101,16 +116,23 @@ fn partial_tuple_acquisition_rolls_back_prior_keys() {
     let world = World::new();
     let entity = world.entity().set(Foo(1)).set(Bar(1));
 
-    entity.get::<&mut Foo>(|_| {
+    {
+        let _foo = entity.get_ref::<&mut Foo>().unwrap();
         let result = catch_unwind(AssertUnwindSafe(|| {
-            entity.get::<(&mut Bar, &mut Foo)>(|_| {});
+            let _ = entity.get_ref::<(&mut Bar, &mut Foo)>();
         }));
 
         assert!(result.is_err());
-        entity.get::<&mut Bar>(|bar| bar.0 += 1);
-    });
+        {
+            let mut bar = entity.get_ref::<&mut Bar>().unwrap();
+            bar.0 += 1;
+        }
+    }
 
-    entity.get::<&Bar>(|bar| assert_eq!(bar.0, 2));
+    {
+        let bar = entity.get_ref::<&Bar>().unwrap();
+        assert_eq!(bar.0, 2);
+    }
 }
 
 /// Assert the world is still usable after a caught trampoline panic: the stage

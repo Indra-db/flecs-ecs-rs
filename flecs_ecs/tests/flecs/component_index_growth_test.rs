@@ -1,3 +1,4 @@
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::prelude::*;
 use seq_macro::seq;
 
@@ -27,7 +28,8 @@ fn component_array_growth_covers_high_type_index() {
     assert_ne!(comp.id(), 0);
 
     let e = world_b.entity().set(HighIndexComponent { value: 7 });
-    e.get::<&HighIndexComponent>(|c| {
+    {
+        let c = e.get_ref::<&HighIndexComponent>().unwrap();
         assert_eq!(c.value, 7);
-    });
+    };
 }

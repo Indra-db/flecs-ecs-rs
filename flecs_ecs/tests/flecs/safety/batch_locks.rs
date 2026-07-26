@@ -11,6 +11,7 @@
 
 use super::*;
 use flecs_ecs::experimental::QuerySharedExt;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 #[derive(Component)]
 struct A(u8);
@@ -33,7 +34,9 @@ fn batch_write_term_view_read() {
     let world = World::new();
     seed(&world);
     query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
-        entity.get::<&A>(|_| {});
+        {
+            let _guard = entity.get_ref::<&A>().unwrap();
+        };
     });
 }
 
@@ -44,7 +47,9 @@ fn batch_write_term_view_write() {
     let world = World::new();
     seed(&world);
     query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
-        entity.get::<&mut A>(|_| {});
+        {
+            let _guard = entity.get_ref::<&mut A>().unwrap();
+        };
     });
 }
 
@@ -55,7 +60,9 @@ fn batch_read_term_view_write() {
     let world = World::new();
     seed(&world);
     query!(world, &A, &B).build().each_entity_shared(&world, |entity, _| {
-        entity.get::<&mut A>(|_| {});
+        {
+            let _guard = entity.get_ref::<&mut A>().unwrap();
+        };
     });
 }
 
@@ -65,7 +72,9 @@ fn batch_read_term_view_read_ok() {
     let world = World::new();
     seed(&world);
     query!(world, &A, &B).build().each_entity_shared(&world, |entity, _| {
-        entity.get::<&A>(|_| {});
+        {
+            let _guard = entity.get_ref::<&A>().unwrap();
+        };
     });
 }
 
@@ -76,7 +85,9 @@ fn batch_disjoint_view_ok() {
     let world = World::new();
     seed(&world);
     query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
-        entity.get::<&mut C>(|_| {});
+        {
+            let _guard = entity.get_ref::<&mut C>().unwrap();
+        };
     });
 }
 
@@ -88,9 +99,10 @@ fn batch_disjoint_view_ok() {
 fn write_held_across_batch_read_term() {
     let world = World::new();
     let entity = world.entity().set(A(0)).set(B(0));
-    entity.get::<&mut A>(|_| {
+    {
+        let _guard = entity.get_ref::<&mut A>().unwrap();
         query!(world, &A, &B).build().each_shared(&world, |_| {});
-    });
+    };
 }
 
 /// A read guard held across the iteration coexists with batched read terms on
@@ -99,9 +111,10 @@ fn write_held_across_batch_read_term() {
 fn read_held_across_batch_read_term_ok() {
     let world = World::new();
     let entity = world.entity().set(A(0)).set(B(0));
-    entity.get::<&A>(|_| {
+    {
+        let _guard = entity.get_ref::<&A>().unwrap();
         query!(world, &A, &B).build().each_shared(&world, |_| {});
-    });
+    };
 }
 
 mod sparse {
@@ -122,7 +135,9 @@ mod sparse {
         let world = World::new();
         seed_sparse(&world);
         query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
-            entity.get::<&A>(|_| {});
+            {
+                let _guard = entity.get_ref::<&A>().unwrap();
+            };
         });
     }
 
@@ -134,7 +149,9 @@ mod sparse {
         let world = World::new();
         seed_sparse(&world);
         query!(world, &mut A, &B).build().each_entity_shared(&world, |entity, _| {
-            entity.get::<&mut C>(|_| {});
+            {
+                let _guard = entity.get_ref::<&mut C>().unwrap();
+            };
         });
     }
 }

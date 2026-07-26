@@ -2,6 +2,7 @@
 use flecs_ecs::core::*;
 use flecs_ecs::macros::*;
 use flecs_ecs::experimental::QuerySharedExt;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 
 mod batch_locks;
 mod cached_ref;
@@ -73,9 +74,12 @@ mod entity_view {
         fn read_write() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.get::<&Foo>(|_| {
-                entity.get::<&mut Foo>(|_| {});
-            });
+            {
+                let _outer = entity.get_ref::<&Foo>().unwrap();
+                {
+                    let _inner = entity.get_ref::<&mut Foo>().unwrap();
+                };
+            };
         }
 
         #[test]
@@ -83,9 +87,12 @@ mod entity_view {
         fn write_read() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.get::<&mut Foo>(|_| {
-                entity.get::<&Foo>(|_| {});
-            });
+            {
+                let _outer = entity.get_ref::<&mut Foo>().unwrap();
+                {
+                    let _inner = entity.get_ref::<&Foo>().unwrap();
+                };
+            };
         }
 
         #[test]
@@ -93,9 +100,10 @@ mod entity_view {
         fn write_cloned() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.get::<&mut Foo>(|_| {
-                let _ = entity.cloned::<&Foo>();
-            });
+            {
+                let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                let _ = entity.cloned_owned::<&Foo>();
+            };
         }
 
         #[test]
@@ -103,9 +111,12 @@ mod entity_view {
         fn write_write() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.get::<&mut Foo>(|_| {
-                entity.get::<&mut Foo>(|_| {});
-            });
+            {
+                let _outer = entity.get_ref::<&mut Foo>().unwrap();
+                {
+                    let _inner = entity.get_ref::<&mut Foo>().unwrap();
+                };
+            };
         }
     }
 
@@ -116,9 +127,12 @@ mod entity_view {
         fn read_write() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.try_get::<&Foo>(|_| {
-                entity.try_get::<&mut Foo>(|_| {});
-            });
+            {
+                let _outer = entity.get_ref::<&Foo>().unwrap();
+                {
+                    let _inner = entity.get_ref::<&mut Foo>().unwrap();
+                };
+            };
         }
 
         #[test]
@@ -126,9 +140,12 @@ mod entity_view {
         fn write_read() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.try_get::<&mut Foo>(|_| {
-                entity.try_get::<&Foo>(|_| {});
-            });
+            {
+                let _outer = entity.get_ref::<&mut Foo>().unwrap();
+                {
+                    let _inner = entity.get_ref::<&Foo>().unwrap();
+                };
+            };
         }
 
         #[test]
@@ -136,9 +153,10 @@ mod entity_view {
         fn write_cloned() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.try_get::<&mut Foo>(|_| {
-                let _ = entity.cloned::<&Foo>();
-            });
+            {
+                let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                let _ = entity.cloned_owned::<&Foo>();
+            };
         }
 
         #[test]
@@ -146,9 +164,12 @@ mod entity_view {
         fn write_write() {
             let world = World::new();
             let entity = world.entity().set(Foo(0));
-            entity.try_get::<&mut Foo>(|_| {
-                entity.try_get::<&mut Foo>(|_| {});
-            });
+            {
+                let _outer = entity.get_ref::<&mut Foo>().unwrap();
+                {
+                    let _inner = entity.get_ref::<&mut Foo>().unwrap();
+                };
+            };
         }
     }
 
@@ -161,7 +182,7 @@ mod entity_view {
             let world = World::new();
             world.entity().set(Foo(0));
             query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
-                let _ = entity.cloned::<&Foo>();
+                let _ = entity.cloned_owned::<&Foo>();
             });
         }
 
@@ -174,7 +195,9 @@ mod entity_view {
                 let world = World::new();
                 world.entity().set(Foo(0));
                 query!(world, &Foo).build().each_entity_shared(&world, |entity, _| {
-                    entity.get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
             }
 
@@ -184,7 +207,9 @@ mod entity_view {
                 let world = World::new();
                 world.entity().set(Foo(0));
                 query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
-                    entity.get::<&Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&Foo>().unwrap();
+                    };
                 });
             }
 
@@ -194,7 +219,9 @@ mod entity_view {
                 let world = World::new();
                 world.entity().set(Foo(0));
                 query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
-                    entity.get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
             }
         }
@@ -208,7 +235,9 @@ mod entity_view {
                 let world = World::new();
                 world.entity().set(Foo(0));
                 query!(world, &Foo).build().each_entity_shared(&world, |entity, _| {
-                    entity.try_get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
             }
 
@@ -218,7 +247,9 @@ mod entity_view {
                 let world = World::new();
                 world.entity().set(Foo(0));
                 query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
-                    entity.try_get::<&Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&Foo>().unwrap();
+                    };
                 });
             }
 
@@ -228,7 +259,9 @@ mod entity_view {
                 let world = World::new();
                 world.entity().set(Foo(0));
                 query!(world, &mut Foo).build().each_entity_shared(&world, |entity, _| {
-                    entity.try_get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
             }
         }
@@ -243,7 +276,7 @@ mod entity_view {
             let mut world = World::new();
             world.entity().set(Foo(0));
             system!(world, &mut Foo).each_entity(|entity, _| {
-                let _ = entity.cloned::<&Foo>();
+                let _ = entity.cloned_owned::<&Foo>();
             });
             world.progress();
         }
@@ -257,7 +290,9 @@ mod entity_view {
                 let mut world = World::new();
                 world.entity().set(Foo(0));
                 system!(world, &Foo).each_entity(|entity, _| {
-                    entity.get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.progress();
             }
@@ -268,7 +303,9 @@ mod entity_view {
                 let mut world = World::new();
                 world.entity().set(Foo(0));
                 system!(world, &mut Foo).each_entity(|entity, _| {
-                    entity.get::<&Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&Foo>().unwrap();
+                    };
                 });
                 world.progress();
             }
@@ -279,7 +316,9 @@ mod entity_view {
                 let mut world = World::new();
                 world.entity().set(Foo(0));
                 system!(world, &mut Foo).each_entity(|entity, _| {
-                    entity.get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.progress();
             }
@@ -294,7 +333,9 @@ mod entity_view {
                 let mut world = World::new();
                 world.entity().set(Foo(0));
                 system!(world, &Foo).each_entity(|entity, _| {
-                    entity.try_get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.progress();
             }
@@ -305,7 +346,9 @@ mod entity_view {
                 let mut world = World::new();
                 world.entity().set(Foo(0));
                 system!(world, &mut Foo).each_entity(|entity, _| {
-                    entity.try_get::<&Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&Foo>().unwrap();
+                    };
                 });
                 world.progress();
             }
@@ -316,7 +359,9 @@ mod entity_view {
                 let mut world = World::new();
                 world.entity().set(Foo(0));
                 system!(world, &mut Foo).each_entity(|entity, _| {
-                    entity.try_get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.progress();
             }
@@ -331,7 +376,7 @@ mod entity_view {
         fn observer_write_view_clone() {
             let world = World::new();
             observer!(world, flecs::OnSet, &mut Foo).each_entity(|entity, _| {
-                let _ = entity.cloned::<&Foo>();
+                let _ = entity.cloned_owned::<&Foo>();
             });
             world.entity().set(Foo(0));
         }
@@ -344,7 +389,9 @@ mod entity_view {
             fn observer_read_view_write() {
                 let world = World::new();
                 observer!(world, flecs::OnSet, &Foo).each_entity(|entity, _| {
-                    entity.get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.entity().set(Foo(0));
             }
@@ -354,7 +401,9 @@ mod entity_view {
             fn observer_write_view_read() {
                 let world = World::new();
                 observer!(world, flecs::OnSet, &mut Foo).each_entity(|entity, _| {
-                    entity.get::<&Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&Foo>().unwrap();
+                    };
                 });
                 world.entity().set(Foo(0));
             }
@@ -364,7 +413,9 @@ mod entity_view {
             fn observer_write_view_write() {
                 let world = World::new();
                 observer!(world, flecs::OnSet, &mut Foo).each_entity(|entity, _| {
-                    entity.get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.entity().set(Foo(0));
             }
@@ -378,7 +429,9 @@ mod entity_view {
             fn observer_read_view_write() {
                 let world = World::new();
                 observer!(world, flecs::OnSet, &Foo).each_entity(|entity, _| {
-                    entity.try_get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.entity().set(Foo(0));
             }
@@ -388,7 +441,9 @@ mod entity_view {
             fn observer_write_view_read() {
                 let world = World::new();
                 observer!(world, flecs::OnSet, &mut Foo).each_entity(|entity, _| {
-                    entity.try_get::<&Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&Foo>().unwrap();
+                    };
                 });
                 world.entity().set(Foo(0));
             }
@@ -398,7 +453,9 @@ mod entity_view {
             fn observer_write_view_write() {
                 let world = World::new();
                 observer!(world, flecs::OnSet, &mut Foo).each_entity(|entity, _| {
-                    entity.try_get::<&mut Foo>(|_| {});
+                    {
+                        let _guard = entity.get_ref::<&mut Foo>().unwrap();
+                    };
                 });
                 world.entity().set(Foo(0));
             }
@@ -1522,7 +1579,7 @@ fn filter_does_not_panic() {
     world.entity().set(Foo(0));
 
     query!(world, Foo).build().each_entity_shared(&world, |entity, _| {
-        let _ = entity.cloned::<&Foo>();
+        let _ = entity.cloned_owned::<&Foo>();
     });
 }
 

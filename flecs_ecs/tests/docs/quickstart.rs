@@ -4,6 +4,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 use crate::common_test::*;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, WorldSingletonExt};
 
 #[test]
 fn flecs_quickstart_concepts_world_01() {
@@ -62,9 +63,10 @@ fn flecs_quickstart_concepts_component_05() {
      .set(Velocity { x: 1.0, y: 2.0 });
 
     // Get a component
-    e.get::<&Position>(|p| {
+    {
+        let p = e.get_ref::<&Position>().unwrap();
         println!("Position: ({}, {})", p.x, p.y);
-    });
+    };
 
     // Remove component
     e.remove(Position::id());
@@ -86,9 +88,10 @@ fn flecs_quickstart_concepts_component_07() {
     let world = World::new();
     let pos_e = world.entity_from::<Position>();
 
-    pos_e.get::<&flecs::Component>(|c| {
+    {
+        let c = pos_e.get_ref::<&flecs::Component>().unwrap();
         println!("Component size: {}", c.size);
-    });
+    };
 }
 
 #[test]
@@ -241,9 +244,10 @@ fn flecs_quickstart_concepts_singleton_19() {
     world.set(Gravity { value: 9.8 });
 
     // Get singleton component
-    world.get::<&Gravity>(|g| {
+    {
+        let g = WorldSingletonExt::singleton::<Gravity>(&world).unwrap();
         println!("Gravity: {}", g.value);
-    });
+    };
 }
 
 #[test]
@@ -253,9 +257,10 @@ fn flecs_quickstart_concepts_singleton_20() {
 
     grav_e.set(Gravity { value: 9.8 });
 
-    grav_e.get::<&Gravity>(|g| {
+    {
+        let g = grav_e.get_ref::<&Gravity>().unwrap();
         println!("Gravity: {}", g.value);
-    });
+    };
 }
 
 #[test]
