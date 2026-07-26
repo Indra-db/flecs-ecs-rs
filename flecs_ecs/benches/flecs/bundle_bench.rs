@@ -13,9 +13,9 @@ pub fn bundle_spawn(criterion: &mut Criterion) {
     group.bench_function("bundle_spawn_3", |b| {
         b.iter_batched(
             World::new,
-            |world| {
+            |mut world| {
                 for _ in 0..ENTITY_COUNT {
-                    black_box(world.spawn((C1(1), C2(2), C3(3))));
+                    black_box(world.spawn((C1(1), C2(2), C3(3))).id());
                 }
                 world
             },
@@ -47,7 +47,7 @@ pub fn bundle_spawn_batch(criterion: &mut Criterion) {
     group.bench_function("bundle_spawn_batch_1000", |b| {
         b.iter_batched(
             World::new,
-            |world| {
+            |mut world| {
                 black_box(world.spawn_batch((C1(1), C2(2), C3(3)), BATCH_COUNT));
                 world
             },

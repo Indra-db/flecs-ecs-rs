@@ -31,16 +31,19 @@ struct Marker;
 
 #[test]
 fn spawn_creates_entity_with_all_components_and_values() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e = world.spawn((Pos { x: 1, y: 2 }, Vel { x: 3, y: 4 }, Health(100)));
+    let e = world
+        .spawn((Pos { x: 1, y: 2 }, Vel { x: 3, y: 4 }, Health(100)))
+        .id();
+    let ev = world.entity_from_id(e);
 
-    assert!(e.is_alive());
-    assert!(e.has(Pos::id()));
-    assert!(e.has(Vel::id()));
-    assert!(e.has(Health::id()));
+    assert!(ev.is_alive());
+    assert!(ev.has(Pos::id()));
+    assert!(ev.has(Vel::id()));
+    assert!(ev.has(Health::id()));
 
-    e.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
+    ev.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
         assert_eq!(*p, Pos { x: 1, y: 2 });
         assert_eq!(*v, Vel { x: 3, y: 4 });
         assert_eq!(*h, Health(100));
@@ -49,9 +52,11 @@ fn spawn_creates_entity_with_all_components_and_values() {
 
 #[test]
 fn spawn_single_component_bundle() {
-    let world = World::new();
-    let e = world.spawn((Health(7),));
-    e.get::<&Health>(|h| assert_eq!(*h, Health(7)));
+    let mut world = World::new();
+    let e = world.spawn((Health(7),)).id();
+    world
+        .entity_from_id(e)
+        .get::<&Health>(|h| assert_eq!(*h, Health(7)));
 }
 
 #[test]
@@ -61,12 +66,13 @@ fn spawn_registers_unregistered_components() {
     #[derive(Component, PartialEq, Debug)]
     struct Fresh2(u32);
 
-    let world = World::new();
+    let mut world = World::new();
     // Components have never been touched before this spawn.
-    let e = world.spawn((Fresh1(11), Fresh2(22)));
-    assert!(e.has(Fresh1::id()));
-    assert!(e.has(Fresh2::id()));
-    e.get::<(&Fresh1, &Fresh2)>(|(a, b)| {
+    let e = world.spawn((Fresh1(11), Fresh2(22))).id();
+    let ev = world.entity_from_id(e);
+    assert!(ev.has(Fresh1::id()));
+    assert!(ev.has(Fresh2::id()));
+    ev.get::<(&Fresh1, &Fresh2)>(|(a, b)| {
         assert_eq!(*a, Fresh1(11));
         assert_eq!(*b, Fresh2(22));
     });
@@ -74,26 +80,28 @@ fn spawn_registers_unregistered_components() {
 
 #[test]
 fn spawn_with_zero_sized_tag() {
-    let world = World::new();
-    let e = world.spawn((Pos { x: 5, y: 6 }, Tag, Marker));
-    assert!(e.has(Pos::id()));
-    assert!(e.has(Tag::id()));
-    assert!(e.has(Marker::id()));
-    e.get::<&Pos>(|p| assert_eq!(*p, Pos { x: 5, y: 6 }));
+    let mut world = World::new();
+    let e = world.spawn((Pos { x: 5, y: 6 }, Tag, Marker)).id();
+    let ev = world.entity_from_id(e);
+    assert!(ev.has(Pos::id()));
+    assert!(ev.has(Tag::id()));
+    assert!(ev.has(Marker::id()));
+    ev.get::<&Pos>(|p| assert_eq!(*p, Pos { x: 5, y: 6 }));
 }
 
 #[test]
 fn spawn_only_tags() {
-    let world = World::new();
-    let e = world.spawn((Tag, Marker));
-    assert!(e.has(Tag::id()));
-    assert!(e.has(Marker::id()));
+    let mut world = World::new();
+    let e = world.spawn((Tag, Marker)).id();
+    let ev = world.entity_from_id(e);
+    assert!(ev.has(Tag::id()));
+    assert!(ev.has(Marker::id()));
 }
 
 #[test]
 #[should_panic(expected = "duplicate component type")]
 fn spawn_duplicate_component_type_panics() {
-    let world = World::new();
+    let mut world = World::new();
     let _ = world.spawn((Health(1), Health(2)));
 }
 
@@ -112,8 +120,8 @@ impl Drop for SpawnDropCounter {
 fn spawn_drop_runs_exactly_once_per_value() {
     SPAWN_DROP_COUNT.store(0, SeqCst);
     {
-        let world = World::new();
-        let _e = world.spawn((SpawnDropCounter(1), Health(2)));
+        let mut world = World::new();
+        let _e = world.spawn((SpawnDropCounter(1), Health(2))).id();
         // Value lives in storage; not yet dropped.
         assert_eq!(SPAWN_DROP_COUNT.load(SeqCst), 0);
     }
@@ -135,16 +143,16 @@ impl Drop for DeleteDropCounter {
 #[test]
 fn spawn_then_delete_drops_once() {
     SPAWN_DELETE_DROP.store(0, SeqCst);
-    let world = World::new();
-    let e = world.spawn((DeleteDropCounter(9),));
+    let mut world = World::new();
+    let e = world.spawn((DeleteDropCounter(9),)).id();
     assert_eq!(SPAWN_DELETE_DROP.load(SeqCst), 0);
-    e.destruct();
+    world.entity_from_id(e).destruct();
     assert_eq!(SPAWN_DELETE_DROP.load(SeqCst), 1);
 }
 
 #[test]
 fn spawn_observer_parity_with_set_sequence() {
-    let world = World::new();
+    let mut world = World::new();
 
     let on_add = Arc::new(AtomicUsize::new(0));
     let on_set = Arc::new(AtomicUsize::new(0));
@@ -207,7 +215,7 @@ struct CHealth(i32);
 
 #[test]
 fn spawn_batch_count_and_distinct_ids() {
-    let world = World::new();
+    let mut world = World::new();
 
     let ids = world.spawn_batch((CPos { x: 1, y: 2 }, CHealth(50)), 1000);
     assert_eq!(ids.len(), 1000);
@@ -222,7 +230,7 @@ fn spawn_batch_count_and_distinct_ids() {
 
 #[test]
 fn spawn_batch_values_are_correct_across_rows() {
-    let world = World::new();
+    let mut world = World::new();
     let ids = world.spawn_batch((CPos { x: 7, y: 8 }, CHealth(3)), 16);
     for e in ids {
         let ev = world.entity_from_id(e);
@@ -237,7 +245,7 @@ fn spawn_batch_values_are_correct_across_rows() {
 
 #[test]
 fn spawn_batch_count_one() {
-    let world = World::new();
+    let mut world = World::new();
     let ids = world.spawn_batch((CHealth(42),), 1);
     assert_eq!(ids.len(), 1);
     world
@@ -259,7 +267,7 @@ impl Drop for BatchZeroDrop {
 #[test]
 fn spawn_batch_count_zero_drops_original_and_returns_empty() {
     BATCH_ZERO_DROP.store(0, SeqCst);
-    let world = World::new();
+    let mut world = World::new();
     let ids = world.spawn_batch((BatchZeroDrop(1),), 0);
     assert!(ids.is_empty());
     // The original bundle is not stored anywhere, so it is dropped exactly once.
@@ -282,7 +290,7 @@ impl Drop for BatchDropCounter {
 fn spawn_batch_drop_runs_exactly_once_per_stored_value() {
     BATCH_DROP_COUNT.store(0, SeqCst);
     {
-        let world = World::new();
+        let mut world = World::new();
         let ids = world.spawn_batch((BatchDropCounter(9),), 100);
         assert_eq!(ids.len(), 100);
         // Values live in storage; clones and the moved original were forgotten.
@@ -510,33 +518,23 @@ fn insert_default_component_drops_transient_default_no_leak() {
 mod live_guard {
     use super::*;
 
-    /// `spawn` must refuse while a guard pins storage on this stage:
-    /// `ecs_bulk_init` grows tables and can reallocate the pinned column.
-    #[test]
-    #[should_panic(expected = "while component guards are live")]
-    fn spawn_panics_with_live_guard() {
-        let world = World::new();
-        let e = world.spawn((Pos { x: 1, y: 2 }, Vel { x: 3, y: 4 }));
-        let _g = e.get_ref::<&Pos>().unwrap();
-        let _ = world.spawn((Pos { x: 5, y: 6 }, Vel { x: 7, y: 8 }));
-    }
+    // The former `spawn_panics_with_live_guard` / `spawn_batch_panics_with_live_guard`
+    // runtime refusals are now COMPILE errors: `spawn` / `spawn_batch` take
+    // `&mut World`, so a live shared-register guard (which borrows the world
+    // shared) cannot coexist with the call. The demonstrations are the
+    // `compile_fail` doctests on `WorldBundleExt::spawn`.
 
-    #[test]
-    #[should_panic(expected = "while component guards are live")]
-    fn spawn_batch_panics_with_live_guard() {
-        let world = World::new();
-        let e = world.spawn((CPos { x: 1, y: 2 }, CHealth(9)));
-        let _g = e.get_ref::<&CPos>().unwrap();
-        let _ = world.spawn_batch((CPos { x: 5, y: 6 }, CHealth(1)), 10);
-    }
-
+    /// `spawn` still refuses an open defer scope at runtime: `ecs_bulk_init` must
+    /// observe its ids immediately. The scope is opened with `defer_begin`
+    /// (a `&World` op that returns), so `&mut World` remains available and the
+    /// refusal is reachable from safe code.
     #[test]
     #[should_panic(expected = "while the world is deferred")]
     fn spawn_panics_in_defer_scope() {
-        let world = World::new();
-        world.defer(|| {
-            let _ = world.spawn((Pos { x: 1, y: 2 },));
-        });
+        let mut world = World::new();
+        world.defer_begin();
+        let _ = world.spawn((Pos { x: 1, y: 2 },));
+        world.defer_end();
     }
 
     /// `insert` under a live guard routes through the write episode: the guard

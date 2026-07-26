@@ -16,6 +16,8 @@ use alloc::vec::Vec;
 use crate::core::{ComponentId, ComponentInfo, Entity, EntityView, World, WorldProvider, WorldRef};
 use crate::sys;
 
+use super::entity_mut::EntityMut;
+
 mod private {
     pub trait Sealed {}
 }
@@ -87,43 +89,35 @@ pub trait Bundle: private::Sealed + Sized + 'static {
     fn write_after_commit(self, entity: EntityView, added_mask: &[bool]);
 }
 
-/// Refuses a bulk construction op while any shared-register guard is live on
-/// the current stage. `ecs_bulk_init` appends rows to (and can therefore
-/// reallocate the columns of) existing tables, which would dangle a live
-/// [`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut)
-/// pointing into one of those columns. `spawn` / `spawn_batch` cannot be
-/// deferred behind the guard episode (their contract returns the created ids
-/// immediately), so the only sound answer is to refuse.
+/// Debug-only backstop against a live-guard bulk construction (spec §4.11).
 ///
-/// Compiled out without `flecs_safety_locks` (no guards exist to pin storage,
-/// but the unchecked-build contract also removes this refusal).
+/// `spawn` / `spawn_batch` now take `&mut World`, so from safe code no
+/// shared-register guard (which borrows the world *shared*) can be alive across
+/// the call: the borrow checker rejects it (see the compile-fail doctests on
+/// [`WorldBundleExt::spawn`]). The runtime refusal is therefore unreachable from
+/// safe code and is kept only as a `debug_assert` backstop against an `unsafe` /
+/// raw path that fabricated a `&mut World` while a guard's pin was still live —
+/// where `ecs_bulk_init` could reallocate the pinned column out from under the
+/// guard. It costs nothing in release and is compiled out entirely without
+/// `flecs_safety_locks`.
 #[cfg(feature = "flecs_safety_locks")]
 #[inline(always)]
 #[track_caller]
 fn assert_no_live_guards(world: &WorldRef, op: &str) {
     let locks = crate::core::stage_locks_dyn(world);
     // SAFETY: the stage map is owned by the calling thread.
-    if unsafe { (*locks.as_ptr()).has_live_pin() } {
-        bundle_live_guard_panic(op);
-    }
+    debug_assert!(
+        !unsafe { (*locks.as_ptr()).has_live_pin() },
+        "cannot {op} while component guards are live on this stage: `ecs_bulk_init` \
+         appends rows to existing tables and can reallocate a pinned column, which would \
+         dangle the guard. Reachable only via an `unsafe`/raw `&mut World`; safe code is \
+         refused at compile time"
+    );
 }
 
 #[cfg(not(feature = "flecs_safety_locks"))]
 #[inline(always)]
 fn assert_no_live_guards(_world: &WorldRef, _op: &str) {}
-
-#[cfg(feature = "flecs_safety_locks")]
-#[cold]
-#[inline(never)]
-#[track_caller]
-fn bundle_live_guard_panic(op: &str) -> ! {
-    panic!(
-        "cannot {op} while component guards are live on this stage: `ecs_bulk_init` \
-         appends rows to existing tables and can reallocate a pinned column, which would \
-         dangle the guard. Drop all `Ref` / `Mut` guards (from `get_ref` / `try_get_ref`) \
-         before calling {op}"
-    );
-}
 
 #[cold]
 #[inline(never)]
@@ -334,7 +328,7 @@ fn record_bundle_ids<B: Bundle>(world: &World, ids: &[u64]) {
 /// intended final surface is inherent `World::spawn` / `World::spawn_batch`.
 pub trait WorldBundleExt {
     /// Constructs one entity from a bundle in a single archetype move (spec
-    /// §4.11).
+    /// §4.11), on the exclusive register.
     ///
     /// Resolves the bundle's component id list once per bundle type per world
     /// (caching the sorted id array), then moves the bundle's values into
@@ -348,28 +342,46 @@ pub trait WorldBundleExt {
     /// the Rust side. First use of a bundle type registers any unregistered
     /// components.
     ///
-    /// Returns an [`EntityView`]. (This will return `EntityMut` once the
-    /// exclusive-surface redesign lands; see spec §4.11.)
+    /// Takes `&mut World` and returns an [`EntityMut`] for further immediate ops,
+    /// so `world.spawn((A, B)).set(C)` lands all three in one exclusive scope.
+    ///
+    /// # Live guards are a compile error
+    ///
+    /// Because `spawn` takes `&mut World`, no shared-register guard (which borrows
+    /// the world *shared*) can be live across the call: `ecs_bulk_init` could
+    /// reallocate the guard's pinned column, and the borrow checker refuses the
+    /// aliasing outright. This is the refusal the previous runtime panic covered,
+    /// now moved to compile time:
+    ///
+    /// ```compile_fail
+    /// use flecs_ecs::prelude::*;
+    /// use flecs_ecs::experimental::prelude::*;
+    ///
+    /// #[derive(Component)]
+    /// struct Pos { x: i32 }
+    ///
+    /// let mut world = World::new();
+    /// let e = world.spawn((Pos { x: 1 },));
+    /// let g = e.get_ref::<&Pos>().unwrap();      // borrows `world` shared
+    /// let _ = world.spawn((Pos { x: 2 },));      // needs `&mut world`: conflict
+    /// let _ = g.x;
+    /// ```
     ///
     /// # Panics
     ///
     /// Panics if the bundle contains a duplicate component type, if the bundle
-    /// arity exceeds 31, or if the world is in its multithreaded execution
-    /// phase.
+    /// arity exceeds 31, or if the world is in its multithreaded execution phase.
     ///
-    /// Also panics, like a `RefCell` borrow conflict, if any shared-register
-    /// guard ([`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut)
-    /// from `get_ref` / `try_get_ref`) is live on the current stage, or if the
-    /// world is deferred: `ecs_bulk_init` grows existing tables (which can
-    /// reallocate a pinned column out from under a live guard) and must observe
-    /// its entity ids immediately (so it cannot be queued behind the guard's
-    /// write episode or an open `defer()` scope). Drop all guards and leave any
-    /// defer scope before spawning.
+    /// Also panics if the world is deferred (for example between
+    /// [`World::defer_begin`](crate::core::World::defer_begin) /
+    /// [`World::defer_end`](crate::core::World::defer_end)): `ecs_bulk_init` must
+    /// observe its entity ids immediately and cannot run under an open defer
+    /// scope. Leave any defer scope before spawning.
     ///
-    /// The live-guard check is part of the `flecs_safety_locks` bookkeeping;
-    /// building without that feature compiles the check out along with the
-    /// guards themselves (the unchecked-build contract).
-    fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_>;
+    /// The live-guard `debug_assert` backstop is part of the `flecs_safety_locks`
+    /// bookkeeping and guards only against an `unsafe`/raw `&mut World`; building
+    /// without that feature compiles it out.
+    fn spawn<B: Bundle>(&mut self, bundle: B) -> EntityMut<'_>;
 
     /// Constructs `count` entities from one bundle in a single `ecs_bulk_init`
     /// call (spec §4.11).
@@ -388,15 +400,15 @@ pub trait WorldBundleExt {
     /// arity exceeds 31, or if the world is in its multithreaded execution
     /// phase.
     ///
-    /// Also panics under a live shared-register guard or an open defer scope,
-    /// for the same reasons as [`spawn`](WorldBundleExt::spawn) (and with the
-    /// same `flecs_safety_locks` unchecked-build contract for the guard check).
-    fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity>;
+    /// Takes `&mut World`, so a live shared-register guard across the call is a
+    /// compile error, exactly as for [`spawn`](WorldBundleExt::spawn). Also
+    /// panics under an open defer scope, for the same reason as `spawn`.
+    fn spawn_batch<B: Bundle + Clone>(&mut self, bundle: B, count: usize) -> Vec<Entity>;
 }
 
 impl WorldBundleExt for World {
     #[track_caller]
-    fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_> {
+    fn spawn<B: Bundle>(&mut self, bundle: B) -> EntityMut<'_> {
         const {
             assert!(
                 B::ARITY <= MAX_BUNDLE_ARITY,
@@ -404,8 +416,10 @@ impl WorldBundleExt for World {
             );
         }
 
-        let world = self.world();
         let world_ptr = self.raw_world.as_ptr();
+        // SAFETY: `world_ptr` is this world's live pointer; `&mut self` is held
+        // for the whole call (and the returned handle for `spawn`).
+        let world = unsafe { WorldRef::from_ptr(world_ptr) };
         crate::core::assert_not_in_multithreaded_phase(world_ptr);
         assert_no_live_guards(&world, "World::spawn");
         if self.is_deferred() {
@@ -450,14 +464,13 @@ impl WorldBundleExt for World {
         // Copy the id out immediately; the returned array aliases internal state.
         let id = unsafe { *id_ptr };
 
-        EntityView {
-            world,
-            id: Entity::new(id),
-        }
+        // SAFETY: `world` names this live world; we hold `&mut self` for the
+        // returned handle's lifetime, and `id` was just created live.
+        unsafe { EntityMut::new(world, Entity::new(id)) }
     }
 
     #[track_caller]
-    fn spawn_batch<B: Bundle + Clone>(&self, bundle: B, count: usize) -> Vec<Entity> {
+    fn spawn_batch<B: Bundle + Clone>(&mut self, bundle: B, count: usize) -> Vec<Entity> {
         const {
             assert!(
                 B::ARITY <= MAX_BUNDLE_ARITY,
@@ -465,8 +478,10 @@ impl WorldBundleExt for World {
             );
         }
 
-        let world = self.world();
         let world_ptr = self.raw_world.as_ptr();
+        // SAFETY: `world_ptr` is this world's live pointer; `&mut self` is held
+        // for the whole call (and the returned handle for `spawn`).
+        let world = unsafe { WorldRef::from_ptr(world_ptr) };
         crate::core::assert_not_in_multithreaded_phase(world_ptr);
         // Checked before the count == 0 early return so misuse fails
         // deterministically instead of depending on the requested count.
