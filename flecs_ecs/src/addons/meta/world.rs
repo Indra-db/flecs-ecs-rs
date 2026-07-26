@@ -34,7 +34,10 @@ impl World {
     }
 
     /// Return meta cursor to value
-    pub fn cursor<T: ComponentId>(&self, data: &mut T) -> Cursor<'_> {
+    ///
+    /// The returned [`Cursor`] borrows `data` for as long as it is alive, so
+    /// `data` cannot be used again until the cursor is dropped.
+    pub fn cursor<'a, T: ComponentId>(&'a self, data: &'a mut T) -> Cursor<'a> {
         unsafe { Cursor::new(self, T::id(), data as *mut T) }
     }
 

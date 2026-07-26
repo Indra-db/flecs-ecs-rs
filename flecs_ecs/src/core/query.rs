@@ -470,6 +470,17 @@ use crate::sys;
 /// - [Module documentation](self) for comprehensive query examples
 /// - [Flecs Query Manual](https://www.flecs.dev/flecs/md_docs_2Queries.html)
 ///
+/// The raw query pointer is not writable from safe code: overwriting it with an
+/// arbitrary value would let safe code hand a dangling pointer to flecs.
+///
+/// ```compile_fail,E0616
+/// # use flecs_ecs::prelude::*;
+/// # #[derive(Component)] struct Position { x: f32 }
+/// # let world = World::new();
+/// let mut q = world.new_query::<&Position>();
+/// q.query = q.query; // `query` field is private
+/// ```
+///
 /// [systems]: crate::addons::system
 /// [observers]: Observer
 /// [tooling]: flecs::rest
@@ -477,7 +488,7 @@ pub struct Query<T>
 where
     T: QueryTuple,
 {
-    pub query: NonNull<sys::ecs_query_t>,
+    pub(crate) query: NonNull<sys::ecs_query_t>,
     // this is a leaked box, which is valid during the lifecycle of the query object.
     world_ctx: NonNull<WorldCtx>,
     _phantom: PhantomData<T>,

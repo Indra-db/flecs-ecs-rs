@@ -16,7 +16,7 @@ pub struct IsAnyArray {
 pub struct TableColumnSafety {
     //only set for sparse terms
     pub component_id: u64,
-    pub table: *mut sys::ecs_table_t,
+    pub(crate) table: *mut sys::ecs_table_t,
     pub column: i16,
 }
 
@@ -32,7 +32,7 @@ impl Default for TableColumnSafety {
 }
 
 pub struct ComponentsData<T: QueryTuple, const LEN: usize> {
-    pub array_components: [*mut u8; LEN],
+    pub(crate) array_components: [*mut u8; LEN],
     pub is_ref_array_components: [bool; LEN],
     pub is_row_array_components: [bool; LEN],
     pub index_array_components: [i8; LEN],

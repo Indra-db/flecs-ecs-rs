@@ -45,7 +45,7 @@ impl Default for SafetyInfo {
 }
 
 pub struct ComponentsData<T: GetTuple, const LEN: usize> {
-    pub array_components: [*mut c_void; LEN],
+    pub(crate) array_components: [*mut c_void; LEN],
     pub has_all_components: bool,
     #[cfg(feature = "flecs_safety_locks")]
     pub(crate) safety_info: [SafetyInfo; LEN],
