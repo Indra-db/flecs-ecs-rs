@@ -51,7 +51,7 @@ Lock cost (on vs off, same tree): 1_term +4.9% (was +37.6%), 4_terms +11.6%, 1_w
 
 ## Prototype findings (Phase 3, worktree branch `worktree-agent-a384a086b27116b5d`)
 
-Built in `flecs_ecs/src/experimental/`: guard-based `get_ref`/`try_get_ref`/`cloned_owned` with fused tuple acquire and rollback, exclusive-register `get_exclusive`/`each_exclusive`, lending `ChunkCursor` + `each!` macro, and the tier-0 disjointness proof. 44 tests green, clippy clean. Provisional benches (shared machine, controls within 3%): guard `get` ~11% faster than the closure `get`; `each_exclusive` ~10% faster than locked `each`, within ~5% of raw C; `each!` write path ~14% faster than locked `each`.
+Built in `flecs_ecs/src/experimental/`: guard-based `get_ref`/`try_get_ref`/`cloned_owned` with fused tuple acquire and rollback, exclusive-register `get_exclusive`/`each_exclusive`, lending `ChunkCursor` + `each!` macro, and the tier-0 disjointness proof. 44 tests green, clippy clean. Verified benches (quiet machine, powermode 0, controls consistent): guard `get` 12.68 ns vs closure `get` 14.36 ns (-11.7%); `each_exclusive` 2.767 µs vs locked `each` 2.989 µs (-7.4%), +4.7% over raw C 2.642 µs; `each!` write 2.751 µs vs locked write 3.224 µs (-14.7%); chunk read cursor 3.57 µs, slower than `each` per the bounds-check friction below.
 
 Validated design facts:
 
