@@ -99,12 +99,33 @@ impl World {
     ///
     /// True if the world has been progressed, false if [`World::quit()`] has been called.
     ///
+    /// # A live guard cannot span a frame
+    ///
+    /// `progress` takes `&mut self`. A shared-register guard
+    /// ([`Ref`](crate::experimental::Ref) / [`Mut`](crate::experimental::Mut) /
+    /// `get_ref`) borrows the world `&World`, so the borrow checker forbids it
+    /// from being live across a frame step. This replaces the old runtime refusal
+    /// (which could only fire after the fact); it is now a compile error:
+    ///
+    /// ```compile_fail
+    /// use flecs_ecs::prelude::*;
+    ///
+    /// #[derive(Component)]
+    /// struct Position { x: i32, y: i32 }
+    ///
+    /// let mut world = World::new();
+    /// let e = world.entity().set(Position { x: 1, y: 2 });
+    /// let guard = e.get_ref::<&Position>().unwrap(); // borrows the world
+    /// world.progress();                              // needs &mut world -> conflict
+    /// let _ = guard;
+    /// ```
+    ///
     /// # See also
     ///
     /// * [`World::progress_time()`]
     /// * C API: `ecs_progress`
     #[inline(always)]
-    pub fn progress(&self) -> bool {
+    pub fn progress(&mut self) -> bool {
         self.progress_time(0.0)
     }
 
@@ -130,11 +151,16 @@ impl World {
     /// * [`World::progress()`]
     /// * C API: `ecs_progress`
     #[inline(always)]
-    pub fn progress_time(&self, delta_time: f32) -> bool {
-        // Running the pipeline executes systems that structurally mutate storage
-        // immediately and cannot defer, so it would reallocate a pinned column out
-        // from under a live guard: refuse rather than dangle it (spec §3.6).
-        crate::core::assert_no_live_pin(&self.world(), "World::progress()");
+    pub fn progress_time(&mut self, delta_time: f32) -> bool {
+        // `progress` takes `&mut self` (spec §5.7): it is an exclusive-register
+        // frame step. A shared-register guard (`Ref` / `Mut`) borrows the world
+        // `&World`, which the borrow checker cannot let coexist with this
+        // `&mut self`, so the runtime refusal below is now unreachable from safe
+        // code (see the compile_fail doctest on `progress`). It is demoted to a
+        // debug-only backstop against `unsafe` code that manufactures a live pin
+        // without an outstanding borrow; it costs the release hot path nothing.
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+        crate::core::assert_no_live_pin(&(&*self).world(), "World::progress()");
         unsafe { sys::ecs_progress(self.raw_world.as_ptr(), delta_time) }
     }
 
@@ -160,7 +186,7 @@ impl World {
     /// * [`World::run_pipeline()`]
     /// * [`World::run_pipeline_time()`]
     #[inline(always)]
-    pub fn run_pipeline(&self, pipeline: impl IntoEntity) {
+    pub fn run_pipeline(&mut self, pipeline: impl IntoEntity) {
         Self::run_pipeline_time(self, pipeline, 0.0);
     }
 
@@ -187,10 +213,12 @@ impl World {
     /// * [`World::run_pipeline()`]
     /// * [`World::run_pipeline_time()`]
     #[inline(always)]
-    pub fn run_pipeline_time(&self, pipeline: impl IntoEntity, delta_time: FTime) {
-        let world = self.world();
-        // As `progress`: running the pipeline executes systems that mutate storage
-        // immediately and cannot defer, so refuse under a live guard (spec §3.6).
+    pub fn run_pipeline_time(&mut self, pipeline: impl IntoEntity, delta_time: FTime) {
+        let world = (&*self).world();
+        // As `progress` (spec §5.7): `&mut self` makes a live shared-register
+        // guard impossible to hold across this call, so the runtime refusal is
+        // unreachable from safe code and demoted to a debug-only backstop.
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
         crate::core::assert_no_live_pin(&world, "World::run_pipeline()");
         unsafe {
             sys::ecs_run_pipeline(

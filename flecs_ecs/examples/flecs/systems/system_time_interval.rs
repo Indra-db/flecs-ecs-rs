@@ -15,7 +15,7 @@ fn tick(mut it: TableIter) {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Timeout { value: 3.5 });
 

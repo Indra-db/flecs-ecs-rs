@@ -49,7 +49,7 @@ fn world_factory_prefab_w_name() {
 
 #[test]
 fn world_factory_system() {
-    let world = World::new();
+    let mut world = World::new();
 
     let s = world
         .system::<(&mut Position, &Velocity)>()
@@ -63,11 +63,12 @@ fn world_factory_system() {
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -75,7 +76,7 @@ fn world_factory_system() {
 
 #[test]
 fn world_factory_system_w_name() {
-    let world = World::new();
+    let mut world = World::new();
 
     let s = world
         .system_named::<(&mut Position, &Velocity)>("MySystem")
@@ -90,11 +91,12 @@ fn world_factory_system_w_name() {
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -102,7 +104,7 @@ fn world_factory_system_w_name() {
 
 #[test]
 fn world_factory_system_w_expr() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.component::<Position>();
     world.component::<Velocity>();
@@ -128,11 +130,12 @@ fn world_factory_system_w_expr() {
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });

@@ -15,7 +15,7 @@ pub struct Velocity {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create a system for moving an entity
     world

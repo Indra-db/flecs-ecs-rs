@@ -110,7 +110,7 @@ int main(int, char *[]) {
 */
 
 fn main() {
-    let world_a = World::new();
+    let mut world_a = World::new();
 
     world_a.import::<Move>();
 
@@ -162,7 +162,7 @@ fn main() {
     //    }
 
     // Create second world, import same module
-    let world_b = World::new();
+    let mut world_b = World::new();
     world_b.import::<Move>();
 
     // Deserialize JSON into second world

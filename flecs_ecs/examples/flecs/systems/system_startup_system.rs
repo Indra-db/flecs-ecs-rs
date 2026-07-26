@@ -11,7 +11,7 @@ use flecs_ecs::prelude::*;
 // they are guaranteed to always run on the main thread.
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Startup system
     world

@@ -47,7 +47,7 @@ fn non_send_component_access_from_worker_thread_panics() {
         value: Rc<i32>,
     }
 
-    let world = World::new();
+    let mut world = World::new();
     world.set(NonSendSingleton { value: Rc::new(1) });
 
     for _ in 0..1024 {
@@ -120,7 +120,7 @@ fn non_send_component_set_from_worker_thread_panics() {
         _value: Rc<i32>,
     }
 
-    let world = World::new();
+    let mut world = World::new();
     world.component::<NonSendPayload>();
 
     for _ in 0..1024 {

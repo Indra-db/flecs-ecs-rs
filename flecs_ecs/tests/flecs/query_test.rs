@@ -3360,7 +3360,7 @@ fn iter_pair_object() {
 fn iter_query_in_system() {
     thread_local! { static COUNT: core::cell::Cell<i32> = const { core::cell::Cell::new(0) }; }
 
-    let world = World::new();
+    let mut world = World::new();
 
     world.entity().add(Position::id()).add(Velocity::id());
 

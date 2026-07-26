@@ -225,7 +225,7 @@ fn implicit_components_system_optional() {
         value: f32,
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
     use alloc::sync::Arc;
     use core::sync::atomic::{AtomicI32, Ordering};
@@ -283,7 +283,7 @@ fn implicit_components_system_const() {
         y: f32,
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
     use alloc::sync::Arc;
     use core::sync::atomic::{AtomicI32, Ordering};
@@ -307,7 +307,8 @@ fn implicit_components_system_const() {
     let e = world
         .entity()
         .set(Position { x: 10.0, y: 20.0 })
-        .set(Velocity { x: 1.0, y: 2.0 });
+        .set(Velocity { x: 1.0, y: 2.0 })
+        .id();
 
     let pcomp = world.component::<Position>();
     assert_eq!(pcomp.id(), position.id());
@@ -319,7 +320,7 @@ fn implicit_components_system_const() {
 
     assert_eq!(count.load(Ordering::Relaxed), 1);
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert!((p.x - 11.0_f32).abs() < f32::EPSILON);
         assert!((p.y - 22.0_f32).abs() < f32::EPSILON);
     });
@@ -466,17 +467,17 @@ fn implicit_components_first_use_in_system() {
         y: f32,
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.add(Velocity::id());
     });
 
-    let e = world.entity().add(Position::id());
+    let e = world.entity().add(Position::id()).id();
 
     world.progress();
 
-    assert!(e.has(Velocity::id()));
+    assert!(world.entity_from_id(e).has(Velocity::id()));
 }
 
 #[test]
@@ -489,17 +490,17 @@ fn implicit_components_first_use_tag_in_system() {
     #[derive(Component)]
     struct Tag;
 
-    let world = World::new();
+    let mut world = World::new();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.add(Tag::id());
     });
 
-    let e = world.entity().add(Position::id());
+    let e = world.entity().add(Position::id()).id();
 
     world.progress();
 
-    assert!(e.has(Tag::id()));
+    assert!(world.entity_from_id(e).has(Tag::id()));
 }
 
 #[test]
@@ -520,21 +521,21 @@ fn implicit_components_first_use_enum_in_system() {
         Blue,
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.add(Tag::id());
         e.set(Color::Green);
     });
 
-    let e = world.entity().add(Position::id());
+    let e = world.entity().add(Position::id()).id();
 
     world.progress();
 
-    assert!(e.has(Position::id()));
-    assert!(e.has(Tag::id()));
+    assert!(world.entity_from_id(e).has(Position::id()));
+    assert!(world.entity_from_id(e).has(Tag::id()));
 
-    e.try_get::<&Color>(|c| {
+    world.entity_from_id(e).try_get::<&Color>(|c| {
         assert_eq!(*c, Color::Green);
     });
 
@@ -581,9 +582,9 @@ fn implicit_components_use_const_w_stage() {
         y: f32,
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
-    let e = world.entity().set(Position { x: 10.0, y: 20.0 });
+    let e = world.entity().set(Position { x: 10.0, y: 20.0 }).id();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.set(Velocity { x: 1.0, y: 2.0 });
@@ -591,9 +592,9 @@ fn implicit_components_use_const_w_stage() {
 
     world.progress();
 
-    assert!(e.has(Velocity::id()));
+    assert!(world.entity_from_id(e).has(Velocity::id()));
 
-    e.get::<&Velocity>(|v| {
+    world.entity_from_id(e).get::<&Velocity>(|v| {
         assert!((v.x - 1.0_f32).abs() < f32::EPSILON);
         assert!((v.y - 2.0_f32).abs() < f32::EPSILON);
     });
@@ -614,9 +615,9 @@ fn implicit_components_use_const_w_threads() {
         y: f32,
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
-    let e = world.entity().set(Position { x: 10.0, y: 20.0 });
+    let e = world.entity().set(Position { x: 10.0, y: 20.0 }).id();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.set(Velocity { x: 1.0, y: 2.0 });
@@ -625,9 +626,9 @@ fn implicit_components_use_const_w_threads() {
     world.set_threads(2);
     world.progress();
 
-    assert!(e.has(Velocity::id()));
+    assert!(world.entity_from_id(e).has(Velocity::id()));
 
-    e.get::<&Velocity>(|v| {
+    world.entity_from_id(e).get::<&Velocity>(|v| {
         assert!((v.x - 1.0_f32).abs() < f32::EPSILON);
         assert!((v.y - 2.0_f32).abs() < f32::EPSILON);
     });

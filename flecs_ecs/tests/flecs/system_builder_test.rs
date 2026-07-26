@@ -610,7 +610,7 @@ fn system_builder_write_annotation() {
     #[derive(Component)]
     struct LocalTagB;
 
-    let world = World::new();
+    let mut world = World::new();
 
     let e1 = world.entity().add(LocalTagA::id()).id();
 

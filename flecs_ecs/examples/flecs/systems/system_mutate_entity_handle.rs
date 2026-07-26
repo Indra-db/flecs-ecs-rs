@@ -14,7 +14,7 @@ struct Timeout {
 pub struct Tag;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // System that deletes an entity after a timeout expires
     world
@@ -70,10 +70,10 @@ fn main() {
             println!("Expired: {} actually deleted", e.name());
         });
 
-    let to_delete = world.entity_named("ToDelete").add(Tag);
+    let to_delete = world.entity_named("ToDelete").add(Tag).id();
 
     world.entity_named("MyEntity").set(Timeout {
-        to_delete: to_delete.id(),
+        to_delete,
         value: 2.5,
     });
 
@@ -81,7 +81,7 @@ fn main() {
 
     while world.progress() {
         // If entity is no longer alive, exit
-        if !to_delete.is_alive() {
+        if !world.entity_from_id(to_delete).is_alive() {
             break;
         }
 

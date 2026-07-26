@@ -86,18 +86,11 @@ fn entity_bulk_build_refuses_under_live_guard() {
     let _ = world.entity_bulk(4).set(&positions).build();
 }
 
-// --- progress / run_pipeline refuse under a live guard (run systems, cannot defer) ---
-
-#[test]
-#[should_panic(expected = "component guards are live")]
-fn progress_refuses_under_live_guard() {
-    let world = World::new();
-    let e = world.entity().set(Position { x: 1, y: 2 });
-    let _g = e.get_ref::<&Position>().unwrap();
-    // Running the pipeline executes systems that mutate storage immediately; it
-    // cannot defer behind the pin, so it refuses.
-    world.progress();
-}
+// A live guard across `progress` / `run_pipeline` is no longer a runtime refusal
+// but a compile error: `progress` takes `&mut self` (spec §5.7) and a
+// shared-register guard borrows `&World`, so the two cannot coexist. The
+// borrow-check refusal is pinned by a `compile_fail` doctest on
+// `World::progress`. The old runtime `should_panic` test is therefore gone.
 
 // --- meta unit/quantity setters defer behind a live guard (routed) ---
 

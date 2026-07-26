@@ -13,7 +13,7 @@ fn sys(mut it: TableIter) {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create three custom phases. Note that the phases have the Phase tag,
     // which is necessary for the builtin pipeline to discover which systems it

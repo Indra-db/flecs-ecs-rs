@@ -25,7 +25,7 @@ struct Spawned(i32);
 /// the stage applies after the frame.
 #[test]
 fn each_with_delivers_stage_and_defers() {
-    let world = World::new();
+    let mut world = World::new();
     let e = world.entity().set(Value(0)).id();
 
     world.system::<&Value>().each_with(move |v, stage| {
@@ -46,7 +46,7 @@ fn each_with_delivers_stage_and_defers() {
 /// `add` is not visible mid-frame and applies at the sync point.
 #[test]
 fn each_entity_with_defers_structural_op_to_sync() {
-    let world = World::new();
+    let mut world = World::new();
     let e = world.entity().set(Value(1)).id();
 
     world.system::<&Value>().each_entity_with(|entity, _v, stage| {
@@ -70,7 +70,7 @@ fn each_entity_with_defers_structural_op_to_sync() {
 /// after the sync point.
 #[test]
 fn stage_spawn_defers_new_entity() {
-    let world = World::new();
+    let mut world = World::new();
     world.entity().set(Value(0));
 
     world.system::<&Value>().each_with(|_v, stage| {
@@ -90,7 +90,7 @@ fn stage_spawn_defers_new_entity() {
 /// `Stage::delta_time` reflects the frame timestep.
 #[test]
 fn stage_delta_time_visible() {
-    let world = World::new();
+    let mut world = World::new();
     world.entity().set(Value(0));
 
     static SEEN: AtomicI32 = AtomicI32::new(0);
@@ -112,7 +112,7 @@ fn stage_delta_time_visible() {
 /// inside the callback so nothing unwinds through the C pipeline frame.
 #[test]
 fn each_entity_with_registers_write_term_lock() {
-    let world = World::new();
+    let mut world = World::new();
     world.entity().set(Value(0));
 
     static CONFLICTED: AtomicBool = AtomicBool::new(false);
@@ -142,7 +142,7 @@ fn each_entity_with_registers_write_term_lock() {
 /// `_with` system registers only its own terms.
 #[test]
 fn each_entity_with_disjoint_guard_ok() {
-    let world = World::new();
+    let mut world = World::new();
     world.entity().set(Value(0)).set(Spawned(0));
 
     world

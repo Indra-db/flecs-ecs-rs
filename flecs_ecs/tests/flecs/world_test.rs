@@ -127,10 +127,10 @@ fn multi_world_component_namespace() {
 fn multi_world_module() {
     ns::reset_invoke_count();
 
-    let world1 = World::new();
+    let mut world1 = World::new();
     world1.import::<ns::NamespaceModule>();
 
-    let world2 = World::new();
+    let mut world2 = World::new();
     world2.import::<ns::NamespaceModule>();
 
     world1.entity().add(ns::FooComp::id());
@@ -1519,7 +1519,7 @@ fn reset_all() {}
 
 #[test]
 fn get_tick() {
-    let world = World::new();
+    let mut world = World::new();
 
     assert_eq!(world.info().frame_count_total, 0);
 
@@ -1624,7 +1624,7 @@ fn run_post_frame() {
         static CTX: Cell<i32> = const { Cell::new(10) };
     }
 
-    let world = World::new();
+    let mut world = World::new();
 
     world.system::<()>().run(|mut it| {
         while it.next() {
@@ -1783,7 +1783,7 @@ fn delta_time() {
         static DT: core::cell::Cell<f32> = const { core::cell::Cell::new(0.0) };
     }
 
-    let world = World::new();
+    let mut world = World::new();
     world.entity().add(Tag::id());
 
     world.system::<()>().with(Tag::id()).run(|mut it| {

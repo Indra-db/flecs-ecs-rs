@@ -3,7 +3,7 @@ use crate::z_ignore_test_common::*;
 use flecs_ecs::prelude::*;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create system that prints delta_time. This system doesn't query for any
     // components which means it won't match any entities, but will still be ran

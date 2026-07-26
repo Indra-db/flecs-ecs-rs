@@ -49,7 +49,7 @@ const WORKERS: i32 = 4;
 /// single-core CI that collapses every stage onto the calling thread.
 #[test]
 fn single_threaded_systems_run_only_on_progress_thread() {
-    let world = World::new();
+    let mut world = World::new();
 
     for i in 0..ENTITY_COUNT {
         let e = world.entity().set(StSingle(0)).set(MtWork(0));

@@ -54,7 +54,7 @@ fn spawn_across_tables(world: &World, f: impl Fn(EntityView)) {
 /// accept it.
 #[test]
 fn par_each_mut_sparse_disjoint_entities_no_violation() {
-    let world = World::new();
+    let mut world = World::new();
     world
         .component::<SparseCounter>()
         .add_trait::<flecs::Sparse>();
@@ -83,7 +83,7 @@ fn par_each_mut_sparse_disjoint_entities_no_violation() {
 /// writing the same column type in different partitions must not conflict.
 #[test]
 fn par_each_mut_dense_disjoint_entities_no_violation() {
-    let world = World::new();
+    let mut world = World::new();
 
     spawn_across_tables(&world, |e| {
         e.set(DenseCounter(0));
@@ -110,12 +110,12 @@ fn par_each_mut_dense_disjoint_entities_no_violation() {
 #[test]
 #[should_panic(expected = "Cannot set write")]
 fn conflict_detection_still_active_after_multithreaded_run() {
-    let world = World::new();
+    let mut world = World::new();
     world
         .component::<SparseCounter>()
         .add_trait::<flecs::Sparse>();
 
-    let e = world.entity().set(SparseCounter(0));
+    let e = world.entity().set(SparseCounter(0)).id();
 
     world.set_threads(4);
     world.system::<&mut SparseCounter>().par_each(|counter| {
@@ -127,6 +127,7 @@ fn conflict_detection_still_active_after_multithreaded_run() {
 
     // nested mutable access to the same sparse component on the same stage
     // must still panic
+    let e = world.entity_from_id(e);
     e.get::<&mut SparseCounter>(|_outer| {
         e.get::<&mut SparseCounter>(|_inner| {});
     });
@@ -134,7 +135,7 @@ fn conflict_detection_still_active_after_multithreaded_run() {
 
 #[test]
 fn par_each_entity_cached_ref_preserves_worker_stage() {
-    let world = World::new();
+    let mut world = World::new();
     spawn_across_tables(&world, |entity| {
         entity.set(DenseCounter(0)).set(StageProbe(0));
     });
@@ -156,7 +157,7 @@ fn par_each_entity_cached_ref_preserves_worker_stage() {
 
 #[test]
 fn par_each_iter_entity_preserves_worker_stage() {
-    let world = World::new();
+    let mut world = World::new();
     spawn_across_tables(&world, |entity| {
         entity.set(DenseCounter(0));
     });

@@ -205,7 +205,7 @@ fn pairs_set_tag_pair() {
 #[test]
 #[cfg(feature = "flecs_system")]
 fn pairs_system_1_pair_instance() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .entity()
@@ -244,7 +244,7 @@ fn pairs_system_1_pair_instance() {
 #[test]
 #[cfg(feature = "flecs_system")]
 fn pairs_system_2_pair_instances() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .entity()

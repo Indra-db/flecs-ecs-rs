@@ -15,7 +15,7 @@ pub struct Velocity {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // This example shows how to annotate systems that delete entities, in a way
     // that allows the scheduler to correctly insert sync points. See the

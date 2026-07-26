@@ -13,7 +13,7 @@ use flecs_ecs::prelude::*;
 struct Physics;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create a pipeline that matches systems with Physics. Note that this
     // pipeline does not require the use of phases (see custom_phases) or of the

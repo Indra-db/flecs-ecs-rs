@@ -60,7 +60,11 @@ fn app_frame_action_runs_every_frame() {
         .set_frames(3)
         .frame_action(move |world, _desc| {
             frames_clone.fetch_add(1, Ordering::Relaxed);
-            if world.progress() { 0 } else { 1 }
+            if unsafe { sys::ecs_progress(world.ptr_mut(), 0.0) } {
+                0
+            } else {
+                1
+            }
         })
         .run();
 

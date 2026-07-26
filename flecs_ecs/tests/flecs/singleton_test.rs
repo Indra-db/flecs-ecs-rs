@@ -156,7 +156,7 @@ fn singleton_has_singleton() {
 
 #[test]
 fn singleton_singleton_system() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Position>()

@@ -22,7 +22,7 @@ struct Waiter;
 struct Plate;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Create query to find all waiters without a plate
     let mut q_waiter = world

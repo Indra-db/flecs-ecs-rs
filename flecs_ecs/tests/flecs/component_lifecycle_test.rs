@@ -603,7 +603,7 @@ fn drop_on_remove() {
 #[test]
 fn set_singleton() {
     {
-        let world = world_new();
+        let mut world = world_new();
 
         world
             .component::<PodDefaultCloneDrop>()
@@ -625,7 +625,7 @@ fn set_singleton() {
 #[test]
 fn drop_on_world_delete() {
     {
-        let world = world_new();
+        let mut world = world_new();
 
         world
             .entity_named("object 1")

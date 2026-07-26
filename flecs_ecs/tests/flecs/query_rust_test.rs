@@ -70,7 +70,7 @@ fn query_iter_stage() {
     #[derive(Component, Debug)]
     struct Comp(usize);
 
-    let world = World::new();
+    let mut world = World::new();
     world.set_threads(4);
 
     let query = world.new_query::<&Comp>().handle();
@@ -149,13 +149,14 @@ fn query_handle_entity_query_off_thread_drop() {
 
 #[test]
 fn query_handle_two_par_systems() {
-    let world = World::new();
+    let mut world = World::new();
     world.set_threads(2);
 
     let e = world
         .entity()
         .set(Position { x: 0, y: 0 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let query = world.new_query::<&Velocity>();
     let h1 = query.handle();
@@ -178,7 +179,7 @@ fn query_handle_two_par_systems() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 1);
         assert_eq!(p.y, 2);
     });
@@ -186,13 +187,14 @@ fn query_handle_two_par_systems() {
 
 #[test]
 fn query_handle_clone_inside_par_callback() {
-    let world = World::new();
+    let mut world = World::new();
     world.set_threads(4);
 
     let e = world
         .entity()
         .set(Position { x: 0, y: 0 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let handle = world.new_query::<&Velocity>().handle();
 
@@ -208,19 +210,20 @@ fn query_handle_clone_inside_par_callback() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 1);
     });
 }
 
 #[test]
 fn query_handle_in_single_threaded_system() {
-    let world = World::new();
+    let mut world = World::new();
 
     let e = world
         .entity()
         .set(Position { x: 0, y: 0 })
-        .set(Velocity { x: 3, y: 4 });
+        .set(Velocity { x: 3, y: 4 })
+        .id();
 
     let handle = world.new_query::<&Velocity>().handle();
 
@@ -232,7 +235,7 @@ fn query_handle_in_single_threaded_system() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 3);
     });
 }
@@ -2611,7 +2614,7 @@ fn query_iter_pair_object() {
 
 #[test]
 fn query_iter_query_in_system() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.entity().add(Position::id()).add(Velocity::id());
 

@@ -2143,7 +2143,7 @@ fn untyped_field() {
 
 #[test]
 fn query_eval_w_component_that_triggered_observer() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entry_event = world.entity().id();
     let sequence_shared = world.entity().add_trait::<flecs::Trait>().id();
@@ -2189,7 +2189,7 @@ fn query_eval_w_component_that_triggered_observer() {
 
 #[test]
 fn query_eval_w_pair_first_var_that_triggered_observer() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entry_event = world.entity();
     let rel_tag = world.entity_named("RelTag");
@@ -2242,7 +2242,7 @@ fn query_eval_w_pair_first_var_that_triggered_observer() {
 
 #[test]
 fn query_eval_w_pair_second_var_that_triggered_observer() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entry_event = world.entity();
     let tgt_tag = world.entity_named("TgtTag");
@@ -2295,7 +2295,7 @@ fn query_eval_w_pair_second_var_that_triggered_observer() {
 
 #[test]
 fn query_eval_w_pair_both_vars_that_triggered_observer() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entry_event = world.entity();
     let rel_tag = world.entity_named("RelTag");

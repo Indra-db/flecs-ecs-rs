@@ -16,12 +16,13 @@ struct LastVal(i32);
 
 #[test]
 fn iter() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world
         .system::<(&mut Position, &mut Velocity)>()
@@ -38,7 +39,7 @@ fn iter() {
 
     world.progress();
 
-    entity.get::<(&Position, &Velocity)>(|(p, v)| {
+    world.entity_from_id(entity).get::<(&Position, &Velocity)>(|(p, v)| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
         assert_eq!(v.x, 1);
@@ -48,12 +49,13 @@ fn iter() {
 
 #[test]
 fn iter_macro() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     system!(world, &mut Position, &Velocity).run(|mut it| {
         while it.next() {
@@ -68,7 +70,7 @@ fn iter_macro() {
 
     world.progress();
 
-    entity.get::<(&Position, &Velocity)>(|(p, v)| {
+    world.entity_from_id(entity).get::<(&Position, &Velocity)>(|(p, v)| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
         assert_eq!(v.x, 1);
@@ -78,12 +80,13 @@ fn iter_macro() {
 
 #[test]
 fn iter_const() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world.system::<(&mut Position, &Velocity)>().run(|mut it| {
         while it.next() {
@@ -98,7 +101,7 @@ fn iter_const() {
 
     world.progress();
 
-    entity.get::<(&Position, &Velocity)>(|(p, v)| {
+    world.entity_from_id(entity).get::<(&Position, &Velocity)>(|(p, v)| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
         assert_eq!(v.x, 1);
@@ -108,7 +111,7 @@ fn iter_const() {
 
 #[test]
 fn iter_shared() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Position>()
@@ -122,12 +125,14 @@ fn iter_shared() {
     let e1 = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .add((flecs::IsA::ID, base));
+        .add((flecs::IsA::ID, base))
+        .id();
 
     let e2 = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 3, y: 4 });
+        .set(Velocity { x: 3, y: 4 })
+        .id();
 
     world
         .system::<&mut Position>()
@@ -154,12 +159,12 @@ fn iter_shared() {
 
     world.progress();
 
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    e2.get::<&Position>(|p| {
+    world.entity_from_id(e2).get::<&Position>(|p| {
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     });
@@ -167,24 +172,26 @@ fn iter_shared() {
 
 #[test]
 fn iter_optional() {
-    let world = World::new();
+    let mut world = World::new();
     world.component_named::<Mass>("Mass");
 
     let e1 = world
         .entity()
         .set(Position { x: 10, y: 20 })
         .set(Velocity { x: 1, y: 2 })
-        .set(Mass { value: 1 });
+        .set(Mass { value: 1 })
+        .id();
 
     let e2 = world
         .entity()
         .set(Position { x: 30, y: 40 })
         .set(Velocity { x: 3, y: 4 })
-        .set(Mass { value: 1 });
+        .set(Mass { value: 1 })
+        .id();
 
-    let e3 = world.entity().set(Position { x: 50, y: 60 });
+    let e3 = world.entity().set(Position { x: 50, y: 60 }).id();
 
-    let e4 = world.entity().set(Position { x: 70, y: 80 });
+    let e4 = world.entity().set(Position { x: 70, y: 80 }).id();
 
     world
         .system::<(&mut Position, Option<&mut Velocity>, Option<&mut Mass>)>()
@@ -210,22 +217,22 @@ fn iter_optional() {
 
     world.progress();
 
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    e2.get::<&Position>(|p| {
+    world.entity_from_id(e2).get::<&Position>(|p| {
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     });
 
-    e3.get::<&Position>(|p| {
+    world.entity_from_id(e3).get::<&Position>(|p| {
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     });
 
-    e4.get::<&Position>(|p| {
+    world.entity_from_id(e4).get::<&Position>(|p| {
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     });
@@ -233,12 +240,13 @@ fn iter_optional() {
 
 #[test]
 fn each() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world
         .system::<(&mut Position, &mut Velocity)>()
@@ -249,7 +257,7 @@ fn each() {
 
     world.progress();
 
-    entity.get::<&Position>(|p| {
+    world.entity_from_id(entity).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -257,12 +265,13 @@ fn each() {
 
 #[test]
 fn each_const() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world
         .system::<(&mut Position, &Velocity)>()
@@ -273,7 +282,7 @@ fn each_const() {
 
     world.progress();
 
-    entity.get::<&Position>(|p| {
+    world.entity_from_id(entity).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -281,19 +290,21 @@ fn each_const() {
 
 #[test]
 fn each_shared() {
-    let world = World::new();
+    let mut world = World::new();
 
     let base = world.entity().set(Velocity { x: 1, y: 2 });
 
     let e1 = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .add((flecs::IsA::ID, base));
+        .add((flecs::IsA::ID, base))
+        .id();
 
     let e2 = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 3, y: 4 });
+        .set(Velocity { x: 3, y: 4 })
+        .id();
 
     world
         .system::<(&mut Position, &Velocity)>()
@@ -304,12 +315,12 @@ fn each_shared() {
 
     world.progress();
 
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    e2.get::<&Position>(|p| {
+    world.entity_from_id(e2).get::<&Position>(|p| {
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     });
@@ -317,24 +328,26 @@ fn each_shared() {
 
 #[test]
 fn each_optional() {
-    let world = World::new();
+    let mut world = World::new();
     world.component_named::<Mass>("Mass");
 
     let e1 = world
         .entity()
         .set(Position { x: 10, y: 20 })
         .set(Velocity { x: 1, y: 2 })
-        .set(Mass { value: 1 });
+        .set(Mass { value: 1 })
+        .id();
 
     let e2 = world
         .entity()
         .set(Position { x: 30, y: 40 })
         .set(Velocity { x: 3, y: 4 })
-        .set(Mass { value: 1 });
+        .set(Mass { value: 1 })
+        .id();
 
-    let e3 = world.entity().set(Position { x: 50, y: 60 });
+    let e3 = world.entity().set(Position { x: 50, y: 60 }).id();
 
-    let e4 = world.entity().set(Position { x: 70, y: 80 });
+    let e4 = world.entity().set(Position { x: 70, y: 80 }).id();
 
     world
         .system::<(&mut Position, Option<&mut Velocity>, Option<&mut Mass>)>()
@@ -352,26 +365,26 @@ fn each_optional() {
 
     world.progress();
 
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    e2.get::<&Position>(|p| {
+    world.entity_from_id(e2).get::<&Position>(|p| {
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     });
 
-    e3.get::<&Position>(|p| {
+    world.entity_from_id(e3).get::<&Position>(|p| {
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     });
 
-    e4.get::<&Position>(|p| {
+    world.entity_from_id(e4).get::<&Position>(|p| {
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     });
@@ -379,12 +392,13 @@ fn each_optional() {
 
 #[test]
 fn signature() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world
         .system::<()>()
@@ -404,12 +418,12 @@ fn signature() {
 
     world.progress();
 
-    entity.get::<&Position>(|p| {
+    world.entity_from_id(entity).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    entity.get::<&Velocity>(|v| {
+    world.entity_from_id(entity).get::<&Velocity>(|v| {
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     });
@@ -417,12 +431,13 @@ fn signature() {
 
 #[test]
 fn signature_const() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world
         .system::<()>()
@@ -442,12 +457,12 @@ fn signature_const() {
 
     world.progress();
 
-    entity.get::<&Position>(|p| {
+    world.entity_from_id(entity).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    entity.get::<&Velocity>(|v| {
+    world.entity_from_id(entity).get::<&Velocity>(|v| {
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     });
@@ -455,7 +470,7 @@ fn signature_const() {
 
 #[test]
 fn signature_shared() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Position>()
@@ -469,12 +484,14 @@ fn signature_shared() {
     let e1 = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .add((flecs::IsA::ID, base));
+        .add((flecs::IsA::ID, base))
+        .id();
 
     let e2 = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 3, y: 4 });
+        .set(Velocity { x: 3, y: 4 })
+        .id();
 
     world
         .system::<()>()
@@ -501,12 +518,12 @@ fn signature_shared() {
 
     world.progress();
 
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    e2.get::<&Position>(|p| {
+    world.entity_from_id(e2).get::<&Position>(|p| {
         assert_eq!(p.x, 13);
         assert_eq!(p.y, 24);
     });
@@ -514,24 +531,26 @@ fn signature_shared() {
 
 #[test]
 fn signature_optional() {
-    let world = World::new();
+    let mut world = World::new();
     world.component_named::<Mass>("Mass");
 
     let e1 = world
         .entity()
         .set(Position { x: 10, y: 20 })
         .set(Velocity { x: 1, y: 2 })
-        .set(Mass { value: 1 });
+        .set(Mass { value: 1 })
+        .id();
 
     let e2 = world
         .entity()
         .set(Position { x: 30, y: 40 })
         .set(Velocity { x: 3, y: 4 })
-        .set(Mass { value: 1 });
+        .set(Mass { value: 1 })
+        .id();
 
-    let e3 = world.entity().set(Position { x: 50, y: 60 });
+    let e3 = world.entity().set(Position { x: 50, y: 60 }).id();
 
-    let e4 = world.entity().set(Position { x: 70, y: 80 });
+    let e4 = world.entity().set(Position { x: 70, y: 80 }).id();
 
     world
         .system::<()>()
@@ -559,22 +578,22 @@ fn signature_optional() {
 
     world.progress();
 
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    e2.get::<&Position>(|p| {
+    world.entity_from_id(e2).get::<&Position>(|p| {
         assert_eq!(p.x, 33);
         assert_eq!(p.y, 44);
     });
 
-    e3.get::<&Position>(|p| {
+    world.entity_from_id(e3).get::<&Position>(|p| {
         assert_eq!(p.x, 51);
         assert_eq!(p.y, 61);
     });
 
-    e4.get::<&Position>(|p| {
+    world.entity_from_id(e4).get::<&Position>(|p| {
         assert_eq!(p.x, 71);
         assert_eq!(p.y, 81);
     });
@@ -619,7 +638,7 @@ fn nested_system() {
 
 #[test]
 fn empty_signature() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count(0));
 
@@ -641,7 +660,7 @@ fn empty_signature() {
 
 #[test]
 fn iter_tag() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count(0));
 
@@ -665,7 +684,7 @@ fn iter_tag() {
 
 #[test]
 fn each_tag() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count(0));
 
@@ -899,11 +918,11 @@ fn get_query() {
 
 #[test]
 fn add_from_each() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(Position { x: 0, y: 0 });
-    let e2 = world.entity().set(Position { x: 1, y: 0 });
-    let e3 = world.entity().set(Position { x: 2, y: 0 });
+    let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e2 = world.entity().set(Position { x: 1, y: 0 }).id();
+    let e3 = world.entity().set(Position { x: 2, y: 0 }).id();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.add(Velocity::id());
@@ -913,18 +932,18 @@ fn add_from_each() {
 
     world.progress();
 
-    assert!(e1.has(Velocity::id()));
-    assert!(e2.has(Velocity::id()));
-    assert!(e3.has(Velocity::id()));
+    assert!(world.entity_from_id(e1).has(Velocity::id()));
+    assert!(world.entity_from_id(e2).has(Velocity::id()));
+    assert!(world.entity_from_id(e3).has(Velocity::id()));
 }
 
 #[test]
 fn delete_from_each() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(Position { x: 0, y: 0 });
-    let e2 = world.entity().set(Position { x: 1, y: 0 });
-    let e3 = world.entity().set(Position { x: 2, y: 0 });
+    let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e2 = world.entity().set(Position { x: 1, y: 0 }).id();
+    let e3 = world.entity().set(Position { x: 2, y: 0 }).id();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.destruct();
@@ -934,24 +953,33 @@ fn delete_from_each() {
 
     world.progress();
 
-    assert!(!e1.is_alive());
-    assert!(!e2.is_alive());
-    assert!(!e3.is_alive());
+    assert!(!world.entity_from_id(e1).is_alive());
+    assert!(!world.entity_from_id(e2).is_alive());
+    assert!(!world.entity_from_id(e3).is_alive());
 }
 
 #[test]
 fn add_from_each_world_handle() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(EntityRef {
-        value: world.entity().id(),
-    });
-    let e2 = world.entity().set(EntityRef {
-        value: world.entity().id(),
-    });
-    let e3 = world.entity().set(EntityRef {
-        value: world.entity().id(),
-    });
+    let e1 = world
+        .entity()
+        .set(EntityRef {
+            value: world.entity().id(),
+        })
+        .id();
+    let e2 = world
+        .entity()
+        .set(EntityRef {
+            value: world.entity().id(),
+        })
+        .id();
+    let e3 = world
+        .entity()
+        .set(EntityRef {
+            value: world.entity().id(),
+        })
+        .id();
 
     world.system::<&EntityRef>().each_entity(|e, c| {
         let world = e.world();
@@ -961,17 +989,17 @@ fn add_from_each_world_handle() {
 
     world.progress();
 
-    e1.get::<&EntityRef>(|c| {
+    world.entity_from_id(e1).get::<&EntityRef>(|c| {
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     });
 
-    e2.get::<&EntityRef>(|c| {
+    world.entity_from_id(e2).get::<&EntityRef>(|c| {
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     });
 
-    e3.get::<&EntityRef>(|c| {
+    world.entity_from_id(e3).get::<&EntityRef>(|c| {
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     });
@@ -979,11 +1007,11 @@ fn add_from_each_world_handle() {
 
 #[test]
 fn new_from_each() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(Position { x: 0, y: 0 });
-    let e2 = world.entity().set(Position { x: 0, y: 0 });
-    let e3 = world.entity().set(Position { x: 0, y: 0 });
+    let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e2 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e3 = world.entity().set(Position { x: 0, y: 0 }).id();
 
     world.system::<&Position>().each_entity(|e, _p| {
         e.set(EntityRef {
@@ -993,30 +1021,30 @@ fn new_from_each() {
 
     world.progress();
 
-    assert!(e1.has(EntityRef::id()));
-    assert!(e2.has(EntityRef::id()));
-    assert!(e3.has(EntityRef::id()));
+    assert!(world.entity_from_id(e1).has(EntityRef::id()));
+    assert!(world.entity_from_id(e2).has(EntityRef::id()));
+    assert!(world.entity_from_id(e3).has(EntityRef::id()));
 
-    e1.get::<&EntityRef>(|c| {
+    world.entity_from_id(e1).get::<&EntityRef>(|c| {
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     });
 
-    e2.get::<&EntityRef>(|c| {
+    world.entity_from_id(e2).get::<&EntityRef>(|c| {
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     });
 
-    e3.get::<&EntityRef>(|c| {
+    world.entity_from_id(e3).get::<&EntityRef>(|c| {
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     });
 }
 
 #[test]
 fn add_from_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(Position { x: 0, y: 0 });
-    let e2 = world.entity().set(Position { x: 1, y: 0 });
-    let e3 = world.entity().set(Position { x: 2, y: 0 });
+    let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e2 = world.entity().set(Position { x: 1, y: 0 }).id();
+    let e3 = world.entity().set(Position { x: 2, y: 0 }).id();
 
     world.system::<&Position>().run(|mut it| {
         while it.next() {
@@ -1029,18 +1057,18 @@ fn add_from_iter() {
 
     world.progress();
 
-    assert!(e1.has(Velocity::id()));
-    assert!(e2.has(Velocity::id()));
-    assert!(e3.has(Velocity::id()));
+    assert!(world.entity_from_id(e1).has(Velocity::id()));
+    assert!(world.entity_from_id(e2).has(Velocity::id()));
+    assert!(world.entity_from_id(e3).has(Velocity::id()));
 }
 
 #[test]
 fn delete_from_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(Position { x: 0, y: 0 });
-    let e2 = world.entity().set(Position { x: 1, y: 0 });
-    let e3 = world.entity().set(Position { x: 2, y: 0 });
+    let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e2 = world.entity().set(Position { x: 1, y: 0 }).id();
+    let e3 = world.entity().set(Position { x: 2, y: 0 }).id();
 
     world.system::<&Position>().run(|mut it| {
         while it.next() {
@@ -1054,24 +1082,33 @@ fn delete_from_iter() {
 
     world.progress();
 
-    assert!(!e1.is_alive());
-    assert!(!e2.is_alive());
-    assert!(!e3.is_alive());
+    assert!(!world.entity_from_id(e1).is_alive());
+    assert!(!world.entity_from_id(e2).is_alive());
+    assert!(!world.entity_from_id(e3).is_alive());
 }
 
 #[test]
 fn add_from_iter_world_handle() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(EntityRef {
-        value: world.entity().id(),
-    });
-    let e2 = world.entity().set(EntityRef {
-        value: world.entity().id(),
-    });
-    let e3 = world.entity().set(EntityRef {
-        value: world.entity().id(),
-    });
+    let e1 = world
+        .entity()
+        .set(EntityRef {
+            value: world.entity().id(),
+        })
+        .id();
+    let e2 = world
+        .entity()
+        .set(EntityRef {
+            value: world.entity().id(),
+        })
+        .id();
+    let e3 = world
+        .entity()
+        .set(EntityRef {
+            value: world.entity().id(),
+        })
+        .id();
 
     world.system::<&EntityRef>().run(|mut it| {
         let world = it.world();
@@ -1088,17 +1125,17 @@ fn add_from_iter_world_handle() {
 
     world.progress();
 
-    e1.get::<&EntityRef>(|c| {
+    world.entity_from_id(e1).get::<&EntityRef>(|c| {
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     });
 
-    e2.get::<&EntityRef>(|c| {
+    world.entity_from_id(e2).get::<&EntityRef>(|c| {
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     });
 
-    e3.get::<&EntityRef>(|c| {
+    world.entity_from_id(e3).get::<&EntityRef>(|c| {
         let e = world.entity_from_id(c.value);
         assert!(e.has(Position::id()));
     });
@@ -1106,11 +1143,11 @@ fn add_from_iter_world_handle() {
 
 #[test]
 fn new_from_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
-    let e1 = world.entity().set(Position { x: 0, y: 0 });
-    let e2 = world.entity().set(Position { x: 0, y: 0 });
-    let e3 = world.entity().set(Position { x: 0, y: 0 });
+    let e1 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e2 = world.entity().set(Position { x: 0, y: 0 }).id();
+    let e3 = world.entity().set(Position { x: 0, y: 0 }).id();
 
     world.system::<&Position>().run(|mut it| {
         while it.next() {
@@ -1124,31 +1161,43 @@ fn new_from_iter() {
 
     world.progress();
 
-    assert!(e1.has(EntityRef::id()));
-    assert!(e2.has(EntityRef::id()));
-    assert!(e3.has(EntityRef::id()));
+    assert!(world.entity_from_id(e1).has(EntityRef::id()));
+    assert!(world.entity_from_id(e2).has(EntityRef::id()));
+    assert!(world.entity_from_id(e3).has(EntityRef::id()));
 
-    e1.get::<&EntityRef>(|c| {
+    world.entity_from_id(e1).get::<&EntityRef>(|c| {
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     });
 
-    e2.get::<&EntityRef>(|c| {
+    world.entity_from_id(e2).get::<&EntityRef>(|c| {
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     });
 
-    e3.get::<&EntityRef>(|c| {
+    world.entity_from_id(e3).get::<&EntityRef>(|c| {
         assert!(world.entity_from_id(c.value).has(Velocity::id()));
     });
 }
 
 #[test]
 fn each_w_mut_children_it() {
-    let world = World::new();
+    let mut world = World::new();
 
     let parent = world.entity().set(Position { x: 0, y: 0 });
-    let e1 = world.entity().set(Position { x: 0, y: 0 }).child_of(parent);
-    let e2 = world.entity().set(Position { x: 0, y: 0 }).child_of(parent);
-    let e3 = world.entity().set(Position { x: 0, y: 0 }).child_of(parent);
+    let e1 = world
+        .entity()
+        .set(Position { x: 0, y: 0 })
+        .child_of(parent)
+        .id();
+    let e2 = world
+        .entity()
+        .set(Position { x: 0, y: 0 })
+        .child_of(parent)
+        .id();
+    let e3 = world
+        .entity()
+        .set(Position { x: 0, y: 0 })
+        .child_of(parent)
+        .id();
 
     world.set(Count(0));
 
@@ -1172,14 +1221,14 @@ fn each_w_mut_children_it() {
         assert_eq!(c.0, 3);
     });
 
-    assert!(e1.has(Velocity::id()));
-    assert!(e2.has(Velocity::id()));
-    assert!(e3.has(Velocity::id()));
+    assert!(world.entity_from_id(e1).has(Velocity::id()));
+    assert!(world.entity_from_id(e2).has(Velocity::id()));
+    assert!(world.entity_from_id(e3).has(Velocity::id()));
 }
 
 #[test]
 fn readonly_children_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
     let parent = world.entity();
     world.entity().set(EntityRef { value: parent.id() });
@@ -1218,7 +1267,7 @@ fn readonly_children_iter() {
 
 #[test]
 fn rate_filter() {
-    let world = World::new();
+    let mut world = World::new();
 
     #[derive(Default, Component)]
     struct Counter {
@@ -1325,7 +1374,7 @@ fn rate_filter() {
 
 #[test]
 fn self_rate_filter() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count(0));
 
@@ -1352,7 +1401,7 @@ fn self_rate_filter() {
 
 #[test]
 fn update_rate_filter() {
-    let world = World::new();
+    let mut world = World::new();
 
     #[derive(Default, Component)]
     struct Counter {
@@ -1401,6 +1450,8 @@ fn update_rate_filter() {
             }
         });
 
+    let l1 = l1.id();
+
     for _i in 0..12 {
         world.progress();
         frame_count += 1;
@@ -1411,7 +1462,7 @@ fn update_rate_filter() {
         });
     }
 
-    let _l1 = l1.set_rate(4); // Run twice as slow
+    let _l1 = System::new_from_existing(world.entity_from_id(l1)).set_rate(4); // Run twice as slow
     l1_mult *= 2;
     l2_mult *= 2;
 
@@ -1508,7 +1559,7 @@ fn test_auto_defer_iter() {
 
 #[test]
 fn custom_pipeline() {
-    let world = World::new();
+    let mut world = World::new();
     world.set(Count(0));
 
     let pre_frame = world.entity().add(id::<flecs::pipeline::Phase>());
@@ -1570,7 +1621,7 @@ fn custom_pipeline() {
 
 #[test]
 fn custom_pipeline_w_kind() {
-    let world = World::new();
+    let mut world = World::new();
 
     let tag = world.entity();
 
@@ -1970,7 +2021,7 @@ struct Second;
 
 #[test]
 fn system_w_type_kind_type_pipeline() {
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .component::<Second>()
@@ -2114,14 +2165,15 @@ fn ensure_instanced_w_each() {
 
 #[test]
 fn multithread_system_w_query_each() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set_threads(2);
 
     let e1 = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let q = world.new_query::<&Velocity>().handle();
 
@@ -2137,7 +2189,7 @@ fn multithread_system_w_query_each() {
 
     world.progress();
 
-    e1.get::<&Position>(|p| {
+    world.entity_from_id(e1).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -2145,14 +2197,15 @@ fn multithread_system_w_query_each() {
 
 #[test]
 fn multithread_system_w_query_each_w_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set_threads(2);
 
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let q = world.new_query::<&Velocity>().handle();
 
@@ -2171,7 +2224,7 @@ fn multithread_system_w_query_each_w_iter() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -2179,14 +2232,15 @@ fn multithread_system_w_query_each_w_iter() {
 
 #[test]
 fn multithread_system_w_query_each_w_world() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set_threads(2);
 
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let q = world.new_query::<&Velocity>().handle();
     world.system::<&mut Position>().par_run(move |mut it| {
@@ -2205,7 +2259,7 @@ fn multithread_system_w_query_each_w_world() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -2213,14 +2267,15 @@ fn multithread_system_w_query_each_w_world() {
 
 #[test]
 fn multithread_system_w_query_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set_threads(2);
 
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let q = world.new_query::<&Velocity>().handle();
 
@@ -2241,7 +2296,7 @@ fn multithread_system_w_query_iter() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -2249,14 +2304,15 @@ fn multithread_system_w_query_iter() {
 
 #[test]
 fn multithread_system_w_query_iter_w_iter() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set_threads(2);
 
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let q = world.new_query::<&Velocity>().handle();
 
@@ -2281,7 +2337,7 @@ fn multithread_system_w_query_iter_w_iter() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -2289,14 +2345,15 @@ fn multithread_system_w_query_iter_w_iter() {
 
 #[test]
 fn multithread_system_w_query_iter_w_world() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set_threads(2);
 
     let e = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     let q = world.new_query::<&Velocity>().handle();
 
@@ -2321,7 +2378,7 @@ fn multithread_system_w_query_iter_w_world() {
 
     world.progress();
 
-    e.get::<&Position>(|p| {
+    world.entity_from_id(e).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
@@ -2329,7 +2386,7 @@ fn multithread_system_w_query_iter_w_world() {
 
 #[test]
 fn multithread_system_w_get_var() {
-    let world = World::new();
+    let mut world = World::new();
     world.set_threads(4);
 
     let bob = world.entity_named("bob").add(Position::id());
@@ -2363,12 +2420,13 @@ fn multithread_system_w_get_var() {
 
 #[test]
 fn run_callback() {
-    let world = World::new();
+    let mut world = World::new();
 
     let entity = world
         .entity()
         .set(Position { x: 10, y: 20 })
-        .set(Velocity { x: 1, y: 2 });
+        .set(Velocity { x: 1, y: 2 })
+        .id();
 
     world.system::<(&mut Position, &Velocity)>().run_each(
         |mut it| {
@@ -2384,12 +2442,12 @@ fn run_callback() {
 
     world.progress();
 
-    entity.get::<&Position>(|p| {
+    world.entity_from_id(entity).get::<&Position>(|p| {
         assert_eq!(p.x, 11);
         assert_eq!(p.y, 22);
     });
 
-    entity.get::<&Velocity>(|v| {
+    world.entity_from_id(entity).get::<&Velocity>(|v| {
         assert_eq!(v.x, 1);
         assert_eq!(v.y, 2);
     });
@@ -2397,7 +2455,7 @@ fn run_callback() {
 
 #[test]
 fn startup_system() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count2 { a: 0, b: 0 });
 
@@ -2441,7 +2499,7 @@ fn startup_system() {
 
 #[test]
 fn interval_tick_source() {
-    let world = World::new();
+    let mut world = World::new();
 
     let t = world.timer().set_interval(2.1);
 
@@ -2487,7 +2545,7 @@ fn interval_tick_source() {
 
 #[test]
 fn rate_tick_source() {
-    let world = World::new();
+    let mut world = World::new();
 
     let t = world.timer().set_rate(3);
 
@@ -2529,7 +2587,7 @@ fn rate_tick_source() {
 
 #[test]
 fn nested_rate_tick_source() {
-    let world = World::new();
+    let mut world = World::new();
     world.set(Count(0));
     world.set(Count2 { a: 0, b: 0 });
 
@@ -2697,7 +2755,7 @@ fn optional_pair_term() {
     WITH_PAIR.set(0);
     WITHOUT_PAIR.set(0);
 
-    let world = World::new();
+    let mut world = World::new();
 
     world
         .entity()
@@ -2725,7 +2783,7 @@ fn optional_pair_term() {
 
 #[test]
 fn singleton_tick_source() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.timer_from::<TagA>().set_timeout(1.5);
 
@@ -2754,7 +2812,7 @@ fn singleton_tick_source() {
 
 #[test]
 fn pipeline_step_with_kind_enum() {
-    let world = World::new();
+    let mut world = World::new();
 
     let custom_step = world
         .entity()
@@ -2775,7 +2833,7 @@ fn pipeline_step_with_kind_enum() {
 
 #[test]
 fn pipeline_step_depends_on_pipeline_step_with_enum() {
-    let world = World::new();
+    let mut world = World::new();
 
     let custom_step = world
         .entity()
@@ -3121,7 +3179,7 @@ fn set_group() {
 
 #[test]
 fn run_w_0_src_query() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.set(Count(0));
 
@@ -3140,7 +3198,7 @@ fn run_w_0_src_query() {
 
 #[test]
 fn reuse_system_builder() {
-    let world = World::new();
+    let mut world = World::new();
 
     world.entity().set(Position { x: 10, y: 20 });
     world
@@ -3197,7 +3255,7 @@ fn kind_on_shared_builder() {
 
 #[test]
 fn custom_pipeline_w_name() {
-    let world = World::new();
+    let mut world = World::new();
 
     let tag = world.entity();
 

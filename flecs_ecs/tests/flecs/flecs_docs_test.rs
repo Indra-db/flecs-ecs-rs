@@ -136,7 +136,7 @@ struct Archer;
 struct Node;
 
 fn flecs_system_docs_compile_test() {
-    let world = World::new();
+    let mut world = World::new();
 
     let sys = world
         .system_named::<(&mut Position, &Velocity)>("Move")
@@ -145,6 +145,7 @@ fn flecs_system_docs_compile_test() {
             p.y += v.y;
         });
     sys.run();
+    let sys = sys.id();
 
     world.progress();
 
@@ -329,9 +330,9 @@ fn flecs_system_docs_compile_test() {
     // Runs the pipeline & system
     world.progress();
 
-    sys.disable_self();
-    sys.enable_self();
-    sys.add(id::<flecs::Disabled>());
+    world.entity_from_id(sys).disable_self();
+    world.entity_from_id(sys).enable_self();
+    world.entity_from_id(sys).add(id::<flecs::Disabled>());
 
     world
         .system::<&Position>()
@@ -1678,7 +1679,7 @@ fn flecs_docs_quick_start_compile_test() {
     let pears = world.entity();
     let grows = world.entity();
 
-    let world = World::new();
+    let mut world = World::new();
 
     // Do the ECS stuff
 
@@ -1896,6 +1897,7 @@ fn flecs_docs_quick_start_compile_test() {
     println!("System: {}", move_sys.name());
     move_sys.add(id::<flecs::pipeline::OnUpdate>());
     move_sys.destruct();
+    let move_sys = move_sys.id();
 
     flecs::pipeline::OnLoad;
     flecs::pipeline::PostLoad;
@@ -1921,8 +1923,10 @@ fn flecs_docs_quick_start_compile_test() {
 
     world.progress();
 
-    move_sys.add(id::<flecs::pipeline::OnUpdate>());
-    move_sys.remove(id::<flecs::pipeline::PostUpdate>());
+    world.entity_from_id(move_sys).add(id::<flecs::pipeline::OnUpdate>());
+    world
+        .entity_from_id(move_sys)
+        .remove(id::<flecs::pipeline::PostUpdate>());
 
     world
         .observer_named::<flecs::OnSet, (&Position, &Velocity)>("OnSetPosition")
@@ -2724,7 +2728,7 @@ fn flecs_docs_component_traits_compile_test() {
 // // enable stats for flecs (system, pipeline, etc)
 // app.world.import::<stats::Stats>();
 fn flecs_docs_remote_api_compile_test() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Optional, gather statistics for explorer
     world.import::<stats::Stats>();

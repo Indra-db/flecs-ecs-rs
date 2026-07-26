@@ -14,7 +14,7 @@ pub struct VelocitySP {
 }
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // System that sets velocity using ecs_set for entities with PositionSP.
     // While systems are progressing, operations like ecs_set are deferred until
