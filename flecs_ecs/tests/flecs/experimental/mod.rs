@@ -14,6 +14,8 @@ mod iter_ctx;
 #[cfg(feature = "flecs_safety_locks")]
 mod guard_pin;
 #[cfg(feature = "flecs_safety_locks")]
+mod guard_revalidation;
+#[cfg(feature = "flecs_safety_locks")]
 mod singleton;
 mod exclusive;
 

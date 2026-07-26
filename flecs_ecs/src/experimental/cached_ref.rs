@@ -97,7 +97,16 @@ impl<T: ComponentId + DataComponent> CachedRef<T> {
         // SAFETY: ptr is a live `T` kept valid for `'w` by the pin this guard
         // holds; the read borrow for `key` is registered and the pin taken.
         Some(unsafe {
-            Ref::from_parts(ptr, NonNull::new_unchecked(world_ptr), locks, key)
+            Ref::from_parts(
+                ptr,
+                NonNull::new_unchecked(world_ptr),
+                locks,
+                key,
+                #[cfg(debug_assertions)]
+                self.component_ref.entity,
+                #[cfg(debug_assertions)]
+                self.component_id,
+            )
         })
     }
 
@@ -142,7 +151,16 @@ impl<T: ComponentId + DataComponent> CachedRef<T> {
         // SAFETY: ptr is a live, uniquely-borrowed `T` kept valid for `'w` by
         // the pin; the write borrow for `key` is registered and the pin taken.
         Some(unsafe {
-            Mut::from_parts(ptr, NonNull::new_unchecked(world_ptr), locks, key)
+            Mut::from_parts(
+                ptr,
+                NonNull::new_unchecked(world_ptr),
+                locks,
+                key,
+                #[cfg(debug_assertions)]
+                self.component_ref.entity,
+                #[cfg(debug_assertions)]
+                self.component_id,
+            )
         })
     }
 

@@ -96,6 +96,14 @@ pub struct Ref<'w, T> {
     locks: NonNull<StageLocks>,
     #[cfg(feature = "flecs_safety_locks")]
     key: LockKey,
+    /// Debug-only backstop identity (spec §7, structural safety net): the entity
+    /// and component id this guard resolved, used by [`Drop`] to re-resolve the
+    /// storage and prove it did not move under the live pin. Compiled out of
+    /// release builds entirely.
+    #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+    entity: u64,
+    #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+    component_id: u64,
     _marker: PhantomData<&'w T>,
 }
 
@@ -112,6 +120,11 @@ pub struct Mut<'w, T> {
     locks: NonNull<StageLocks>,
     #[cfg(feature = "flecs_safety_locks")]
     key: LockKey,
+    /// Debug-only backstop identity; see [`Ref`]. Compiled out of release builds.
+    #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+    entity: u64,
+    #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+    component_id: u64,
     _marker: PhantomData<&'w mut T>,
 }
 
@@ -127,6 +140,8 @@ impl<'w, T> Ref<'w, T> {
         world: NonNull<sys::ecs_world_t>,
         #[cfg(feature = "flecs_safety_locks")] locks: NonNull<StageLocks>,
         #[cfg(feature = "flecs_safety_locks")] key: LockKey,
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))] entity: u64,
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))] component_id: u64,
     ) -> Self {
         Ref {
             ptr,
@@ -135,6 +150,10 @@ impl<'w, T> Ref<'w, T> {
             locks,
             #[cfg(feature = "flecs_safety_locks")]
             key,
+            #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+            entity,
+            #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+            component_id,
             _marker: PhantomData,
         }
     }
@@ -150,6 +169,8 @@ impl<'w, T> Mut<'w, T> {
         world: NonNull<sys::ecs_world_t>,
         #[cfg(feature = "flecs_safety_locks")] locks: NonNull<StageLocks>,
         #[cfg(feature = "flecs_safety_locks")] key: LockKey,
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))] entity: u64,
+        #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))] component_id: u64,
     ) -> Self {
         Mut {
             ptr,
@@ -158,6 +179,10 @@ impl<'w, T> Mut<'w, T> {
             locks,
             #[cfg(feature = "flecs_safety_locks")]
             key,
+            #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+            entity,
+            #[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+            component_id,
             _marker: PhantomData,
         }
     }
@@ -242,6 +267,56 @@ impl<T: PartialEq> PartialEq for Mut<'_, T> {
     }
 }
 
+/// Debug-only structural safety net (spec §7): re-resolve the guarded storage
+/// while the pin is still held and panic if it moved.
+///
+/// Correct paths defer every structural mutation issued while a guard is live
+/// (the pin keeps them queued behind the borrow), so the guarded component
+/// pointer is stable until the last guard drops. A bypass path that skips the
+/// write-episode hook applies its structural change immediately, reallocating or
+/// moving the pinned column; re-resolving the component here then yields a
+/// different pointer (or none) and this fires, turning a silent use-after-free
+/// into a loud debug panic naming the component. Ran before the guard releases
+/// its pin, i.e. before the episode's queued writes are flushed, so the correct
+/// path always observes the unchanged pointer. Compiled out of release builds.
+#[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+#[inline]
+fn revalidate_pinned_storage(
+    world: NonNull<sys::ecs_world_t>,
+    entity: u64,
+    component_id: u64,
+    cached: *const core::ffi::c_void,
+) {
+    // Re-resolve on the real world: entity records live there and
+    // `ecs_rust_record_get_id` poly-asserts a world (not a stage) pointer.
+    let real =
+        unsafe { sys::ecs_get_world(world.as_ptr().cast_const().cast()) as *mut sys::ecs_world_t };
+    // SAFETY: `real` is a live world pointer; `entity` / `component_id` are this
+    // guard's own, resolved on acquire. Both calls are pure reads, sound even
+    // while the episode's defer level is open.
+    let record = unsafe { sys::ecs_rust_get_record(real, entity) };
+    let fresh = if record.is_null() {
+        core::ptr::null_mut()
+    } else {
+        unsafe { sys::ecs_rust_record_get_id(real, entity, record, component_id).ptr }
+    };
+    if !core::ptr::eq(fresh.cast_const(), cached) {
+        storage_moved_panic(entity, component_id);
+    }
+}
+
+#[cfg(all(debug_assertions, feature = "flecs_safety_locks"))]
+#[cold]
+#[inline(never)]
+fn storage_moved_panic(entity: u64, component_id: u64) -> ! {
+    panic!(
+        "flecs safety net: component storage moved while a shared-register guard was live \
+         (entity {entity}, component id {component_id}). A structural operation reached \
+         flecs without routing through the write-episode hook and reallocated pinned \
+         storage: a use-after-free hazard. See core::safety_map::ensure_write_episode."
+    );
+}
+
 impl<T> Drop for Ref<'_, T> {
     #[inline(always)]
     fn drop(&mut self) {
@@ -252,6 +327,13 @@ impl<T> Drop for Ref<'_, T> {
         // the read-only path.
         #[cfg(feature = "flecs_safety_locks")]
         unsafe {
+            #[cfg(debug_assertions)]
+            revalidate_pinned_storage(
+                self.world,
+                self.entity,
+                self.component_id,
+                self.ptr.as_ptr().cast(),
+            );
             let map = &mut *self.locks.as_ptr();
             map.read_end(self.key);
             map.pin_release(self.world.as_ptr());
@@ -265,6 +347,13 @@ impl<T> Drop for Mut<'_, T> {
         // SAFETY: as Ref::drop, releasing a write borrow.
         #[cfg(feature = "flecs_safety_locks")]
         unsafe {
+            #[cfg(debug_assertions)]
+            revalidate_pinned_storage(
+                self.world,
+                self.entity,
+                self.component_id,
+                self.ptr.as_ptr().cast(),
+            );
             let map = &mut *self.locks.as_ptr();
             map.write_end(self.key);
             map.pin_release(self.world.as_ptr());

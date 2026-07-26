@@ -67,6 +67,15 @@ fn safety_key(si: &SafetyInfo) -> LockKey {
     }
 }
 
+/// Component id behind a term's safety info, for the debug-only guard backstop.
+#[cfg(debug_assertions)]
+#[inline(always)]
+fn safety_id(si: &SafetyInfo) -> u64 {
+    match si {
+        SafetyInfo::Read(li) | SafetyInfo::Write(li) => li.id,
+    }
+}
+
 /// Resolved, locked component data for a guard tuple: every present component's
 /// borrow is registered in `locks` and its pin taken, and `world`/pin ownership
 /// is handed to the returned guards by the caller.
@@ -179,6 +188,10 @@ pub struct GuardParts {
     world: NonNull<sys::ecs_world_t>,
     locks: NonNull<StageLocks>,
     key: LockKey,
+    #[cfg(debug_assertions)]
+    entity: u64,
+    #[cfg(debug_assertions)]
+    component_id: u64,
 }
 
 /// One element of a guard tuple: maps `&T` to [`Ref`] and `&mut T` to [`Mut`].
@@ -205,7 +218,18 @@ where
 
     #[inline(always)]
     unsafe fn wrap(p: GuardParts) -> Self::Guard {
-        unsafe { Ref::from_parts(NonNull::new_unchecked(p.ptr.cast()), p.world, p.locks, p.key) }
+        unsafe {
+            Ref::from_parts(
+                NonNull::new_unchecked(p.ptr.cast()),
+                p.world,
+                p.locks,
+                p.key,
+                #[cfg(debug_assertions)]
+                p.entity,
+                #[cfg(debug_assertions)]
+                p.component_id,
+            )
+        }
     }
 }
 
@@ -217,7 +241,18 @@ where
 
     #[inline(always)]
     unsafe fn wrap(p: GuardParts) -> Self::Guard {
-        unsafe { Mut::from_parts(NonNull::new_unchecked(p.ptr.cast()), p.world, p.locks, p.key) }
+        unsafe {
+            Mut::from_parts(
+                NonNull::new_unchecked(p.ptr.cast()),
+                p.world,
+                p.locks,
+                p.key,
+                #[cfg(debug_assertions)]
+                p.entity,
+                #[cfg(debug_assertions)]
+                p.component_id,
+            )
+        }
     }
 }
 
@@ -233,7 +268,16 @@ where
             None
         } else {
             Some(unsafe {
-                Ref::from_parts(NonNull::new_unchecked(p.ptr.cast()), p.world, p.locks, p.key)
+                Ref::from_parts(
+                    NonNull::new_unchecked(p.ptr.cast()),
+                    p.world,
+                    p.locks,
+                    p.key,
+                    #[cfg(debug_assertions)]
+                    p.entity,
+                    #[cfg(debug_assertions)]
+                    p.component_id,
+                )
             })
         }
     }
@@ -251,7 +295,16 @@ where
             None
         } else {
             Some(unsafe {
-                Mut::from_parts(NonNull::new_unchecked(p.ptr.cast()), p.world, p.locks, p.key)
+                Mut::from_parts(
+                    NonNull::new_unchecked(p.ptr.cast()),
+                    p.world,
+                    p.locks,
+                    p.key,
+                    #[cfg(debug_assertions)]
+                    p.entity,
+                    #[cfg(debug_assertions)]
+                    p.component_id,
+                )
             })
         }
     }
@@ -286,6 +339,10 @@ where
             world: r.world,
             locks: r.locks,
             key: safety_key(&r.data.safety_info()[0]),
+            #[cfg(debug_assertions)]
+            entity: *id,
+            #[cfg(debug_assertions)]
+            component_id: safety_id(&r.data.safety_info()[0]),
         };
         Ok(unsafe { <&T as GuardElement<'w>>::wrap(parts) })
     }
@@ -305,6 +362,10 @@ where
             world: r.world,
             locks: r.locks,
             key: safety_key(&r.data.safety_info()[0]),
+            #[cfg(debug_assertions)]
+            entity: *id,
+            #[cfg(debug_assertions)]
+            component_id: safety_id(&r.data.safety_info()[0]),
         };
         Ok(unsafe { <&mut T as GuardElement<'w>>::wrap(parts) })
     }
@@ -330,6 +391,10 @@ macro_rules! impl_guard_tuple {
                         world: r.world,
                         locks: r.locks,
                         key: safety_key(&si[$idx]),
+                        #[cfg(debug_assertions)]
+                        entity: *id,
+                        #[cfg(debug_assertions)]
+                        component_id: safety_id(&si[$idx]),
                     }) },
                 )+ ))
             }
