@@ -125,6 +125,8 @@ impl StageLocks {
     }
 
     /// True when no borrow is currently registered in this stage map.
+    /// Used by the experimental exclusive-register debug assertions.
+    #[cfg_attr(not(feature = "flecs_experimental"), allow(dead_code))]
     #[inline(always)]
     pub(crate) fn is_empty(&self) -> bool {
         self.entries.is_empty()
