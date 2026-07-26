@@ -8,6 +8,31 @@ extern crate std;
 extern crate alloc;
 use alloc::boxed::Box;
 
+/// Reclaim a binding context that was leaked into a system/observer descriptor
+/// when the underlying `ecs_*_init` call failed.
+///
+/// On a failed init (for example an invalid query expression) flecs returns `0`
+/// before taking ownership of the descriptor's binding contexts, so their
+/// registered free trampolines are never invoked and the leaked closure boxes
+/// would leak. Calling this with the descriptor's `ctx`/`ctx_free` pair on
+/// failure runs the same trampoline flecs would have run, reclaiming the box.
+///
+/// # Safety
+///
+/// Must only be called when flecs did not take ownership of `ctx` (i.e. the
+/// init returned `0`); `ctx_free` must be the free function registered for
+/// `ctx`.
+pub(crate) unsafe fn reclaim_leaked_binding_ctx(
+    ctx: *mut c_void,
+    ctx_free: flecs_ecs_sys::ecs_ctx_free_t,
+) {
+    if let Some(free) = ctx_free
+        && !ctx.is_null()
+    {
+        unsafe { free(ctx) };
+    }
+}
+
 pub trait SystemAPI<'a, P, T>: Builder<'a> + private::internal_SystemAPI<'a, P, T>
 where
     T: QueryTuple,

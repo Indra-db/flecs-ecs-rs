@@ -231,6 +231,13 @@ where
         }
 
         let observer = Observer::new(self.world(), self.desc);
+        if *observer.id() == 0 {
+            unsafe {
+                reclaim_leaked_binding_ctx(self.desc.ctx, self.desc.ctx_free);
+                reclaim_leaked_binding_ctx(self.desc.callback_ctx, self.desc.callback_ctx_free);
+                reclaim_leaked_binding_ctx(self.desc.run_ctx, self.desc.run_ctx_free);
+            }
+        }
         for s in self.term_builder.str_ptrs_to_free.iter_mut() {
             unsafe { core::mem::ManuallyDrop::drop(s) };
         }

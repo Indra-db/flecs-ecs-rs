@@ -120,6 +120,52 @@ fn observer_payload_closure_dropped_on_world_destroy() {
     );
 }
 
+/// A system whose query fails to parse (invalid `expr`) used to leak the
+/// `each`/`run` closure: `ecs_system_init` returns 0 before flecs registers the
+/// ctx-free trampoline, so `build()` must reclaim the leaked closure box itself.
+#[test]
+fn system_query_init_failure_reclaims_closure() {
+    let world = World::new();
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_clone = Arc::clone(&counter);
+
+    let sys = world
+        .system::<&Position>()
+        .expr("invalid syntax!!!")
+        .each(move |_p| {
+            counter_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+    assert_eq!(*sys.id(), 0, "system creation must fail on invalid query");
+    assert_eq!(
+        Arc::strong_count(&counter),
+        1,
+        "closure must be reclaimed when ecs_system_init fails"
+    );
+}
+
+/// Same reclaim requirement on the observer path (`ecs_observer_init`).
+#[test]
+fn observer_query_init_failure_reclaims_closure() {
+    let world = World::new();
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_clone = Arc::clone(&counter);
+
+    let obs = world
+        .observer::<flecs::OnSet, &Position>()
+        .expr("invalid syntax!!!")
+        .each(move |_p| {
+            counter_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+    assert_eq!(*obs.id(), 0, "observer creation must fail on invalid query");
+    assert_eq!(
+        Arc::strong_count(&counter),
+        1,
+        "closure must be reclaimed when ecs_observer_init fails"
+    );
+}
+
 #[derive(Component)]
 struct ArcPayload {
     tracker: Arc<()>,
