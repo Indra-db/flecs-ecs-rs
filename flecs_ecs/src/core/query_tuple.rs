@@ -54,6 +54,10 @@ pub trait ComponentPointers<T: QueryTuple> {
 
     fn get_tuple_with_ref(&mut self, index: usize) -> T::TupleType<'_>;
 
+    /// Per-term column base pointers for the current table batch, in term order.
+    /// Used by the experimental chunk cursor to build whole-column slices.
+    fn column_ptrs(&self) -> &[*mut u8];
+
     #[cfg(feature = "flecs_safety_locks")]
     fn safety_table_records(&self) -> &[TableColumnSafety];
 }
@@ -146,6 +150,11 @@ impl<T: QueryTuple, const LEN: usize> ComponentPointers<T> for ComponentsData<T,
             &self.is_ref_array_components[..],
             index,
         )
+    }
+
+    #[inline(always)]
+    fn column_ptrs(&self) -> &[*mut u8] {
+        &self.array_components[..]
     }
 
     #[cfg(feature = "flecs_safety_locks")]

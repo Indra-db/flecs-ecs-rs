@@ -193,9 +193,15 @@ flecs_base = [
     "flecs_safety_locks",
 ]
 
+# Next-generation experimental API prototype (guard-based entity access,
+# exclusive register, chunk cursor + each! macro, tier-0 disjointness proof).
+# Default-on; disabling it keeps the stable surface untouched.
+flecs_experimental = []
+
 default = [
     #"flecs_regenerate_binding",
     #"flecs_nightly_tests",
+    "flecs_experimental",
     "flecs_base",
     "flecs_script",
     "flecs_stats",

@@ -49,6 +49,8 @@ mod refs_test;
 mod rust_trait_test;
 #[cfg(feature = "flecs_safety_locks")]
 mod safety;
+#[cfg(feature = "flecs_experimental")]
+mod experimental;
 mod singleton_test;
 mod soundness_test;
 #[cfg(feature = "flecs_safety_locks")]

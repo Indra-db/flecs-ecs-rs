@@ -61,6 +61,7 @@ criterion_group!(
     targets =
     query_iter,
     query_each,
+    query_experimental,
 );
 
 criterion_group!(

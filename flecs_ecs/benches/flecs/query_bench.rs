@@ -378,6 +378,164 @@ pub fn query_iter(criterion: &mut Criterion) {
     group.finish();
 }
 
+/// Experimental (next-gen) API benchmarks. All numbers are provisional: run on
+/// a quiet machine for final verification. The raw-C controls
+/// `query_each_1_term_raw_c` / `query_each_4_terms_raw_c` are the drift anchors;
+/// if they move >3% between runs the comparison is unreliable.
+pub fn query_experimental(criterion: &mut Criterion) {
+    use flecs_ecs::each;
+    use flecs_ecs::experimental::prelude::*;
+
+    let mut group = criterion.benchmark_group("flecs");
+
+    let mut world = World::new();
+    let mut seed: u64 = 0x1234_5678_9abc_def0;
+    let mut coin = move || {
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (seed >> 33) & 1 == 0
+    };
+    for i in 0..QUERY_ENTITY_COUNT {
+        let e = world.entity();
+        seq!(P in 1..=10 {
+            if coin() {
+                e.set(C~P(i));
+            }
+        });
+    }
+    // A stable entity that has C1 for the single-entity get benchmarks.
+    let e_id = *world.entity().set(C1(7)).id();
+
+    let q1 = world.new_query::<&C1>();
+    let q4 = world.new_query::<(&C1, &C2, &C3, &C4)>();
+    let q4w = world.new_query::<(&mut C1, &C2, &C3, &C4)>();
+
+    // --- entity access: guard get vs closure get ---
+
+    group.bench_function("exp_entity_get_ref_1", |b| {
+        b.iter(|| {
+            let g = world.entity_from_id(e_id).get_ref::<&C1>().unwrap();
+            black_box(g.0)
+        });
+    });
+
+    group.bench_function("exp_entity_closure_get_1", |b| {
+        b.iter(|| {
+            let mut v = 0u32;
+            world.entity_from_id(e_id).get::<&C1>(|c| v = c.0);
+            black_box(v)
+        });
+    });
+
+    // --- iteration: exclusive each vs locked each vs raw C ---
+
+    group.bench_function("exp_each_locked_4", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q4.each(|(a, b_, c, d)| sum += (a.0 + b_.0 + c.0 + d.0) as u64);
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("exp_each_exclusive_4", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q4.each_exclusive(&mut world, |(a, b_, c, d)| sum += (a.0 + b_.0 + c.0 + d.0) as u64);
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("exp_each_4_terms_raw_c", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            unsafe {
+                let qptr = q4.query_ptr() as *mut sys::ecs_query_t;
+                let mut it = sys::ecs_query_iter(world.ptr_mut(), qptr);
+                while sys::ecs_query_next(&mut it) {
+                    let n = it.count as usize;
+                    let a = sys::ecs_field_w_size(&it, 4, 0) as *const u32;
+                    let b_ = sys::ecs_field_w_size(&it, 4, 1) as *const u32;
+                    let c = sys::ecs_field_w_size(&it, 4, 2) as *const u32;
+                    let d = sys::ecs_field_w_size(&it, 4, 3) as *const u32;
+                    for i in 0..n {
+                        sum += (*a.add(i) + *b_.add(i) + *c.add(i) + *d.add(i)) as u64;
+                    }
+                }
+            }
+            black_box(sum)
+        });
+    });
+
+    // --- chunk cursor vs each vs raw C ---
+
+    group.bench_function("exp_chunks_for_each_4", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q4.chunks(&mut world).for_each(|(a, b_, c, d)| {
+                for i in 0..a.len() {
+                    sum += (a[i].0 + b_[i].0 + c[i].0 + d[i].0) as u64;
+                }
+            });
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("exp_each_macro_4", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            each!((a, b_, c, d) in q4.chunks(&mut world) {
+                sum += (a.0 + b_.0 + c.0 + d.0) as u64;
+            });
+            black_box(sum)
+        });
+    });
+
+    // Write path: SIMD-friendly mutable chunk vs locked mutable each.
+    group.bench_function("exp_each_locked_4_write", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            q4w.each(|(a, b_, c, d)| {
+                a.0 = a.0.wrapping_add(1);
+                sum += (a.0 + b_.0 + c.0 + d.0) as u64;
+            });
+            black_box(sum)
+        });
+    });
+
+    group.bench_function("exp_each_macro_4_write", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            each!((a, b_, c, d) in q4w.chunks(&mut world) {
+                a.0 = a.0.wrapping_add(1);
+                sum += (a.0 + b_.0 + c.0 + d.0) as u64;
+            });
+            black_box(sum)
+        });
+    });
+
+    // Raw-C control drift anchor, single term.
+    group.bench_function("exp_each_1_term_raw_c", |b| {
+        b.iter(|| {
+            let mut sum = 0u64;
+            unsafe {
+                let qptr = q1.query_ptr() as *mut sys::ecs_query_t;
+                let mut it = sys::ecs_query_iter(world.ptr_mut(), qptr);
+                while sys::ecs_query_next(&mut it) {
+                    let n = it.count as usize;
+                    let a = sys::ecs_field_w_size(&it, 4, 0) as *const u32;
+                    for i in 0..n {
+                        sum += *a.add(i) as u64;
+                    }
+                }
+            }
+            black_box(sum)
+        });
+    });
+
+    group.finish();
+}
+
 fn c_query_iter_read_4(
     group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
     name: &str,
