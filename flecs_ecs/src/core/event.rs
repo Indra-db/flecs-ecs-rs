@@ -184,18 +184,27 @@ impl<'a, T: ComponentId> EventBuilder<'a, T> {
         desc.observable = world.real_world().world_ptr_mut() as *mut c_void;
         unsafe {
             let world_ptr = world.world_ptr_mut();
+            // A single defer-state read drives both which operation we perform
+            // and how we reclaim the payload, so the two can never disagree. If
+            // we instead let `ecs_enqueue` re-decide internally, a defer-state
+            // change would leave the reclaim arm acting on a stale answer,
+            // double-dropping or leaking the payload.
             let deferred = sys::ecs_is_deferred(world_ptr);
-            sys::ecs_enqueue(world_ptr, desc);
-            if !T::IS_TAG {
-                if deferred {
-                    // Deferred: flecs copied the value into the command queue
-                    // and runs the registered dtor on that copy at flush.
+            if deferred {
+                // Deferred: flecs move-constructs the value into the command
+                // queue and runs the registered dtor on that copy at flush.
+                sys::ecs_enqueue(world_ptr, desc);
+                if !T::IS_TAG {
                     // Ownership moved to C, so free only the heap slot without
                     // dropping (dropping here would double-drop at flush).
                     dealloc(desc.param as *mut u8, Layout::new::<T>());
-                } else {
-                    // Not deferred: ecs_enqueue fell through to ecs_emit, which
-                    // used the value synchronously without taking ownership.
+                }
+            } else {
+                // Not deferred: emit synchronously (exactly what `ecs_enqueue`
+                // does when not deferred), which uses the value without taking
+                // ownership.
+                sys::ecs_emit(world_ptr, desc);
+                if !T::IS_TAG {
                     // Reclaim the Box so T's destructor runs.
                     drop(Box::from_raw(desc.param as *mut T));
                 }
