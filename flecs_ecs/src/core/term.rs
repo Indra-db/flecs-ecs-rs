@@ -196,6 +196,26 @@ pub mod internals {
         fn increment_current_term(&mut self) {
             *self.current_term_index_mut() += 1;
         }
+
+        /// Advance to the next term slot in place (the shared core of the
+        /// by-value `term()` chaining method and the in-place tuple population
+        /// path, which operates on a `&mut` builder during construction).
+        #[inline(always)]
+        fn advance_term(&mut self) {
+            let current_index = self.current_term_index();
+            let next_index = self.next_term_index();
+
+            if current_index != next_index {
+                *self.current_term_index_mut() = next_index;
+            }
+            *self.next_term_index_mut() = next_index + 1;
+
+            ecs_assert!(
+                current_index < sys::FLECS_TERM_COUNT_MAX as i32,
+                FlecsErrorCode::InvalidParameter,
+                "Maximum number of terms reached in query builder",
+            );
+        }
     }
 }
 
@@ -315,7 +335,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     }
 
     /// The self flag indicates the term identifier itself is used
-    fn self_(&mut self) -> &mut Self {
+    fn self_(mut self) -> Self {
         self.term_ref_mut().id |= ECS_SELF;
         self
     }
@@ -325,10 +345,10 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `id` - The id to set.
-    fn set_id(&mut self, id: impl IntoEntity) -> &mut Self {
+    fn set_id(mut self, id: impl IntoEntity) -> Self {
         let world = self.world();
         if self.current_term_ref_mode() != TermRefMode::Src {
-            check_term_access_validity(self);
+            check_term_access_validity(&self);
         }
 
         let term_ref = self.term_ref_mut();
@@ -347,8 +367,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `id` - The id to set.
-    fn entity(&mut self, entity: impl Into<Entity>) -> &mut Self {
-        check_term_access_validity(self);
+    fn entity(mut self, entity: impl Into<Entity>) -> Self {
+        check_term_access_validity(&self);
 
         self.term_ref_mut().id = *entity.into() | ECS_IS_ENTITY;
         self
@@ -359,7 +379,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `name` - The name to set.
-    fn name(&mut self, name: &str) -> &mut Self {
+    fn name(mut self, name: &str) -> Self {
         let name = core::mem::ManuallyDrop::new(format!("{name}\0"));
         let term_ref = self.term_ref_mut();
         term_ref.name = name.as_ptr() as *mut _;
@@ -373,8 +393,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `var_name` - The name of the variable.
-    fn set_var(&mut self, var_name: &str) -> &mut Self {
-        check_term_access_validity(self);
+    fn set_var(mut self, var_name: &str) -> Self {
+        check_term_access_validity(&self);
 
         let var_name = core::mem::ManuallyDrop::new(format!("{var_name}\0"));
         let term_ref = self.term_ref_mut();
@@ -389,15 +409,15 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `flags` - The flags to set.
-    fn flags(&mut self, flags: u64) -> &mut Self {
-        check_term_access_validity(self);
+    fn flags(mut self, flags: u64) -> Self {
+        check_term_access_validity(&self);
 
         self.term_ref_mut().id = flags;
         self
     }
 
     /// Call prior to setting values for src identifier
-    fn src(&mut self) -> &mut Self {
+    fn src(mut self) -> Self {
         self.set_term_ref_mode(TermRefMode::Src);
         self
     }
@@ -405,8 +425,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// Call prior to setting values for first identifier. This is either the
     /// component identifier, or first element of a pair (in case second is
     /// populated as well).
-    fn first(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn first(mut self) -> Self {
+        check_term_access_validity(&self);
 
         self.set_term_ref_mode(TermRefMode::First);
         self
@@ -414,8 +434,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
 
     /// Call prior to setting values for second identifier. This is the second
     /// element of a pair. Requires that `first()` is populated as well.
-    fn second(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn second(mut self) -> Self {
+        check_term_access_validity(&self);
         self.set_term_ref_mode(TermRefMode::Second);
         self
     }
@@ -429,7 +449,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `id` - The id to set.
-    fn set_src<'s, T: SingleAccessArg<'s>>(&mut self, id: T) -> &mut Self
+    fn set_src<'s, T: SingleAccessArg<'s>>(self, id: T) -> Self
     where
         Access<'s>: FromAccessArg<T>,
     {
@@ -443,11 +463,11 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
                     FlecsErrorCode::InvalidParameter,
                     "name is empty"
                 );
-                self.src();
+                let me = self.src();
                 if let Some(stripped_name) = strip_prefix_str_raw(name, "$") {
-                    self.set_var(stripped_name)
+                    me.set_var(stripped_name)
                 } else {
-                    self.name(name)
+                    me.name(name)
                 }
             }
             _ => panic!("Invalid access target, only single targets allowed"),
@@ -459,15 +479,15 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * initialize with id or
     /// * initialize it with name. If name starts with a $
     ///   the name is interpreted as a variable.
-    fn set_first<'s, Q: SingleAccessArg<'s>>(&mut self, id: Q) -> &mut Self
+    fn set_first<'s, Q: SingleAccessArg<'s>>(mut self, id: Q) -> Self
     where
         Access<'s>: FromAccessArg<Q>,
     {
-        check_term_access_validity(self);
+        check_term_access_validity(&self);
         let access = Access::from_access_arg(id, self.world());
         match access.target {
             AccessTarget::Entity(entity) => {
-                self.first().set_id(entity);
+                self = self.first().set_id(entity);
             }
             AccessTarget::Name(name) => {
                 ecs_assert!(
@@ -476,12 +496,12 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
                     "name is empty"
                 );
 
-                self.first();
-                if let Some(stripped_name) = strip_prefix_str_raw(name, "$") {
-                    self.set_var(stripped_name);
+                self = self.first();
+                self = if let Some(stripped_name) = strip_prefix_str_raw(name, "$") {
+                    self.set_var(stripped_name)
                 } else {
-                    self.name(name);
-                }
+                    self.name(name)
+                };
             }
             _ => panic!("Invalid access target, only single targets allowed"),
         }
@@ -495,15 +515,15 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * initialize with id or
     /// * initialize it with name. If name starts with a $
     ///   the name is interpreted as a variable.
-    fn set_second<'s, T: SingleAccessArg<'s>>(&mut self, id: T) -> &mut Self
+    fn set_second<'s, T: SingleAccessArg<'s>>(mut self, id: T) -> Self
     where
         Access<'s>: FromAccessArg<T>,
     {
-        check_term_access_validity(self);
+        check_term_access_validity(&self);
         let access = Access::from_access_arg(id, self.world());
         match access.target {
             AccessTarget::Entity(entity) => {
-                self.second().set_id(entity);
+                self = self.second().set_id(entity);
             }
             AccessTarget::Name(name) => {
                 ecs_assert!(
@@ -512,12 +532,12 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
                     "name is empty"
                 );
 
-                self.second();
-                if let Some(stripped_name) = strip_prefix_str_raw(name, "$") {
-                    self.set_var(stripped_name);
+                self = self.second();
+                self = if let Some(stripped_name) = strip_prefix_str_raw(name, "$") {
+                    self.set_var(stripped_name)
                 } else {
-                    self.name(name);
-                }
+                    self.name(name)
+                };
             }
             _ => panic!("Invalid access target, only single targets allowed"),
         }
@@ -531,7 +551,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// traversing a relationship upwards. For example: substitute the identifier
     /// with its parent by traversing the `ChildOf` relationship.
     #[inline]
-    fn up(&mut self) -> &mut Self {
+    fn up(mut self) -> Self {
         ecs_assert!(
             self.current_term_ref_mode() == TermRefMode::Src,
             FlecsErrorCode::InvalidParameter,
@@ -543,7 +563,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
 
     /// same as [`up`](crate::core::term)
     #[inline]
-    fn parent(&mut self) -> &mut Self {
+    fn parent(self) -> Self {
         self.up()
     }
 
@@ -554,7 +574,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `traverse_relationship` - The relationship to traverse.
-    fn up_id(&mut self, traverse_relationship: impl IntoEntity) -> &mut Self {
+    fn up_id(mut self, traverse_relationship: impl IntoEntity) -> Self {
         ecs_assert!(
             self.current_term_ref_mode() == TermRefMode::Src,
             FlecsErrorCode::InvalidParameter,
@@ -569,8 +589,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// Cascade iterates a hierarchy in top to bottom order (breadth first search)
     /// The cascade flag is like up, but returns results in breadth-first order.
     /// Only supported for `flecs::query`.
-    fn cascade(&mut self) -> &mut Self {
-        self.up();
+    fn cascade(mut self) -> Self {
+        self = self.up();
         self.term_ref_mut().id |= ECS_CASCADE;
         self
     }
@@ -582,14 +602,14 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `traverse_relationship` - The optional relationship to traverse.
-    fn cascade_id(&mut self, traverse_relationship: impl IntoEntity) -> &mut Self {
-        self.up_id(traverse_relationship);
+    fn cascade_id(mut self, traverse_relationship: impl IntoEntity) -> Self {
+        self = self.up_id(traverse_relationship);
         self.term_ref_mut().id |= ECS_CASCADE;
         self
     }
 
     /// Use with cascade to iterate results in descending (bottom + top) order.
-    fn desc(&mut self) -> &mut Self {
+    fn desc(mut self) -> Self {
         self.term_ref_mut().id |= ECS_DESC;
         self
     }
@@ -600,7 +620,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     ///
     /// * `traverse_relationship` - The relationship to traverse.
     /// * `flags` - The direction to traverse.
-    fn trav(&mut self, traverse_relationship: impl IntoEntity, flags: u64) -> &mut Self {
+    fn trav(mut self, traverse_relationship: impl IntoEntity, flags: u64) -> Self {
         self.current_term_mut().trav = *traverse_relationship.into_entity(self.world());
         self.term_ref_mut().id |= flags;
         self
@@ -611,7 +631,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `flags` - The direction to traverse.
-    fn id_flags(&mut self, flags: impl IntoId) -> &mut Self {
+    fn id_flags(mut self, flags: impl IntoId) -> Self {
         self.term_ref_mut().id |= *flags.into_id(self.world());
         self
     }
@@ -621,8 +641,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * `inout` - The inout to set.
-    fn set_inout_kind(&mut self, inout: InOutKind) -> &mut Self {
-        check_term_access_validity(self);
+    fn set_inout_kind(mut self, inout: InOutKind) -> Self {
+        check_term_access_validity(&self);
         self.current_term_mut().inout = inout.into();
         self
     }
@@ -638,11 +658,11 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// # Arguments
     ///
     /// * 'inout' - The inout to set.
-    fn inout_stage(&mut self, inout: InOutKind) -> &mut Self {
-        check_term_access_validity(self);
-        self.set_inout_kind(inout);
+    fn inout_stage(mut self, inout: InOutKind) -> Self {
+        check_term_access_validity(&self);
+        self = self.set_inout_kind(inout);
         if self.current_term_mut().oper != OperKind::Not as i16 {
-            self.src().entity(0);
+            self = self.src().entity(0);
         }
 
         self
@@ -657,8 +677,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::inout_stage`]
     /// * [`InOutKind`]
     #[inline(always)]
-    fn write_curr(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn write_curr(self) -> Self {
+        check_term_access_validity(&self);
         self.inout_stage(InOutKind::Out)
     }
 
@@ -671,8 +691,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::inout_stage`]
     /// * [`InOutKind`]
     #[inline(always)]
-    fn read_curr(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn read_curr(self) -> Self {
+        check_term_access_validity(&self);
         self.inout_stage(InOutKind::In)
     }
 
@@ -684,8 +704,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::inout_stage`]
     /// * [`InOutKind`]
     #[inline(always)]
-    fn read_write_curr(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn read_write_curr(self) -> Self {
+        check_term_access_validity(&self);
         self.inout_stage(InOutKind::InOut)
     }
 
@@ -696,7 +716,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::inout_stage`]
     /// * [`InOutKind`]
     #[inline(always)]
-    fn set_in(&mut self) -> &mut Self {
+    fn set_in(self) -> Self {
         if self.current_term_index() < self.count_generic_terms() {
             panic!(
                 "This function should only be used on terms that are not part of the generic type signature. use &T instead"
@@ -712,7 +732,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::inout_stage`]
     /// * [`InOutKind`]
     #[inline(always)]
-    fn set_out(&mut self) -> &mut Self {
+    fn set_out(self) -> Self {
         if self.current_term_index() < self.count_generic_terms() {
             panic!(
                 "This function should only be used on terms that are not part of the generic type signature. Use &mut T instead."
@@ -728,7 +748,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::inout_stage`]
     /// * [`InOutKind`]
     #[inline(always)]
-    fn set_inout(&mut self) -> &mut Self {
+    fn set_inout(self) -> Self {
         if self.current_term_index() < self.count_generic_terms() {
             panic!(
                 "This function should only be used on terms that are not part of the generic type signature. Use &mut T instead."
@@ -744,8 +764,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::inout_stage`]
     /// * [`InOutKind`]
     #[inline(always)]
-    fn set_inout_none(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn set_inout_none(mut self) -> Self {
+        check_term_access_validity(&self);
         self.current_term_mut().inout = InOutKind::None as i16;
         self
     }
@@ -756,8 +776,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     ///
     /// * `oper` - The operator to set.
     #[inline(always)]
-    fn set_oper(&mut self, oper: OperKind) -> &mut Self {
-        check_term_access_validity(self);
+    fn set_oper(mut self, oper: OperKind) -> Self {
+        check_term_access_validity(&self);
         self.current_term_mut().oper = oper as i16;
         self
     }
@@ -769,8 +789,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::set_oper`]
     /// * [`OperKind`]
     #[inline(always)]
-    fn and(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn and(self) -> Self {
+        check_term_access_validity(&self);
         self.set_oper(OperKind::And)
     }
 
@@ -781,8 +801,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::set_oper`]
     /// * [`OperKind`]
     #[inline(always)]
-    fn or(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn or(self) -> Self {
+        check_term_access_validity(&self);
         self.set_oper(OperKind::Or)
     }
 
@@ -794,8 +814,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`OperKind`]
     #[allow(clippy::should_implement_trait)]
     #[inline(always)]
-    fn not(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn not(self) -> Self {
+        check_term_access_validity(&self);
         self.set_oper(OperKind::Not)
     }
 
@@ -806,7 +826,7 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::set_oper`]
     /// * [`OperKind`]
     #[inline(always)]
-    fn optional(&mut self) -> &mut Self {
+    fn optional(self) -> Self {
         if self.current_term_index() < self.count_generic_terms() {
             panic!(
                 "This function should only be used on terms that are not part of the generic type signature. Use Option<> instead."
@@ -822,8 +842,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::set_oper`]
     /// * [`OperKind`]
     #[inline(always)]
-    fn and_from(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn and_from(self) -> Self {
+        check_term_access_validity(&self);
         self.set_oper(OperKind::AndFrom)
     }
 
@@ -834,8 +854,8 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::set_oper`]
     /// * [`OperKind`]
     #[inline(always)]
-    fn or_from(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn or_from(self) -> Self {
+        check_term_access_validity(&self);
         self.set_oper(OperKind::OrFrom)
     }
 
@@ -846,14 +866,14 @@ pub trait TermBuilderImpl<'a>: Sized + WorldProvider<'a> + internals::QueryConfi
     /// * [`Self::set_oper`]
     /// * [`OperKind`]
     #[inline(always)]
-    fn not_from(&mut self) -> &mut Self {
-        check_term_access_validity(self);
+    fn not_from(self) -> Self {
+        check_term_access_validity(&self);
         self.set_oper(OperKind::NotFrom)
     }
 
     /// Query terms are not triggered on by observers
     #[inline(always)]
-    fn filter(&mut self) -> &mut Self {
+    fn filter(mut self) -> Self {
         self.current_term_mut().inout = InOutKind::Filter as i16;
         self
     }

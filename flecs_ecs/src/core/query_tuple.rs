@@ -454,7 +454,8 @@ where
             );
         }
         
-        query.with(id);
+        query.advance_term();
+        query.init_current_term(id);
         let term = query.current_term_mut();
         A::populate_term(term);
 
@@ -635,7 +636,8 @@ macro_rules! impl_iterable {
                         );
                     }
 
-                    query.with(id);
+                    query.advance_term();
+                    query.init_current_term(id);
                     let term = query.current_term_mut();
                     $t::populate_term(term);
 

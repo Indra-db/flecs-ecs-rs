@@ -125,26 +125,26 @@ impl<'a, P, T: QueryTuple> ObserverBuilder<'a, P, T> {
     /// [`FallibleObserverBuilder`] whose terminals return
     /// `Result<Observer, ObserverBuildError>`. All remaining configuration methods are
     /// still available on the returned builder.
-    pub fn expr(mut self, expr: &str) -> FallibleObserverBuilder<'a, P, T> {
-        QueryBuilderImpl::expr(&mut self, expr);
+    pub fn expr(self, expr: &str) -> FallibleObserverBuilder<'a, P, T> {
+        let mut me = QueryBuilderImpl::expr(self, expr);
         FallibleObserverBuilder {
-            desc: self.desc,
-            term_builder: core::mem::take(&mut self.term_builder),
-            world: self.world,
-            event_count: self.event_count,
+            desc: me.desc,
+            term_builder: core::mem::take(&mut me.term_builder),
+            world: me.world,
+            event_count: me.event_count,
             expr: expr.to_string(),
             _phantom: core::marker::PhantomData,
         }
     }
 }
 
-impl<P, T: QueryTuple> ObserverBuilder<'_, P, T> {
+impl<'a, P, T: QueryTuple> ObserverBuilder<'a, P, T> {
     /// set observer flags, which are the same as Query flags
     ///
     /// # Arguments
     ///
     /// * `flags` - the flags to set
-    pub fn set_observer_flags(&mut self, flags: ObserverFlags) -> &mut Self {
+    pub fn set_observer_flags(mut self, flags: ObserverFlags) -> Self {
         self.desc.flags_ |= flags.bits();
         self
     }
@@ -154,12 +154,17 @@ impl<P, T: QueryTuple> ObserverBuilder<'_, P, T> {
     /// # Arguments
     ///
     /// * `event` - The event to add
-    pub fn add_event(&mut self, event: impl IntoEntity) -> &mut ObserverBuilder<'_, (), T> {
+    pub fn add_event(mut self, event: impl IntoEntity) -> ObserverBuilder<'a, (), T> {
         let event = *event.into_entity(self.world);
         self.desc.events[self.event_count] = event;
         self.event_count += 1;
-        // SAFETY: Same layout
-        unsafe { core::mem::transmute(self) }
+        ObserverBuilder {
+            desc: self.desc,
+            term_builder: core::mem::take(&mut self.term_builder),
+            world: self.world,
+            event_count: self.event_count,
+            _phantom: core::marker::PhantomData,
+        }
     }
 
     /// Invoke observer for anything that matches its query on creation
@@ -167,7 +172,7 @@ impl<P, T: QueryTuple> ObserverBuilder<'_, P, T> {
     /// # Arguments
     ///
     /// * `should_yield` - If true, the observer will be invoked for all existing entities that match its query
-    pub fn yield_existing(&mut self) -> &mut Self {
+    pub fn yield_existing(mut self) -> Self {
         self.desc.yield_existing = true;
         self
     }
@@ -212,7 +217,7 @@ where
 
     #[doc(hidden)]
     /// Build the `observer_builder` into an `observer`
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         if self.desc.callback.is_none() && self.desc.run.is_none() {
             panic!("you should not call this fn manually. Use `.each` , `.run` instead")
         }
@@ -299,7 +304,7 @@ where
     type BuiltType = Observer<'a>;
 
     #[doc(hidden)]
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(self) -> Self::BuiltType {
         if self.desc.callback.is_none() && self.desc.run.is_none() {
             panic!("you should not call this fn manually. Use `.each` , `.run` instead")
         }
@@ -365,13 +370,13 @@ pub struct FallibleObserverBuilder<'a, P = (), T: QueryTuple = ()> {
 
 impl<P, T: QueryTuple> FallibleObserverBuilder<'_, P, T> {
     /// set observer flags, which are the same as Query flags
-    pub fn set_observer_flags(&mut self, flags: ObserverFlags) -> &mut Self {
+    pub fn set_observer_flags(mut self, flags: ObserverFlags) -> Self {
         self.desc.flags_ |= flags.bits();
         self
     }
 
     /// Invoke observer for anything that matches its query on creation
-    pub fn yield_existing(&mut self) -> &mut Self {
+    pub fn yield_existing(mut self) -> Self {
         self.desc.yield_existing = true;
         self
     }
@@ -423,7 +428,7 @@ where
 
     #[doc(hidden)]
     /// Build the observer, returning [`ObserverBuildError`] if the descriptor is malformed.
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         if self.desc.callback.is_none() && self.desc.run.is_none() {
             panic!("you should not call this fn manually. Use `.each` , `.run` instead")
         }

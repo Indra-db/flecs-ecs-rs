@@ -93,7 +93,7 @@ where
     /// # Arguments
     ///
     /// * `phase` - the phase
-    pub fn kind(&mut self, phase: impl IntoEntity) -> &mut Self {
+    pub fn kind(mut self, phase: impl IntoEntity) -> Self {
         self.desc.phase = *phase.into_entity(self.world);
         self
     }
@@ -103,7 +103,7 @@ where
     /// # Arguments
     ///
     /// * `phase` - the phase
-    pub fn kind_enum<Phase>(&mut self, phase: Phase) -> &mut Self
+    pub fn kind_enum<Phase>(self, phase: Phase) -> Self
     where
         Phase: ComponentId + ComponentType<Enum> + EnumComponentInfo,
     {
@@ -116,7 +116,7 @@ where
     /// # Arguments
     ///
     /// * `value` - If false,  system will always run staged.
-    pub fn immediate(&mut self, value: bool) -> &mut Self {
+    pub fn immediate(mut self, value: bool) -> Self {
         self.desc.immediate = value;
         self
     }
@@ -124,7 +124,7 @@ where
     /// Mark the system multithreaded (spec §6): flecs partitions its matched
     /// tables across worker stages. Pairs with the `par_*` terminals, which set
     /// this too; calling it explicitly is idempotent.
-    pub fn multi_threaded(&mut self) -> &mut Self {
+    pub fn multi_threaded(mut self) -> Self {
         self.desc.multi_threaded = true;
         self
     }
@@ -137,12 +137,12 @@ where
     /// [`FallibleSystemBuilder`] whose terminals return
     /// `Result<System, SystemBuildError>`. All remaining configuration methods are
     /// still available on the returned builder.
-    pub fn expr(mut self, expr: &str) -> FallibleSystemBuilder<'a, T> {
-        QueryBuilderImpl::expr(&mut self, expr);
+    pub fn expr(self, expr: &str) -> FallibleSystemBuilder<'a, T> {
+        let mut me = QueryBuilderImpl::expr(self, expr);
         FallibleSystemBuilder {
-            desc: self.desc,
-            term_builder: core::mem::take(&mut self.term_builder),
-            world: self.world,
+            desc: me.desc,
+            term_builder: core::mem::take(&mut me.term_builder),
+            world: me.world,
             expr: expr.to_string(),
             _phantom: core::marker::PhantomData,
         }
@@ -158,7 +158,7 @@ where
     ///
     /// Do not mix with the raw [`set_context`](crate::core::SystemAPI::set_context)
     /// on the same system: they share the one context slot.
-    pub fn ctx<C: 'static>(&mut self, value: C) -> &mut Self {
+    pub fn ctx<C: 'static>(mut self, value: C) -> Self {
         // Drop any previously-installed typed ctx before overwriting the slot.
         if let Some(free) = self.desc.ctx_free.take()
             && !self.desc.ctx.is_null()
@@ -229,7 +229,7 @@ where
 
     #[doc(hidden)]
     /// Build the `system_builder` into an system
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         if self.desc.callback.is_none() && self.desc.run.is_none() {
             panic!("you should not call this fn manually. Use `.each` , `.run` instead")
         }
@@ -294,7 +294,7 @@ where
     type BuiltType = System<'a>;
 
     #[doc(hidden)]
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(self) -> Self::BuiltType {
         if self.desc.callback.is_none() && self.desc.run.is_none() {
             panic!("you should not call this fn manually. Use `.each` , `.run` instead")
         }
@@ -364,13 +364,13 @@ where
     T: QueryTuple,
 {
     /// Specify in which phase the system should run.
-    pub fn kind(&mut self, phase: impl IntoEntity) -> &mut Self {
+    pub fn kind(mut self, phase: impl IntoEntity) -> Self {
         self.desc.phase = *phase.into_entity(self.world);
         self
     }
 
     /// Specify in which enum phase the system should run.
-    pub fn kind_enum<Phase>(&mut self, phase: Phase) -> &mut Self
+    pub fn kind_enum<Phase>(self, phase: Phase) -> Self
     where
         Phase: ComponentId + ComponentType<Enum> + EnumComponentInfo,
     {
@@ -379,7 +379,7 @@ where
     }
 
     /// Specify whether system should be ran in staged context.
-    pub fn immediate(&mut self, value: bool) -> &mut Self {
+    pub fn immediate(mut self, value: bool) -> Self {
         self.desc.immediate = value;
         self
     }
@@ -431,7 +431,7 @@ where
 
     #[doc(hidden)]
     /// Build the system, returning [`SystemBuildError`] if the descriptor is malformed.
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         if self.desc.callback.is_none() && self.desc.run.is_none() {
             panic!("you should not call this fn manually. Use `.each` , `.run` instead")
         }

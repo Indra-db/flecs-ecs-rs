@@ -73,8 +73,8 @@ fn system_builder_builder_build_n_statements() {
     let count2 = count.clone();
 
     let mut qb = world.system::<()>();
-    qb.with(&Position::id());
-    qb.with(&Velocity::id());
+    qb = qb.with(&Position::id());
+    qb = qb.with(&Velocity::id());
     let s = qb.each_entity(move |e, _| {
         count2.set(count2.get() + 1);
         assert_eq!(e.id(), e1);

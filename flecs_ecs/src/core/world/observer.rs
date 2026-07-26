@@ -45,9 +45,8 @@ impl World {
     where
         Components: QueryTuple,
     {
-        let mut builder = ObserverBuilder::<(), Components>::new_untyped(self);
-        builder.add_event(event);
-        builder
+        let builder = ObserverBuilder::<(), Components>::new_untyped(self);
+        builder.add_event(event)
     }
 
     /// Create a new named observer.

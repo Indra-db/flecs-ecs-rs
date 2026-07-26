@@ -442,10 +442,10 @@ fn flecs_query_docs_compile_test() {
     let add_npc = true;
 
     let mut q = world.query::<(&mut Position, &Velocity)>();
-    q.with(&Velocity::id());
+    q = q.with(&Velocity::id());
 
     if add_npc {
-        q.with(&Foo::id()); // Conditionally add
+        q = q.with(&Foo::id()); // Conditionally add
     }
 
     q.build(); // Create query

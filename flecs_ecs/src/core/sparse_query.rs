@@ -179,7 +179,7 @@ impl<'a, T: QueryTuple> SparseQuery<'a, T> {
 
     /// Convert to a regular [`Query`] for the same components.
     pub fn to_query(&self) -> Query<T> {
-        let mut builder = QueryBuilder::<T>::new(&self.world);
+        let builder = QueryBuilder::<T>::new(&self.world);
         builder.build()
     }
 }

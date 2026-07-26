@@ -1,7 +1,7 @@
 #![doc(hidden)]
 
-pub trait Builder<'a> {
+pub trait Builder<'a>: Sized {
     type BuiltType;
 
-    fn build(&mut self) -> Self::BuiltType;
+    fn build(self) -> Self::BuiltType;
 }

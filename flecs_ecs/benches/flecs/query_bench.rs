@@ -23,10 +23,10 @@ fn bench_query_iter_tags(
 
         let mut query = world.query::<()>();
 
-        query.set_cache_kind(cache_kind);
+        query = query.set_cache_kind(cache_kind);
 
         for id in &ids[..term_count] {
-            query.with(*id).self_().set_in();
+            query = query.with(*id).self_().set_in();
         }
 
         let query_desc = internals::QueryConfig::query_desc_mut(&mut query);
@@ -82,10 +82,10 @@ fn bench_query_iter_components_setup(
 
     let mut query = world.query::<()>();
 
-    query.set_cache_kind(cache_kind);
+    query = query.set_cache_kind(cache_kind);
 
     for id in &ids[..term_count] {
-        query.with(*id).self_().set_in();
+        query = query.with(*id).self_().set_in();
     }
 
     let f = query.build();

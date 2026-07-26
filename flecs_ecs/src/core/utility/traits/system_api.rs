@@ -39,7 +39,7 @@ where
     P: ComponentId,
 {
     /// Set context
-    fn set_context(&mut self, context: *mut c_void) -> &mut Self;
+    fn set_context(self, context: *mut c_void) -> Self;
 
     /// Each iterator for systems.
     ///
@@ -52,7 +52,7 @@ where
     /// # See also
     ///
     /// * [`SystemAPI::each_unchecked()`] - Unsafe variant without aliasing checks for maximum performance
-    fn each<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn each<Func>(self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: FnMut(T::TupleType<'_>) + 'static,
     {
@@ -111,7 +111,7 @@ where
     ///
     /// * [`SystemAPI::each()`] - Safe variant with aliasing checks
     unsafe fn each_unchecked<Func>(
-        &mut self,
+        self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -122,7 +122,7 @@ where
 
     /// Internal implementation for both checked and unchecked each iteration.
     fn each_internal<Func, const CHECKED: bool>(
-        &mut self,
+        mut self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -162,7 +162,7 @@ where
     /// # See also
     ///
     /// * [`SystemAPI::each_entity_unchecked()`] - Unsafe variant without aliasing checks for maximum performance
-    fn each_entity<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn each_entity<Func>(self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: FnMut(EntityView, T::TupleType<'_>) + 'static,
     {
@@ -215,7 +215,7 @@ where
     ///
     /// * [`SystemAPI::each_entity()`] - Safe variant with aliasing checks
     unsafe fn each_entity_unchecked<Func>(
-        &mut self,
+        self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -226,7 +226,7 @@ where
 
     /// Internal implementation for both checked and unchecked `each_entity` iteration.
     fn each_entity_internal<Func, const CHECKED: bool>(
-        &mut self,
+        mut self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -304,7 +304,7 @@ where
     /// # See also
     ///
     /// * [`SystemAPI::each_iter_unchecked()`] - Unsafe variant without aliasing checks for maximum performance
-    fn each_iter<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn each_iter<Func>(self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: FnMut(TableIter<false, P>, FieldIndex, T::TupleType<'_>) + 'static,
     {
@@ -356,7 +356,7 @@ where
     /// }
     /// ```
     unsafe fn each_iter_unchecked<Func>(
-        &mut self,
+        self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -372,7 +372,7 @@ where
     /// When `CHECKED = false`, bypasses all safety checks for maximum performance.
     #[inline]
     fn each_iter_internal<Func, const CHECKED: bool>(
-        &mut self,
+        mut self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -471,7 +471,7 @@ where
     /// //  Entity name:  -- id: 512 -- archetype: flecs_ecs.main.Tag, flecs_ecs.main.Position, flecs_ecs.main.Velocity: Position { x: 0, y: 0 }
     /// //  end operations
     /// ```
-    fn run<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn run<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: FnMut(TableIter<true, P>) + 'static,
     {
@@ -562,7 +562,7 @@ where
     /// //  end operations
     /// ```
     fn run_each<Func, FuncEach>(
-        &mut self,
+        mut self,
         func: Func,
         func_each: FuncEach,
     ) -> <Self as builder::Builder<'a>>::BuiltType
@@ -666,7 +666,7 @@ where
     /// //  end operations
     /// ```
     fn run_each_entity<Func, FuncEachEntity>(
-        &mut self,
+        mut self,
         func: Func,
         func_each_entity: FuncEachEntity,
     ) -> <Self as builder::Builder<'a>>::BuiltType
@@ -696,7 +696,7 @@ where
     }
 
     fn run_each_iter<Func, FuncEachIter>(
-        &mut self,
+        mut self,
         func: Func,
         func_each_iter: FuncEachIter,
     ) -> <Self as builder::Builder<'a>>::BuiltType
@@ -735,7 +735,7 @@ where
     /// disjointness proof does not cover, so the term borrows must be visible to
     /// any guard taken inside the callback.
     #[cfg(feature = "flecs_experimental")]
-    fn each_with<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn each_with<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: FnMut(T::TupleType<'_>, crate::experimental::Stage<'_>) + 'static,
     {
@@ -762,7 +762,7 @@ where
     ///
     /// Like `each_with`, always registers this system's term locks.
     #[cfg(feature = "flecs_experimental")]
-    fn each_entity_with<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn each_entity_with<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: FnMut(EntityView, T::TupleType<'_>, crate::experimental::Stage<'_>) + 'static,
     {
@@ -800,7 +800,7 @@ where
     /// # See also
     ///
     /// * [`ParSystemAPI::par_each_unchecked()`] - Unsafe variant without aliasing checks
-    fn par_each<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn par_each<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: Fn(T::TupleType<'_>) + Send + Sync + 'static,
         for<'w> T::TupleType<'w>: Send,
@@ -861,7 +861,7 @@ where
     ///
     /// * [`ParSystemAPI::par_each()`] - Safe variant with aliasing checks
     unsafe fn par_each_unchecked<Func>(
-        &mut self,
+        mut self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -880,7 +880,7 @@ where
     /// # See also
     ///
     /// * [`ParSystemAPI::par_each_entity_unchecked()`] - Unsafe variant without aliasing checks
-    fn par_each_entity<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn par_each_entity<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: Fn(EntityView, T::TupleType<'_>) + Send + Sync + 'static,
         for<'w> T::TupleType<'w>: Send,
@@ -935,7 +935,7 @@ where
     ///
     /// * [`ParSystemAPI::par_each_entity()`] - Safe variant with aliasing checks
     unsafe fn par_each_entity_unchecked<Func>(
-        &mut self,
+        mut self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -954,7 +954,7 @@ where
     /// # See also
     ///
     /// * [`ParSystemAPI::par_each_iter_unchecked()`] - Unsafe variant without aliasing checks
-    fn par_each_iter<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn par_each_iter<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: FnMut(TableIter<false, P>, FieldIndex, T::TupleType<'_>) + Send + Sync + 'static,
         for<'w> T::TupleType<'w>: Send,
@@ -1008,7 +1008,7 @@ where
     ///
     /// * [`ParSystemAPI::par_each_iter()`] - Safe variant with aliasing checks
     unsafe fn par_each_iter_unchecked<Func>(
-        &mut self,
+        mut self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -1020,7 +1020,7 @@ where
     }
 
     /// Variant of [`SystemAPI::run`] which allows the system to run in multiple threads
-    fn par_run<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn par_run<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: Fn(TableIter<true, P>) + Send + Sync + 'static,
         for<'w> T::TupleType<'w>: Send,
@@ -1031,7 +1031,7 @@ where
 
     /// Variant of [`SystemAPI::run_each`] which allows the system to run in multiple threads
     fn par_run_each<Func, FuncEach>(
-        &mut self,
+        mut self,
         func: Func,
         func_each: FuncEach,
     ) -> <Self as builder::Builder<'a>>::BuiltType
@@ -1046,7 +1046,7 @@ where
 
     /// Variant of [`SystemAPI::run_each_entity`] which allows the system to run in multiple threads
     fn par_run_each_entity<Func, FuncEachEntity>(
-        &mut self,
+        mut self,
         func: Func,
         func_each_entity: FuncEachEntity,
     ) -> <Self as builder::Builder<'a>>::BuiltType
@@ -1061,7 +1061,7 @@ where
 
     /// Variant of [`SystemAPI::run_each_iter`] which allows the system to run in multiple threads
     fn par_run_each_iter<Func, FuncEachIter>(
-        &mut self,
+        mut self,
         func: Func,
         func_each_iter: FuncEachIter,
     ) -> <Self as builder::Builder<'a>>::BuiltType
@@ -1082,7 +1082,7 @@ where
     /// The `Item: Send` bound is what makes handing a `&mut T` to another thread
     /// sound (`&T` needs `T: Sync`, `&mut T` needs `T: Send`).
     #[cfg(feature = "flecs_experimental")]
-    fn par_each_with<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+    fn par_each_with<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
     where
         Func: Fn(T::TupleType<'_>, crate::experimental::Stage<'_>) + Send + Sync + 'static,
         for<'w> T::TupleType<'w>: Send,
@@ -1094,7 +1094,7 @@ where
     /// Multithreaded variant of [`SystemAPI::each_entity_with`] (spec §6.2).
     #[cfg(feature = "flecs_experimental")]
     fn par_each_entity_with<Func>(
-        &mut self,
+        mut self,
         func: Func,
     ) -> <Self as builder::Builder<'a>>::BuiltType
     where
@@ -1158,7 +1158,7 @@ macro_rules! implement_reactor_api {
         where
             T: QueryTuple,
         {
-            fn set_context(&mut self, context: *mut c_void) -> &mut Self {
+            fn set_context(mut self, context: *mut c_void) -> Self {
                 self.desc.ctx = context;
                 self
             }
@@ -1214,7 +1214,7 @@ macro_rules! implement_reactor_api {
             T: QueryTuple,
             P: ComponentId,
         {
-            fn set_context(&mut self, context: *mut c_void) -> &mut Self {
+            fn set_context(mut self, context: *mut c_void) -> Self {
                 self.desc.ctx = context;
                 self
             }

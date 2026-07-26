@@ -32,7 +32,7 @@ pub fn emit(criterion: &mut Criterion) {
                 let mut o = world.observer::<Event, ()>();
 
                 for id in &ids[..term_count] {
-                    o.with(*id).self_();
+                    o = o.with(*id).self_();
                 }
 
                 o.run(|_| {});

@@ -124,7 +124,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::message`
-    pub fn message(&mut self, message: &str) -> &mut Self {
+    pub fn message(mut self, message: &str) -> Self {
         let message = ManuallyDrop::new(format!("{message}\0"));
         self.desc.message = message.as_ptr() as *const _;
         self.str_ptrs_to_free.push(message);
@@ -140,7 +140,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::brief`
-    pub fn brief(&mut self, brief: &str) -> &mut Self {
+    pub fn brief(mut self, brief: &str) -> Self {
         let brief = ManuallyDrop::new(format!("{brief}\0"));
         self.desc.brief = brief.as_ptr() as *const _;
         self.str_ptrs_to_free.push(brief);
@@ -156,7 +156,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::doc_name`
-    pub fn doc_name(&mut self, doc_name: &str) -> &mut Self {
+    pub fn doc_name(mut self, doc_name: &str) -> Self {
         let doc_name = ManuallyDrop::new(format!("{doc_name}\0"));
         self.desc.doc_name = doc_name.as_ptr() as *const _;
         self.str_ptrs_to_free.push(doc_name);
@@ -172,7 +172,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::severity`
-    pub fn severity(&mut self, severity: impl IntoEntity) -> &mut Self {
+    pub fn severity(mut self, severity: impl IntoEntity) -> Self {
         self.desc.severity = *severity.into_entity(self.world);
         self
     }
@@ -186,7 +186,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::retain_period`
-    pub fn retain_period(&mut self, period: f32) -> &mut Self {
+    pub fn retain_period(mut self, period: f32) -> Self {
         self.desc.retain_period = period;
         self
     }
@@ -203,11 +203,11 @@ where
     ///
     /// * `ecs_alert_desc_t::severity_filters`
     pub fn severity_filter(
-        &mut self,
+        mut self,
         severity: impl IntoEntity,
         with: impl IntoId,
         var: Option<&str>,
-    ) -> &mut Self {
+    ) -> Self {
         ecs_assert!(
             self.severity_filter_count < sys::ECS_ALERT_MAX_SEVERITY_FILTERS as i32,
             "Maximum number of severity filters reached"
@@ -239,7 +239,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::severity_filters`
-    pub fn severity_filter_component<Severity, With>(&mut self, var: Option<&str>) -> &mut Self
+    pub fn severity_filter_component<Severity, With>(self, var: Option<&str>) -> Self
     where
         Severity: ComponentId,
         With: ComponentId + ComponentType<Struct>,
@@ -265,10 +265,10 @@ where
     ///
     /// * `ecs_alert_desc_t::severity_filters`
     pub fn severity_filter_enum<Severity, With>(
-        &mut self,
+        self,
         with: With,
         var: Option<&str>,
-    ) -> &mut Self
+    ) -> Self
     where
         Severity: ComponentId,
         With: EnumComponentInfo + ComponentType<Enum>,
@@ -290,7 +290,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::member`
-    pub fn member(&mut self, member: impl IntoEntity) -> &mut Self {
+    pub fn member(mut self, member: impl IntoEntity) -> Self {
         self.desc.member = *member.into_entity(self.world);
         self
     }
@@ -305,7 +305,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::id`
-    pub fn id(&mut self, id: impl IntoId) -> &mut Self {
+    pub fn id(mut self, id: impl IntoId) -> Self {
         self.desc.id = *id.into_id(self.world);
         self
     }
@@ -324,7 +324,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::member`
-    pub fn member_type<With>(&mut self, member_name: &str, var: Option<&str>) -> &mut Self
+    pub fn member_type<With>(mut self, member_name: &str, var: Option<&str>) -> Self
     where
         With: ComponentId,
     {
@@ -368,7 +368,7 @@ where
     /// # See also
     ///
     /// * `ecs_alert_desc_t::var`
-    pub fn var(&mut self, var: &str) -> &mut Self {
+    pub fn var(mut self, var: &str) -> Self {
         let var = ManuallyDrop::new(format!("{var}\0"));
         self.desc.var = var.as_ptr() as *const _;
         self.str_ptrs_to_free.push(var);
@@ -414,11 +414,12 @@ where
     type BuiltType = Alert<'a>;
 
     /// Build the `AlertBuilder` into an Alert
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         let alert = Alert::new(self.world(), self.desc);
         for s in self.term_builder.str_ptrs_to_free.iter_mut() {
             unsafe { ManuallyDrop::drop(s) };
         }
+        self.term_builder.str_ptrs_to_free.clear();
         alert
     }
 }
@@ -435,10 +436,10 @@ where
     /// terminal [`build()`](FallibleAlertBuilder::build) returns a
     /// `Result<Alert, AlertBuildError>`. All remaining configuration methods are still
     /// available on the returned builder.
-    pub fn expr(mut self, expr: &str) -> FallibleAlertBuilder<'a, T> {
-        QueryBuilderImpl::expr(&mut self, expr);
+    pub fn expr(self, expr: &str) -> FallibleAlertBuilder<'a, T> {
+        let inner = QueryBuilderImpl::expr(self, expr);
         FallibleAlertBuilder {
-            inner: self,
+            inner,
             expr: expr.to_string(),
         }
     }
@@ -528,7 +529,7 @@ where
     type BuiltType = Result<Alert<'a>, AlertBuildError>;
 
     /// Build the alert, returning [`AlertBuildError`] if the descriptor is malformed.
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         let alert = self.inner.build();
         if *alert.id() == 0 {
             Err(AlertBuildError::InvalidExpr {

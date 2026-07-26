@@ -1204,10 +1204,10 @@ fn yield_existing_on_create_flag() {
 
     world.set(Count(0));
 
-    let mut ob = world.observer::<flecs::OnAdd, ()>();
-    ob.with(TagA::id());
-    ob.add_event(flecs::OnRemove::ID);
-    ob.set_observer_flags(ObserverFlags::YieldOnCreate);
+    let ob = world.observer::<flecs::OnAdd, ()>();
+    let ob = ob.with(TagA::id());
+    let ob = ob.add_event(flecs::OnRemove::ID);
+    let ob = ob.set_observer_flags(ObserverFlags::YieldOnCreate);
     let o = ob.each_entity(move |e, _| {
         let world = e.world();
         world.get::<&mut Count>(|count| {
@@ -1246,10 +1246,10 @@ fn yield_existing_on_delete_flag() {
 
     world.set(Count(0));
 
-    let mut ob = world.observer::<flecs::OnAdd, ()>();
-    ob.with(TagA::id());
-    ob.add_event(flecs::OnRemove::ID);
-    ob.set_observer_flags(ObserverFlags::YieldOnDelete);
+    let ob = world.observer::<flecs::OnAdd, ()>();
+    let ob = ob.with(TagA::id());
+    let ob = ob.add_event(flecs::OnRemove::ID);
+    let ob = ob.set_observer_flags(ObserverFlags::YieldOnDelete);
     let o = ob.each_entity(move |e, _| {
         let world = e.world();
         world.get::<&mut Count>(|count| {
@@ -1288,10 +1288,10 @@ fn yield_existing_on_create_delete_flag() {
 
     world.set(Count(0));
 
-    let mut ob = world.observer::<flecs::OnAdd, ()>();
-    ob.with(TagA::id());
-    ob.add_event(flecs::OnRemove::ID);
-    ob.set_observer_flags(ObserverFlags::YieldOnCreate | ObserverFlags::YieldOnDelete);
+    let ob = world.observer::<flecs::OnAdd, ()>();
+    let ob = ob.with(TagA::id());
+    let ob = ob.add_event(flecs::OnRemove::ID);
+    let ob = ob.set_observer_flags(ObserverFlags::YieldOnCreate | ObserverFlags::YieldOnDelete);
     let o = ob.each_entity(move |e, _| {
         let world = e.world();
         world.get::<&mut Count>(|count| {
@@ -2152,8 +2152,9 @@ fn query_eval_w_component_that_triggered_observer() {
 
     world.set(Count(0));
 
-    let mut ob = world.observer_id::<()>(entry_event);
-    ob.with("$Sequence")
+    let ob = world
+        .observer_id::<()>(entry_event)
+        .with("$Sequence")
         .with(sequence_shared)
         .set_src("$Sequence")
         .filter();
@@ -2524,20 +2525,21 @@ fn run_callback_w_yield_existing_2_fields() {
 fn reuse_observer_builder() {
     let world = World::new();
 
-    let mut ob = world.observer::<flecs::OnSet, &Position>();
-
     let count_1 = alloc::rc::Rc::new(core::cell::Cell::new(0));
     let count_2 = alloc::rc::Rc::new(core::cell::Cell::new(0));
 
     let count_1_c = count_1.clone();
-    let o1 = ob.each(move |_p| {
+    let o1 = world.observer::<flecs::OnSet, &Position>().each(move |_p| {
         count_1_c.set(count_1_c.get() + 1);
     });
 
     let count_2_c = count_2.clone();
-    let o2 = ob.with(Velocity::id()).each(move |_p| {
-        count_2_c.set(count_2_c.get() + 1);
-    });
+    let o2 = world
+        .observer::<flecs::OnSet, &Position>()
+        .with(Velocity::id())
+        .each(move |_p| {
+            count_2_c.set(count_2_c.get() + 1);
+        });
 
     assert!(o1.id() != o2.id());
 

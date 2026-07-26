@@ -154,7 +154,7 @@ where
 {
     type BuiltType = Pipeline<'a, T>;
 
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         let pipeline = Pipeline::<T>::new(self.world(), self.desc);
         for s in self.term_builder.str_ptrs_to_free.iter_mut() {
             unsafe { core::mem::ManuallyDrop::drop(s) };

@@ -14,7 +14,7 @@ note: required because it appears within the type `NonSendHandle`
 note: required by a bound in `par_each`
   --> src/core/utility/traits/system_api.rs
    |
-   |     fn par_each<Func>(&mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
+   |     fn par_each<Func>(mut self, func: Func) -> <Self as builder::Builder<'a>>::BuiltType
    |        -------- required by a bound in this associated function
 ...
    |         for<'w> T::TupleType<'w>: Send,

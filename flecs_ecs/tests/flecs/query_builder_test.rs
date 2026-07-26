@@ -132,9 +132,9 @@ fn builder_build_n_statements() {
     let world = World::new();
 
     let mut q = world.query::<()>();
-    q.with(&Position::id());
-    q.with(&Velocity::id());
-    q.set_cache_kind(QueryCacheKind::Auto);
+    q = q.with(&Position::id());
+    q = q.with(&Velocity::id());
+    q = q.set_cache_kind(QueryCacheKind::Auto);
     let q = q.build();
 
     let e1 = world
@@ -1920,8 +1920,8 @@ fn n1_term_to_empty() {
     let apples = world.entity();
 
     let mut q = world.query::<()>();
-    q.with(&Position::id()).set_cache_kind(QueryCacheKind::Auto);
-    q.with((likes, apples));
+    q = q.with(&Position::id()).set_cache_kind(QueryCacheKind::Auto);
+    q = q.with((likes, apples));
 
     let q = q.build();
 
@@ -5094,8 +5094,8 @@ fn assign_after_init() {
     #[allow(unused_assignments)]
     let mut f: Query<()> = world.new_query::<()>();
     let mut fb = world.query::<()>();
-    fb.with(&Position::id());
-    fb.set_cache_kind(QueryCacheKind::Auto);
+    fb = fb.with(&Position::id());
+    fb = fb.set_cache_kind(QueryCacheKind::Auto);
     f = fb.build();
 
     let e1 = world.entity().set(Position { x: 10, y: 20 });

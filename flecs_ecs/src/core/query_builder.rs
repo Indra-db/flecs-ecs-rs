@@ -608,7 +608,7 @@ where
     /// # Example
     ///
     /// * how to return a query / query builder from a function see example in [`QueryBuilder`]
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         let world = self.world;
         let query = Query::<T>::new_from_desc(world, &mut self.desc);
         for s in self.term_builder.str_ptrs_to_free.iter_mut() {
@@ -643,10 +643,10 @@ impl<'a, T: QueryTuple> QueryBuilder<'a, T> {
     /// let result = world.query::<()>().expr("invalid syntax!!!").build();
     /// assert!(matches!(result, Err(QueryBuildError::InvalidExpr { .. })));
     /// ```
-    pub fn expr(mut self, expr: &str) -> FallibleQueryBuilder<'a, T> {
-        QueryBuilderImpl::expr(&mut self, expr);
+    pub fn expr(self, expr: &str) -> FallibleQueryBuilder<'a, T> {
+        let inner = QueryBuilderImpl::expr(self, expr);
         FallibleQueryBuilder {
-            inner: self,
+            inner,
             expr: expr.to_string(),
         }
     }
@@ -759,7 +759,7 @@ where
     type BuiltType = Result<Query<T>, QueryBuildError>;
 
     /// Build the query, returning [`QueryBuildError`] if the descriptor is malformed.
-    fn build(&mut self) -> Self::BuiltType {
+    fn build(mut self) -> Self::BuiltType {
         let world = self.inner.world;
         let query = Query::<T>::try_new_from_desc(world, &mut self.inner.desc);
         for s in self.inner.term_builder.str_ptrs_to_free.iter_mut() {
@@ -825,7 +825,7 @@ type OrderByFnVoidPtrUnsafe =
 /// Functions to build a query using terms.
 pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// set the name of the query-like object
-    fn named(&mut self, name: &str) -> &mut Self {
+    fn named(mut self, name: &str) -> Self {
         let name = compact_str::format_compact!("{}\0", name);
         let world_ptr = self.world_ptr_mut();
 
@@ -850,7 +850,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// # Arguments
     ///
     /// * `entity` - The entity to bind the query to.
-    fn entity_set(&mut self, entity: impl Into<Entity>) -> &mut Self {
+    fn entity_set(mut self, entity: impl Into<Entity>) -> Self {
         self.query_desc_mut().entity = *entity.into();
         self
     }
@@ -860,7 +860,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// # Arguments
     ///
     /// * `flags` - the flags to set
-    fn query_flags(&mut self, flags: QueryFlags) -> &mut Self {
+    fn query_flags(mut self, flags: QueryFlags) -> Self {
         self.query_desc_mut().flags |= flags.bits();
         self
     }
@@ -870,17 +870,17 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// # Arguments
     ///
     /// * `kind` - the cache kind to set
-    fn set_cache_kind(&mut self, kind: QueryCacheKind) -> &mut Self {
+    fn set_cache_kind(mut self, kind: QueryCacheKind) -> Self {
         self.query_desc_mut().cache_kind = kind as sys::ecs_query_cache_kind_t;
         self
     }
 
     /// Set the cache method to cached
-    fn set_cached(&mut self) -> &mut Self {
+    fn set_cached(self) -> Self {
         self.set_cache_kind(QueryCacheKind::Auto)
     }
 
-    fn detect_changes(&mut self) -> &mut Self {
+    fn detect_changes(mut self) -> Self {
         self.query_desc_mut().flags |= sys::EcsQueryDetectChanges;
         self
     }
@@ -890,7 +890,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// # Arguments
     ///
     /// * `expr` - the expression to set
-    fn expr(&mut self, expr: &str) -> &mut Self {
+    fn expr(mut self, expr: &str) -> Self {
         let expr = ManuallyDrop::new(format!("{expr}\0"));
         ecs_assert!(
             *self.expr_count_mut() == 0,
@@ -904,12 +904,12 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
         self
     }
 
-    fn with<'s, T>(&mut self, id: T) -> &mut Self
+    fn with<'s, T>(mut self, id: T) -> Self
     where
         Access<'s>: FromAccessArg<T>,
     {
         let access = <Access<'s> as FromAccessArg<T>>::from_access_arg(id, self.world());
-        self.term();
+        self = self.term();
 
         match access.target {
             AccessTarget::Entity(entity) => {
@@ -919,18 +919,18 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
                 self.init_current_term(ecs_pair(*rel, *target));
             }
             AccessTarget::Name(name) => {
-                self.set_first::<&str>(name);
+                self = self.set_first::<&str>(name);
             }
             AccessTarget::PairName(rel, target) => {
-                self.set_first::<&str>(rel).set_second::<&str>(target);
+                self = self.set_first::<&str>(rel).set_second::<&str>(target);
             }
             AccessTarget::PairEntityName(rel, target) => {
                 self.init_current_term(rel);
-                self.set_second::<&str>(target);
+                self = self.set_second::<&str>(target);
             }
             AccessTarget::PairNameEntity(rel, target) => {
-                self.set_first::<&str>(rel);
-                self.set_second::<Entity>(target);
+                self = self.set_first::<&str>(rel);
+                self = self.set_second::<Entity>(target);
             }
         }
 
@@ -952,16 +952,16 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
 
     /// set term with enum
     fn with_enum<T: ComponentId + ComponentType<Enum> + EnumComponentInfo>(
-        &mut self,
+        self,
         value: T,
-    ) -> &mut Self {
+    ) -> Self {
         let enum_id = T::entity_id(self.world());
         let enum_field_id = value.id_variant(self.world());
         self.with((enum_id, enum_field_id))
     }
 
     /// set term with enum wildcard
-    fn with_enum_wildcard<T: ComponentType<Enum> + ComponentId>(&mut self) -> &mut Self
+    fn with_enum_wildcard<T: ComponentType<Enum> + ComponentId>(self) -> Self
     where
         (crate::core::utility::id::Id<T>, u64): InternalIntoEntity,
     {
@@ -971,7 +971,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /* Without methods, shorthand for .with(...).not() */
 
     /// set term without Id
-    fn without<'s, T>(&mut self, id: T) -> &mut Self
+    fn without<'s, T>(self, id: T) -> Self
     where
         Access<'s>: FromAccessArg<T>,
     {
@@ -980,16 +980,16 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
 
     /// set term without enum
     fn without_enum<T: ComponentId + ComponentType<Enum> + EnumComponentInfo>(
-        &mut self,
+        self,
         value: T,
-    ) -> &mut Self {
+    ) -> Self {
         self.with_enum(value).not()
     }
 
     /// set term without enum wildcard
     fn without_enum_wildcard<T: ComponentId + ComponentType<Enum> + EnumComponentInfo>(
-        &mut self,
-    ) -> &mut Self
+        self,
+    ) -> Self
     where
         (crate::core::utility::id::Id<T>, u64): InternalIntoEntity,
     {
@@ -999,21 +999,8 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// Term notation for more complex query features
     ///
     /// sets the current term to next one in term list
-    fn term(&mut self) -> &mut Self {
-        let current_index = self.current_term_index();
-        let next_index = self.next_term_index();
-
-        if current_index != next_index {
-            *self.current_term_index_mut() = next_index;
-        }
-        *self.next_term_index_mut() = next_index + 1;
-
-        ecs_assert!(
-            current_index < sys::FLECS_TERM_COUNT_MAX as i32,
-            FlecsErrorCode::InvalidParameter,
-            "Maximum number of terms reached in query builder",
-        );
-
+    fn term(mut self) -> Self {
+        self.advance_term();
         self
     }
 
@@ -1025,7 +1012,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     ///
     /// Panics if no term with the provided type exists in the query.
     /// See [`try_term_at_type()`](Self::try_term_at_type) for a fallible variant.
-    fn term_at_type<T: ComponentId>(&mut self) -> &mut Self {
+    fn term_at_type<T: ComponentId>(self) -> Self {
         self.try_term_at_type::<T>()
             .expect("term_at_type() called with type that is not in query")
     }
@@ -1034,7 +1021,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// if no term with the provided type exists in the query.
     /// This loops over all terms to find the one with the provided type.
     /// For performance-critical paths, use `term_at(index: u32)` instead.
-    fn try_term_at_type<T: ComponentId>(&mut self) -> Option<&mut Self> {
+    fn try_term_at_type<T: ComponentId>(self) -> Option<Self> {
         let term_id = T::entity_id(self.world());
         let world_ptr = self.world_ptr_mut();
 
@@ -1059,7 +1046,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     }
 
     /// Sets the current term to the one at the provided index.
-    fn term_at(&mut self, index: u32) -> &mut Self {
+    fn term_at(mut self, index: u32) -> Self {
         ecs_assert!(
             index < sys::FLECS_TERM_COUNT_MAX,
             FlecsErrorCode::InvalidParameter,
@@ -1097,7 +1084,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
 
     /// Set the current term to the one with the provided id and assert that the type matches.
     /// this does not do the type checking in release unless `flecs_force_build_debug_c` or `flecs_force_enable_ecs_asserts` is enabled.
-    fn term_at_checked<T: ComponentId>(&mut self, index: u32) -> &mut Self {
+    fn term_at_checked<T: ComponentId>(mut self, index: u32) -> Self {
         ecs_assert!(
             index < sys::FLECS_TERM_COUNT_MAX,
             FlecsErrorCode::InvalidParameter,
@@ -1139,50 +1126,50 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     }
 
     /// Set the id as current term and in mode out
-    fn write<'s, T>(&mut self, id: T) -> &mut Self
+    fn write<'s, T>(self, id: T) -> Self
     where
         Access<'s>: FromAccessArg<T>,
     {
-        self.with(id);
-        TermBuilderImpl::write_curr(self)
+        let me = self.with(id);
+        TermBuilderImpl::write_curr(me)
     }
 
     /// Set the type as current term and in mode out
     fn write_enum<T: ComponentId + ComponentType<Enum> + EnumComponentInfo>(
-        &mut self,
+        self,
         value: T,
-    ) -> &mut Self {
-        self.with_enum(value);
-        TermBuilderImpl::write_curr(self)
+    ) -> Self {
+        let me = self.with_enum(value);
+        TermBuilderImpl::write_curr(me)
     }
 
     /// Set the id as current term and in mode in
-    fn read<'s, T>(&mut self, id: T) -> &mut Self
+    fn read<'s, T>(self, id: T) -> Self
     where
         Access<'s>: FromAccessArg<T>,
     {
-        self.with(id);
-        TermBuilderImpl::read_curr(self)
+        let me = self.with(id);
+        TermBuilderImpl::read_curr(me)
     }
 
     /// Set the type as current term and in mode in
     fn read_enum<T: ComponentId + ComponentType<Enum> + EnumComponentInfo>(
-        &mut self,
+        self,
         value: T,
-    ) -> &mut Self {
-        self.with_enum(value);
-        TermBuilderImpl::read_curr(self)
+    ) -> Self {
+        let me = self.with_enum(value);
+        TermBuilderImpl::read_curr(me)
     }
 
     /* scope_open/scope_close shorthand notation. */
 
     /// Open a scope for the query
-    fn scope_open(&mut self) -> &mut Self {
+    fn scope_open(self) -> Self {
         self.with(flecs::ScopeOpen::ID).entity(0)
     }
 
     /// Close a scope for the query
-    fn scope_close(&mut self) -> &mut Self {
+    fn scope_close(self) -> Self {
         self.with(flecs::ScopeClose::ID).entity(0)
     }
 
@@ -1210,7 +1197,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     ///
     /// * `compare`: The compare function used to sort the components.
     ///   The signature of the function must be `fn(Entity, &T, Entity, &T) -> i32`.
-    fn order_by<T>(&mut self, compare: impl OrderByFn<T>) -> &mut Self
+    fn order_by<T>(mut self, compare: impl OrderByFn<T>) -> Self
     where
         T: ComponentId,
         Self: QueryBuilderImpl<'a>,
@@ -1250,10 +1237,10 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// * `component`: The component used to sort.
     /// * `compare`: The compare function used to sort the components.
     fn order_by_id(
-        &mut self,
+        mut self,
         component: impl Into<Entity>,
         compare: impl OrderByFnVoid,
-    ) -> &mut Self {
+    ) -> Self {
         let desc = self.query_desc_mut();
         let cmp: sys::ecs_order_by_action_t = Some(unsafe {
             core::mem::transmute::<OrderByFnVoidPtr, OrderByFnVoidPtrUnsafe>(compare.to_extern_fn())
@@ -1283,10 +1270,10 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// * `component`: The component used to determine the group rank.
     /// * `group_by_action`: Callback that determines group id for table.
     fn group_by_fn(
-        &mut self,
+        mut self,
         component: impl IntoEntity,
         group_by_action: sys::ecs_group_by_action_t,
-    ) -> &mut Self {
+    ) -> Self {
         let world = self.world();
         let desc = self.query_desc_mut();
         desc.group_by_callback = group_by_action;
@@ -1301,7 +1288,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// # Arguments
     ///
     /// * `component`: The component used to determine the group rank.
-    fn group_by(&mut self, component: impl IntoEntity) -> &mut Self {
+    fn group_by(self, component: impl IntoEntity) -> Self {
         self.group_by_fn(component, None)
     }
 
@@ -1311,7 +1298,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     ///
     /// * `ctx`: Context to pass to the `group_by` function.
     /// * `ctx_free`: Function to clean up the context (called when the query is deleted).
-    fn group_by_ctx(&mut self, ctx: *mut c_void, ctx_free: sys::ecs_ctx_free_t) -> &mut Self {
+    fn group_by_ctx(mut self, ctx: *mut c_void, ctx_free: sys::ecs_ctx_free_t) -> Self {
         let desc = self.query_desc_mut();
         desc.group_by_ctx = ctx;
         desc.group_by_ctx_free = ctx_free;
@@ -1323,7 +1310,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// # Arguments
     ///
     /// * `action`: The action to execute when a group is created.
-    fn on_group_create(&mut self, action: sys::ecs_group_create_action_t) -> &mut Self {
+    fn on_group_create(mut self, action: sys::ecs_group_create_action_t) -> Self {
         let desc = self.query_desc_mut();
         desc.on_group_create = action;
         self
@@ -1334,7 +1321,7 @@ pub trait QueryBuilderImpl<'a>: TermBuilderImpl<'a> {
     /// # Arguments
     ///
     /// * `action`: The action to execute when a group is deleted.
-    fn on_group_delete(&mut self, action: sys::ecs_group_delete_action_t) -> &mut Self {
+    fn on_group_delete(mut self, action: sys::ecs_group_delete_action_t) -> Self {
         let desc = self.query_desc_mut();
         desc.on_group_delete = action;
         self
