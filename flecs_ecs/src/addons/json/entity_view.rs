@@ -8,6 +8,9 @@ impl EntityView<'_> {
     /// Set component or pair id from JSON.
     pub fn set_json(self, comp: impl IntoId, json: &str, desc: Option<&FromJsonDesc>) -> Self {
         let comp: u64 = *comp.into_id(self.world);
+        // Shared-register write hook (spec §3.6, §7.1): `ecs_ensure_id` adds `comp`
+        // to this entity, moving it, so it must defer behind a live guard.
+        crate::core::ensure_write_episode(&self.world);
         let world = self.world_ptr_mut();
         let id = *self.id;
         unsafe {
@@ -64,6 +67,9 @@ impl EntityView<'_> {
 
     /// Deserialize entity to JSON.
     pub fn from_json(self, json: &str) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): deserialization adds/sets
+        // components on this entity, so it must defer behind a live guard.
+        crate::core::ensure_write_episode(&self.world);
         let world = self.world_ptr_mut();
         let id = *self.id;
         //TODO we should have an Json Type so we don't need to make these conversions multiple times.

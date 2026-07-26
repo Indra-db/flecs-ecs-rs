@@ -398,6 +398,36 @@ pub(crate) fn ensure_write_episode(world: &WorldRef) {
     unsafe { (*locks.as_ptr()).open_episode(world.raw_world.as_ptr()) };
 }
 
+/// Refuse (like a `RefCell` borrow conflict) when any shared-register guard is
+/// live on this stage. For bulk entry points whose C internals
+/// (`ecs_bulk_init`) must create and observe their entity ids immediately and
+/// cannot defer: appending rows to an existing table can reallocate a pinned
+/// column out from under a live guard, so the only sound answer under a live pin
+/// is to refuse rather than dangle the guard (spec §3.6, mirroring the bundle
+/// `spawn` refusal).
+#[cfg(feature = "flecs_safety_locks")]
+#[inline]
+pub(crate) fn assert_no_live_pin(world: &WorldRef, op: &str) {
+    let locks = stage_locks_dyn(world);
+    // SAFETY: the stage map is owned by the calling thread.
+    if unsafe { (*locks.as_ptr()).has_live_pin() } {
+        live_pin_panic(op);
+    }
+}
+
+#[cfg(feature = "flecs_safety_locks")]
+#[cold]
+#[inline(never)]
+#[track_caller]
+fn live_pin_panic(op: &str) -> ! {
+    panic!(
+        "cannot {op} while component guards are live on this stage: the operation appends \
+         rows to existing tables and can reallocate a pinned column, which would dangle a \
+         live `Ref` / `Mut` guard. Drop all guards (from `get_ref` / `entity_ref` / \
+         `singleton`) before calling {op}"
+    );
+}
+
 #[cfg(feature = "flecs_safety_locks")]
 #[cold]
 #[inline(never)]

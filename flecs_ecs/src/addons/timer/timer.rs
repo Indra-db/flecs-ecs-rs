@@ -25,6 +25,9 @@ pub trait TimerAPI: Sized {
     /// If the tick source ticked this frame, the 'tick' member will be true.
     /// When the tick source is a system, the system will tick when the timer ticks.
     fn set_interval(self, interval: f32) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsTimer to the timer
+        // entity, so it must defer behind a live guard on that entity's data.
+        crate::core::ensure_write_episode(&self.world());
         unsafe { sys::ecs_set_interval(self.world_ptr_mut(), *self.id(), interval) };
         self
     }
@@ -52,6 +55,9 @@ pub trait TimerAPI: Sized {
     /// If the tick source ticked this frame, the 'tick' member will be true.
     /// When the tick source is a system, the system will tick when the timer ticks.
     fn set_timeout(self, timeout: f32) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsTimer to the timer
+        // entity, so it must defer behind a live guard on that entity's data.
+        crate::core::ensure_write_episode(&self.world());
         unsafe { sys::ecs_set_timeout(self.world_ptr_mut(), *self.id(), timeout) };
         self
     }
@@ -100,6 +106,9 @@ pub trait TimerAPI: Sized {
     ///
     /// * [`TimerAPI::set_rate_with_tick_source()`]
     fn set_rate(self, rate: i32) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsRateFilter to the
+        // entity, so it must defer behind a live guard on that entity's data.
+        crate::core::ensure_write_episode(&self.world());
         unsafe { sys::ecs_set_rate(self.world_ptr_mut(), *self.id(), rate, 0) };
         self
     }
@@ -129,6 +138,9 @@ pub trait TimerAPI: Sized {
     ///
     /// * [`TimerAPI::set_rate()`]
     fn set_rate_with_tick_source(self, rate: i32, tick_source: impl Into<Entity>) -> Self {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsRateFilter to the
+        // entity, so it must defer behind a live guard on that entity's data.
+        crate::core::ensure_write_episode(&self.world());
         unsafe { sys::ecs_set_rate(self.world_ptr_mut(), *self.id(), rate, *tick_source.into()) };
         self
     }

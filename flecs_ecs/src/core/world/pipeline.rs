@@ -131,6 +131,10 @@ impl World {
     /// * C API: `ecs_progress`
     #[inline(always)]
     pub fn progress_time(&self, delta_time: f32) -> bool {
+        // Running the pipeline executes systems that structurally mutate storage
+        // immediately and cannot defer, so it would reallocate a pinned column out
+        // from under a live guard: refuse rather than dangle it (spec §3.6).
+        crate::core::assert_no_live_pin(&self.world(), "World::progress()");
         unsafe { sys::ecs_progress(self.raw_world.as_ptr(), delta_time) }
     }
 
@@ -185,6 +189,9 @@ impl World {
     #[inline(always)]
     pub fn run_pipeline_time(&self, pipeline: impl IntoEntity, delta_time: FTime) {
         let world = self.world();
+        // As `progress`: running the pipeline executes systems that mutate storage
+        // immediately and cannot defer, so refuse under a live guard (spec §3.6).
+        crate::core::assert_no_live_pin(&world, "World::run_pipeline()");
         unsafe {
             sys::ecs_run_pipeline(
                 self.raw_world.as_ptr(),

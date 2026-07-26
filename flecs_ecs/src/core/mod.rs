@@ -97,6 +97,13 @@ pub(crate) use safety_map::*;
 #[inline(always)]
 pub(crate) fn ensure_write_episode(_world: &WorldRef) {}
 
+/// No-op without the safety-lock bookkeeping: no guards exist, so no pin can be
+/// live and bulk entry points keep their immediate semantics. Companion to
+/// [`ensure_write_episode`] for callers that must compile in both configs.
+#[cfg(not(feature = "flecs_safety_locks"))]
+#[inline(always)]
+pub(crate) fn assert_no_live_pin(_world: &WorldRef, _op: &str) {}
+
 #[doc(hidden)]
 pub use sparse_query::SparseQuery;
 #[doc(hidden)]

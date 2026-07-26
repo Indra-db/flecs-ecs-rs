@@ -167,6 +167,9 @@ impl World {
     /// * [`World::set_doc_name()`]
     #[inline(always)]
     pub fn set_doc_name(&self, entity: impl IntoEntity, name: &str) {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsDocDescription to
+        // `entity`, so it must defer behind a live guard on `entity`'s data.
+        crate::core::ensure_write_episode(&self.world());
         let name = compact_str::format_compact!("{}\0", name);
         unsafe {
             sys::ecs_doc_set_name(
@@ -190,6 +193,9 @@ impl World {
     /// * [`World::set_doc_brief()`]
     #[inline(always)]
     pub fn set_doc_brief(&self, entity: impl IntoEntity, brief: &str) {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsDocDescription to
+        // `entity`, so it must defer behind a live guard on `entity`'s data.
+        crate::core::ensure_write_episode(&self.world());
         let brief = compact_str::format_compact!("{}\0", brief);
         unsafe {
             sys::ecs_doc_set_brief(
@@ -213,6 +219,9 @@ impl World {
     /// * [`World::set_doc_detail()`]
     #[inline(always)]
     pub fn set_doc_detail(&self, entity: impl IntoEntity, detail: &str) {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsDocDescription to
+        // `entity`, so it must defer behind a live guard on `entity`'s data.
+        crate::core::ensure_write_episode(&self.world());
         let detail = compact_str::format_compact!("{}\0", detail);
         unsafe {
             sys::ecs_doc_set_detail(
@@ -236,6 +245,9 @@ impl World {
     /// * [`World::set_doc_link()`]
     #[inline(always)]
     pub fn set_doc_link(&self, entity: impl IntoEntity, link: &str) {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsDocDescription to
+        // `entity`, so it must defer behind a live guard on `entity`'s data.
+        crate::core::ensure_write_episode(&self.world());
         let link = compact_str::format_compact!("{}\0", link);
         unsafe {
             sys::ecs_doc_set_link(
@@ -261,6 +273,9 @@ impl World {
     /// * [`World::set_doc_color()`]
     #[inline(always)]
     pub fn set_doc_color(&self, entity: impl IntoEntity, color: &str) {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsDocDescription to
+        // `entity`, so it must defer behind a live guard on `entity`'s data.
+        crate::core::ensure_write_episode(&self.world());
         let color = compact_str::format_compact!("{}\0", color);
         unsafe {
             sys::ecs_doc_set_color(
@@ -286,6 +301,9 @@ impl World {
     /// * [`World::doc_uuid()`]
     /// * [`Doc::doc_uuid()`](super::Doc::doc_uuid)
     pub fn set_doc_uuid(&self, entity: impl IntoEntity, uuid: &str) {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsDocDescription to
+        // `entity`, so it must defer behind a live guard on `entity`'s data.
+        crate::core::ensure_write_episode(&self.world());
         let uuid = compact_str::format_compact!("{}\0", uuid);
         unsafe {
             sys::ecs_doc_set_uuid(

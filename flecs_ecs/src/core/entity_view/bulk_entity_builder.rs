@@ -244,6 +244,7 @@ impl<'a> BulkEntityBuilder<'a> {
     /// ```
     pub fn build(&mut self) -> Vec<Entity> {
         assert_not_in_multithreaded_phase(self.world.world_ptr());
+        crate::core::assert_no_live_pin(&self.world, "World::entity_bulk(..).build()");
         self.desc.data = self.data.as_ptr() as *mut _;
         if !self.entity_ids.is_empty() {
             self.desc.entities = self.entity_ids.as_mut_ptr();
@@ -319,6 +320,7 @@ impl<'a> BulkEntityBuilder<'a> {
     /// ```
     pub fn build_to_table(&mut self, table: &mut Table) -> Vec<Entity> {
         assert_not_in_multithreaded_phase(self.world.world_ptr());
+        crate::core::assert_no_live_pin(&self.world, "World::entity_bulk(..).build_to_table()");
         if self.data.is_empty() {
             let mut all_default = true;
 

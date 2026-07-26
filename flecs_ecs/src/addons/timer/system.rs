@@ -16,6 +16,9 @@ impl System<'_> {
     ///
     /// To disassociate a tick source from a system, use [`System::reset_tick_source()`](crate::addons::system::System::reset_tick_source).
     pub fn set_tick_source(&self, id: impl IntoEntity) {
+        // Shared-register write hook (spec §3.6, §7.1): adds EcsTickSource to the
+        // system entity, so it must defer behind a live guard on its data.
+        crate::core::ensure_write_episode(&self.world);
         unsafe {
             sys::ecs_set_tick_source(
                 self.entity.world_ptr_mut(),
@@ -27,6 +30,9 @@ impl System<'_> {
 
     /// Reset, disassociate a tick source from a system
     pub fn reset_tick_source(&self) {
+        // Shared-register write hook (spec §3.6, §7.1): mutates EcsTickSource on the
+        // system entity, so it must defer behind a live guard on its data.
+        crate::core::ensure_write_episode(&self.world);
         unsafe { sys::ecs_set_tick_source(self.entity.world_ptr_mut(), *self.id, 0) }
     }
 }
