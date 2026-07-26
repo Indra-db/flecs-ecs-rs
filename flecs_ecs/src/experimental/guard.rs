@@ -159,6 +159,58 @@ impl<T> DerefMut for Mut<'_, T> {
     }
 }
 
+/// Forwards `Debug` to the borrowed `T`, so a guard formats like the component
+/// it wraps.
+impl<T: core::fmt::Debug> core::fmt::Debug for Ref<'_, T> {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(&**self, f)
+    }
+}
+
+/// Forwards `Debug` to the borrowed `T`, so a guard formats like the component
+/// it wraps.
+impl<T: core::fmt::Debug> core::fmt::Debug for Mut<'_, T> {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(&**self, f)
+    }
+}
+
+/// Forwards `Display` to the borrowed `T`.
+impl<T: core::fmt::Display> core::fmt::Display for Ref<'_, T> {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(&**self, f)
+    }
+}
+
+/// Forwards `Display` to the borrowed `T`.
+impl<T: core::fmt::Display> core::fmt::Display for Mut<'_, T> {
+    #[inline]
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(&**self, f)
+    }
+}
+
+/// Compares two `Ref` guards by their borrowed values (`*self == *other`), so a
+/// guard is interchangeable with the component it wraps in equality checks.
+impl<T: PartialEq> PartialEq for Ref<'_, T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+
+/// Compares two `Mut` guards by their borrowed values (`*self == *other`), so a
+/// guard is interchangeable with the component it wraps in equality checks.
+impl<T: PartialEq> PartialEq for Mut<'_, T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+
 impl<T> Drop for Ref<'_, T> {
     #[inline(always)]
     fn drop(&mut self) {

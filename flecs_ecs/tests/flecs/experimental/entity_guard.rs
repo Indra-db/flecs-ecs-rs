@@ -332,6 +332,65 @@ fn panic_with_live_optional_guard_does_not_wedge() {
     assert_eq!(e.get_ref::<&Position>().unwrap().x, 100);
 }
 
+// --- guard ergonomics: Debug / Display / PartialEq forward to T (spec 3.2) ---
+
+#[test]
+fn guard_partial_eq_forwards_to_target() {
+    let world = World::new();
+    let a = world.entity().set(Health(5));
+    let b = world.entity().set(Health(5));
+    let c = world.entity().set(Health(6));
+    let ga = a.get_ref::<&Health>().unwrap();
+    let gb = b.get_ref::<&Health>().unwrap();
+    let gc = c.get_ref::<&Health>().unwrap();
+    assert_eq!(ga, gb);
+    assert_ne!(ga, gc);
+}
+
+#[test]
+fn guard_mut_partial_eq_forwards_to_target() {
+    let world = World::new();
+    // Distinct archetypes so the two Health columns are separate storage and the
+    // two write guards do not conflict.
+    let a = world.entity().set(Health(5));
+    let b = world.entity().set(Health(5)).set(Position::default());
+    let ga = a.get_ref::<&mut Health>().unwrap();
+    let gb = b.get_ref::<&mut Health>().unwrap();
+    assert_eq!(ga, gb);
+}
+
+#[test]
+fn guard_debug_forwards_to_target() {
+    let world = World::new();
+    let e = world.entity().set(Position { x: 3, y: 4 });
+    let g = e.get_ref::<&Position>().unwrap();
+    assert_eq!(format!("{g:?}"), format!("{:?}", Position { x: 3, y: 4 }));
+    drop(g);
+    let gm = e.get_ref::<&mut Position>().unwrap();
+    assert_eq!(format!("{gm:?}"), format!("{:?}", Position { x: 3, y: 4 }));
+}
+
+#[derive(flecs_ecs::macros::Component)]
+struct Meters(i32);
+
+impl core::fmt::Display for Meters {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}m", self.0)
+    }
+}
+
+#[test]
+fn guard_display_forwards_to_target() {
+    let world = World::new();
+    let e = world.entity().set(Meters(42));
+    {
+        let g = e.get_ref::<&Meters>().unwrap();
+        assert_eq!(format!("{g}"), "42m");
+    }
+    let gm = e.get_ref::<&mut Meters>().unwrap();
+    assert_eq!(format!("{gm}"), "42m");
+}
+
 // --- panic safety: a guard live during a panic must not wedge the map ---
 
 #[test]

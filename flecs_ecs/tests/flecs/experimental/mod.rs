@@ -20,5 +20,5 @@ struct Velocity {
     y: i32,
 }
 
-#[derive(Component, Clone, Debug, Default)]
+#[derive(Component, Clone, Debug, Default, PartialEq)]
 struct Health(i32);
