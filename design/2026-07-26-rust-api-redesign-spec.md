@@ -692,11 +692,13 @@ specified, sound behaviour:
   it does not alias.
 - **The defer level leaks, not corrupts.** The forgotten level stays open, so
   writes issued after it remain queued past the point they would otherwise flush.
-  The world is not wedged: `World::progress()` / an explicit sync still run;
-  flecs tolerates unbalanced Rust-side scope levels because the *world's* defer
-  stack is drained at frame boundaries regardless of the Rust counter. A
-  `mem::forget`-leaked level therefore delays some observers but cannot deadlock
-  or crash.
+  A leaked level can only *delay* the flush and the observers behind it; it can
+  never alias or grant access, so no UB is reachable. Whether `progress()`'s
+  pipeline sync points drain the world queue despite an unbalanced user-held
+  level is deliberately not asserted here: the implementation must pin the
+  actual behaviour with a test (leak a guard, run `progress()`, assert either
+  drain-at-sync or delay-until-close, and assert no abort at world destruction),
+  and the guard-type docs must state whichever behaviour is pinned.
 
 This is sound because both leaked resources are *monotonic denials* (a stuck
 lock denies; a stuck defer delays), never grants. The prototype's `PendingDefer`
