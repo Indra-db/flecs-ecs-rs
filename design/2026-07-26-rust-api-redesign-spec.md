@@ -43,8 +43,12 @@ Two registers, split by how uniqueness is proven (Decision 1):
   Validated by `experimental/guard.rs` + `entity_access.rs`.
 
 Shared-register *writes* (`set`, structural ops) are deferred to the next sync
-point (Decision 2); the guard holds a defer level open for its lifetime so
-storage cannot move under a live borrow (storage-pin). `World` stops being
+point (Decision 2). Live guards do not each open a flecs defer level; instead a
+Rust-side per-stage **pin counter** (next to `StageLocks`, single-owner per
+thread, no atomics) counts live guards, and the first shared-register write issued
+while the pin is nonzero lazily opens **one** `ecs_defer_begin` that closes when
+the pin returns to zero (§7.1). Storage therefore cannot move under a live borrow
+(storage-pin), and read-only access pays no defer FFI at all. `World` stops being
 `Clone`. Full rationale and measured state are in the design record; this spec
 does not restate them.
 
@@ -94,6 +98,12 @@ access returns plain `&T` / `&mut T` and performs structural ops *immediately*
 view at another id, which is a footgun with no legitimate use. `Deref<Target =
 Entity>` (read-only id access) is retained; the id is also available via
 `view.id()`.
+
+**Cached query facts (invariant).** A built `Query` carries two facts fixed at
+`build()`: its disjointness verdict (a `bool`, §4.7) and its owning-world identity
+(a world pointer). Per-iteration tier selection and the cross-world guard are then
+a single branch and a single pointer compare; these two cached facts join the
+invariants list beside the 16-byte `get_ptr` rule (design record).
 
 ### 2.3 The hard rule: every entry point threads a world borrow
 
@@ -154,12 +164,14 @@ impl<'w> EntityView<'w> {
 ### 3.2 Guard types
 
 ```rust
-/// Shared immutable access to one component; releases its read borrow and one
-/// defer level on drop. `Deref<Target = T>`.
+/// Shared immutable access to one component; on drop releases its read borrow and
+/// decrements the stage pin (§7.1). Holds no defer level of its own.
+/// `Deref<Target = T>`.
 pub struct Ref<'w, T> { /* ptr, world, lock key */ }
 
-/// Shared mutable access to one component; releases its write borrow and one
-/// defer level on drop. `Deref` + `DerefMut<Target = T>`.
+/// Shared mutable access to one component; on drop releases its write borrow and
+/// decrements the stage pin (§7.1). Holds no defer level of its own.
+/// `Deref` + `DerefMut<Target = T>`.
 pub struct Mut<'w, T> { /* ptr, world, lock key */ }
 ```
 
@@ -199,10 +211,10 @@ was absent at acquire; non-optional elements still gate the whole acquire
 
 Semantics an implementer must honour:
 
-- An absent optional element takes **no lock and no defer level**; only present
-  elements register borrows and hold levels. The fused-acquire rollback and the
-  range release therefore branch per element on presence (the acquire records
-  which elements locked).
+- An absent optional element takes **no lock and does not touch the pin**; only
+  present elements register borrows and increment the stage pin (§7.1). The
+  fused-acquire rollback and the range release therefore branch per element on
+  presence (the acquire records which elements locked and pinned).
 - Absence is stable for the guard's lifetime: the component cannot appear while
   any guard from the same acquire lives, because shared-register `add`/`set` is
   deferred and the flush is unreachable until the last guard drops (§3.6). An
@@ -210,6 +222,10 @@ Semantics an implementer must honour:
   correct: it borrowed nothing.
 - `try_get` reports a conflict only for elements that actually attempt a borrow;
   absent optionals cannot conflict.
+
+A **single optional** needs no tuple: `get::<Option<&T>>()` is itself a valid
+`GuardTuple`, yielding `Option<Ref<T>>` (and `Option<&mut T>` -> `Option<Mut<T>>`),
+so the one-element `(Option<&T>,)` workaround is unnecessary (GAP-3).
 
 Owned copy-out of optionals stays on `cloned`; the chunk cursor's
 `Option<&[T]>` columns (§4.6) are unchanged.
@@ -245,31 +261,165 @@ impl World {
 }
 ```
 
+`World::entity` and `World::entity_new` split entity construction by register:
+
+```rust
+impl World {
+    /// Shared-register handle. Structural ops on the returned view are deferred
+    /// ONLY while a defer scope / guard-pin episode (§7.1) or staging is active;
+    /// with no open level flecs applies them IMMEDIATELY. This preserves today's
+    /// startup ergonomics: `world.entity().set(..).set(..)` at top level (no guard
+    /// live) commits each op at once.
+    pub fn entity(&self) -> EntityView<'_>;
+    /// Exclusive-register handle for immediate construction (the immediate ops above).
+    pub fn entity_new(&mut self) -> EntityMut<'_>;
+}
+```
+
+**Bundles vs fluent chaining.** The `entity().set().set().set()` startup pattern
+performs one archetype move per `set`. `World::spawn(bundle)` / `EntityMut::insert(bundle)`
+(§4.11) collapse those into a single table move; the fluent form remains valid and
+its top-level ops are immediate, but the docs steer bulk construction toward
+`spawn` / `insert`.
+
+**Fused exclusive tuple get.** `EntityMut::get_many` mirrors the shared-register
+fused acquire but with **zero locks** (the exclusive borrow is the proof):
+
+```rust
+impl<'w> EntityMut<'w> {
+    /// Fused multi-component exclusive borrow: `get_many::<(&mut A, &B)>()` ->
+    /// `Option<(&mut A, &B)>`. A duplicate mutable request (`(&mut A, &mut A)`) or a
+    /// mutable+shared alias of one component is a **compile error** (static
+    /// duplicate-mutable check); absence of any requested component is `None`.
+    pub fn get_many<G: ExclusiveTuple<'w>>(&'w mut self) -> Option<G::Refs>;
+}
+```
+
+**Pair access under the register split (GAP-10).** `set_pair`, `set_first`,
+`set_second`, and the pair getters follow the same split as single-component
+access: on the shared register (`EntityView`) a pair `set` is deferred and checks
+the pin (§7.1); on the exclusive register (`EntityMut`) it is immediate. Pair
+*reads* return `Ref` / `Mut` guards under `&World` and plain `&`/`&mut` under
+`&mut World`, exactly as single-component reads.
+
+**Singletons.** Direct world-level singleton access mirrors the register split:
+
+```rust
+impl World {
+    /// Shared read of a singleton: `Ref` guard, pin + lock, no defer FFI on the
+    /// read path (§3.6). `None` if the singleton component is not set.
+    pub fn singleton<T>(&self) -> Option<Ref<T>>;
+    /// Exclusive singleton access: plain `&mut T`, no lock (the `&mut World` is the
+    /// proof). `None` if not set.
+    pub fn singleton_mut<T>(&mut self) -> Option<&mut T>;
+}
+```
+
+The `Singleton<T>` query wrapper (read-only) and the trait-based singleton *term*
+(mutable, Tier-1 locked) are covered in §4.9.
+
 ### 3.6 Deferred-write semantics under `&World` (shared register)
 
 Under `&World` / `EntityView`, `set` and structural ops are **deferred** to the
-next sync point (Decision 2). Each live guard holds one defer level open
-(`ecs_rust_get_scope_begin` / `ecs_defer_begin`), so the flush is unreachable
-while any guard lives — storage cannot move and the borrowed pointer cannot
-dangle. **Observer timing:** deferred ops issued under `&World` run, and their
-`OnSet` / `OnAdd` observers fire, when the **last guard drops** (the outermost
-defer level closes). This generalises the old CPS-`get` "observers run after the
-callback" semantics to arbitrary lexical scopes. A `set` issued while two guards
-are live does not fire its observer until both have dropped.
+next sync point (Decision 2). The mechanism is a Rust-side **per-stage pin
+counter** (§7.1), not a defer level per guard:
+
+- Each live guard increments the stage pin on acquire and decrements it on drop.
+  The pin lives next to `StageLocks` in `core::safety_map`, is single-owner per
+  thread, and uses no atomics. The **read path touches only the pin counter and the
+  lock map: zero defer FFI** on guard acquire and drop.
+- A shared-register **write** wrapper checks the pin. If the pin is nonzero and no
+  defer level is currently open for the stage, it opens **one** lazy
+  `ecs_defer_begin` and marks the level open; subsequent writes in the same episode
+  reuse it. The level is closed with `ecs_defer_end` when the pin returns to zero
+  (the last guard drops). This is **one begin/end per write episode**, not one per
+  guard. If the pin is zero, a shared-register write executes with today's immediate
+  semantics (no defer bracket).
+
+The **observable deferred-write semantics are unchanged** from a per-guard-defer
+design: while any guard is live the flush is unreachable, so storage cannot move and
+the borrowed pointer cannot dangle; queued writes apply, and their `OnSet` / `OnAdd`
+observers fire, when the **last guard drops**. A `set` issued while two guards are
+live does not fire its observer until both have dropped. This generalises the old
+CPS-`get` "observers run after the callback" semantics to arbitrary lexical scopes.
+
+**Read-after-write within a live guard (behavior change, GAP-8).** Because the
+write is queued until the pin returns to zero, a read of the same component
+*through a still-live guard* observes the **pre-write** value. Code that set a
+component and re-read it inside one `get`/`try_get` scope must drop its guards
+(reaching a sync point) before the new value is visible; immediate read-back still
+requires `&mut World` / `EntityMut` (Decision 2). This is a genuine behavior change
+from the CPS API and is listed in the migration guide (§12).
 
 ```rust
 impl<'w> EntityView<'w> {
     /// Deferred under &World: queued now, applied (and observers fired) when the
-    /// last live guard on this stage drops.
+    /// last live guard on this stage drops. Opens at most one shared defer level
+    /// per write episode (§7.1); a write with no guard live is immediate.
     pub fn set<T>(self, value: T) -> Self;
     pub fn add(self, id: impl IntoId) -> Self;
     pub fn remove(self, id: impl IntoId) -> Self;
 }
 ```
 
-Immediate read-back of a shared-register write requires `&mut World` /
-`EntityMut` (Decision 2): there is no way to observe a still-deferred write
-through `&World` without first dropping to a sync point.
+**Soundness obligations (implementation checklist).** Every shared-register
+mutation wrapper MUST check the pin before mutating. The required wrapper set:
+
+- `EntityView::set`, `add`, `remove`, `set_pair` / `set_first` / `set_second` and
+  the other pair setters (§3.5), pair `add` / `remove`, `enable` / `disable`,
+  `is_a` / `child_of` and the relationship-add helpers, `EntityView::destruct`, and
+  every other `&World`-register structural or set op;
+- the trait-based singleton *term* write on the Tier-1 query path (§4.9) is a
+  shared-register mutation and MUST check the pin. (`World::singleton_mut` does not:
+  it is exclusive, §3.5.)
+
+Two required safeguards back the checklist:
+
+- a **debug-mode C-shim assert** at op entry: `stage pin > 0` implies
+  `stage defer > 0` (a pinned stage with an unopened level is a missed wrapper);
+- **one safety test per wrapper** asserting the write is queued under a live guard
+  and flushes at last-guard-drop.
+
+### 3.7 `CachedRef`: resolved-once repeated single-entity access
+
+`CachedRef<T>` replaces today's `CachedRef` and is the sub-10 ns story for repeated
+reads of one entity's component across frames:
+
+```rust
+impl World {
+    /// Resolve `e`'s `T` once, caching table + column and the lock key. Not Copy.
+    pub fn entity_ref<T>(&self, e: impl Into<Entity>) -> Option<CachedRef<T>>;
+}
+
+pub struct CachedRef<T> { /* entity, cached table id + column, lock key; !Copy */ }
+
+impl<T> CachedRef<T> {
+    /// Fast path: table-version check (revalidate by table id), then a direct
+    /// pointer plus pin + lock. `None` if the entity moved tables and no longer has
+    /// `T`, or is dead.
+    pub fn get(&self, world: &World) -> Option<Ref<T>>;
+    pub fn get_mut(&mut self, world: &World) -> Option<Mut<T>>;
+}
+```
+
+Resolution and revalidation reuse the existing C shim
+`ecs_rust_ref_get_scope_begin` (`flecs_ecs_sys/src/flecs_rust.c:620`), which already
+revalidates by table id. On the fast path (entity has not changed tables) `get`
+skips re-resolution and does only the table-version check, then hands back a standard
+`Ref` / `Mut` guard (pin + lock as in §3.1, no defer FFI on the read path per §3.6);
+`get_mut`'s `&mut self` lets it refresh the cached table / column on revalidation.
+`CachedRef<T>` is **never `Copy`**: a copied cache could outlive the table
+revalidation contract. It is the specified replacement for the prototype's caching
+path and for the repeated-single-entity benchmark.
+
+### 3.8 Relationship and hierarchy iteration helpers (GAP-7)
+
+`EntityView::each_child`, `each_target`, and `each_pair` remain closure-based
+iteration on the shared view (permitted by §2.3: `EntityView` carries the world
+borrow). Their callbacks run on the **shared register**: a guard taken inside a
+callback registers in the stage lock map and increments the pin exactly as a
+top-level `get` would, and a `set` issued inside is deferred per §3.6. The callbacks
+may themselves take guards; conflicts panic (or `try_*`-error) as elsewhere.
 
 ---
 
@@ -277,12 +427,40 @@ through `&World` without first dropping to a sync point.
 
 ### 4.1 Building
 
-The builder's terminal is the build, taken **by value**, returning a `Result`:
+Typed-tuple construction is **infallible**. A statically-typed data tuple `D`
+cannot produce `InvalidExpr` or `InvalidTerm` — those failure modes only exist for a
+runtime `expr()` string or dynamically-added terms. So the pure-typed path returns a
+`Query<D>` directly, and `Result` appears only on the builders that actually took a
+runtime expression or a dynamic term:
 
 ```rust
-impl<'w> QueryBuilder<'w, D> {
-    /// Terminal. Consumes the builder (so double-build and build-never are
-    /// compile errors) and returns the query or the construction error.
+impl World {
+    /// Infallible typed-tuple query. Convenience constructor: builds and returns the
+    /// query. The only residual failure is a C `ecs_query_init` rejection, which for
+    /// a well-formed static descriptor is exceptional and **panics** (documented as a
+    /// program/environment bug, not a recoverable condition).
+    pub fn new_query<D: QueryTuple>(&self) -> Query<D>;
+    /// Builder entry for configuration (with/without/term/cached/...).
+    pub fn query<D: QueryTuple>(&self) -> QueryBuilder<'_, D>;
+}
+
+impl<'w, D: QueryTuple> QueryBuilder<'w, D> {
+    /// Terminal for a purely-typed builder. Consumes the builder (double-build and
+    /// build-never are compile errors) and returns the query directly. Panics only on
+    /// the exceptional `ecs_query_init` rejection.
+    pub fn build(self) -> Query<D>;
+
+    /// A runtime query expression. Introduces parse/validation failure modes, so it
+    /// transitions the builder to the fallible-build typestate.
+    pub fn expr(self, expr: &str) -> FallibleQueryBuilder<'w, D>;
+    /// A dynamically-constructed term (id known only at runtime). Same transition.
+    pub fn term_dyn(self, term: TermRef<'_>) -> FallibleQueryBuilder<'w, D>;
+}
+
+impl<'w, D: QueryTuple> FallibleQueryBuilder<'w, D> {
+    /// Terminal for a builder that took `expr()` or a dynamic term. Consuming,
+    /// single, and `Result`-returning because the descriptor can be malformed.
+    /// (Carries the same configuration methods as `QueryBuilder`.)
     pub fn build(self) -> Result<Query<D>, QueryBuildError>;
 }
 
@@ -291,7 +469,7 @@ impl<'w> QueryBuilder<'w, D> {
 pub enum QueryBuildError {
     /// `expr()` string failed to parse.
     InvalidExpr { expr: String },
-    /// A term was malformed (bad id, conflicting modifiers).
+    /// A dynamic term was malformed (bad id, conflicting modifiers).
     InvalidTerm { index: usize },
     /// The C `ecs_query_init` rejected the descriptor for another reason.
     Init,
@@ -299,20 +477,28 @@ pub enum QueryBuildError {
 impl core::error::Error for QueryBuildError {}
 ```
 
-This removes today's two problems at once: `build(&mut self) -> Self::BuiltType`
-(`builder.rs:6`) returns `&mut self`-tied and can be called twice or never, and
-it *panics* on a bad descriptor while `try_build` returns `Option` and loses the
-reason. The clean-break surface has exactly one terminal, consuming, and
-`Result`-returning. There is no `try_build`; `build` is already fallible.
+The typestate makes fallibility **track the actual failure surface**: a query built
+entirely from typed terms has no `Result` to thread, while one that took a runtime
+`expr()` or `term_dyn()` must handle `QueryBuildError`. This removes today's two
+problems — `build(&mut self) -> Self::BuiltType` (`builder.rs:6`) that can be called
+twice or never, and a `build` that *panics* on a bad descriptor while `try_build`
+returns `Option` and loses the reason — and replaces panic-on-bad-descriptor with a
+typed `Result` exactly where a descriptor can be bad. There is no `try_build`.
 
-The intermediate configuration methods (`with`, `without`, `term`, `expr`,
-`set_cached`, ...) keep `&mut self` for chaining but are *not* terminal, so the
-"build twice / never" hazard exists only at the single by-value `build`.
+The intermediate configuration methods (`with`, `without`, `term`, `set_cached`,
+...) keep `&mut self` for chaining but are *not* terminal, so the "build twice /
+never" hazard exists only at the single by-value `build`. **Id-expression helpers
+are unaffected (GAP-11):** `Component::id()`, `id::<T>()`, and `flecs::Wildcard` feed
+`.with(...)` / `.term(...)` on both builder typestates exactly as before; the
+`Result`/infallible split concerns only the terminal `build`.
 
 ### 4.2 The query handle
 
 ```rust
-pub struct Query<D: QueryTuple> { /* owns ecs_query_t refcount */ }
+pub struct Query<D: QueryTuple> {
+    /* owns ecs_query_t refcount; caches the §4.7 disjointness verdict (bool) and
+       the owning-world identity (*const ecs_world_t), both set once at build */
+}
 ```
 
 `Query<D>` is the owned query. It is `!Send`/`!Sync` in general (§4.9). It
@@ -348,41 +534,82 @@ per query:
 No semantic narrowing at any tier: a query legal today is legal in every tier it
 qualifies for.
 
+**`MAX_TRACKED_TERMS = 64`** (spec constant). The stage lock map and the
+disjointness proof are sized to 64 data terms per query; a query with more data
+terms than that falls back to **Tier 1** (batch locks) unconditionally, since the
+build-time proof cannot be sized past the constant.
+
 ### 4.4 Iteration surface
+
+**Guidance (read first).** Bind the world mutably — `let mut world` — and prefer
+`each(&mut world, ..)`: it is the fast, common path and reaches Tier 0 when the
+query is proven-disjoint (§4.7). Reach for `each_shared(&world, ..)` **only** while
+another shared borrow of the world is live (it always registers Tier-1 batch locks).
+`each` on an **unproven** query silently falls back to Tier 1 over the same
+`&mut world` (no panic, no Tier 0) — correctness is preserved, only the lock-free
+fast path is lost. `chunks` / `each!` are the disjoint-only vectorised path (§4.6);
+unproven-but-dense queries use `batches`; non-dense queries route to `each_shared` /
+`run` (routing table, §4.5).
 
 ```rust
 impl<D: QueryTuple> Query<D> {
-    /// Exclusive register. Tier 0 when proven-disjoint, else Tier 1 over &mut
-    /// World. The common fast path.
+    /// Exclusive register. Tier 0 when proven-disjoint (cached at build, §4.7), else
+    /// Tier 1 over &mut World. The common fast path. Prefer this; reach for
+    /// `each_shared` only while another shared borrow of the world is live.
     pub fn each(&self, world: &mut World, f: impl FnMut(D::Item<'_>));
 
     /// Shared register. Tier 1 (always registers batch locks). Legal while other
     /// shared borrows exist; conflicts panic.
     pub fn each_shared(&self, world: &World, f: impl FnMut(D::Item<'_>));
 
-    /// Exclusive register, lending chunk cursor (§4.6). Panics if not
-    /// proven-disjoint.
-    pub fn chunks<'w>(&self, world: &'w mut World) -> ChunkCursor<'w, D>;
+    /// Row form carrying a lightweight iteration context (`Iter`, §5.6): delta time,
+    /// row count, per-row entity, and (for observers) event metadata.
+    pub fn each_iter(&self, world: &mut World, f: impl FnMut(Iter<'_>, D::Item<'_>));
 
     /// Row form carrying the entity.
     pub fn each_entity(&self, world: &mut World, f: impl FnMut(EntityView, D::Item<'_>));
     pub fn each_entity_shared(&self, world: &World, f: impl FnMut(EntityView, D::Item<'_>));
 
-    /// Escape hatch: manual table-batch iteration (replaces today's `run`).
-    /// Still world-threaded; yields a `TableIter` bound to the borrow.
+    /// Exclusive register, true `Iterator` of column-slice chunks (§4.6). Panics if
+    /// not proven-disjoint (routing, §4.5).
+    pub fn chunks<'w>(&self, world: &'w mut World) -> Chunks<'w, D>;
+
+    /// Dense-columns cursor for an UNPROVEN query: registers Tier-1 batch locks per
+    /// batch and yields the same slice tuples as `chunks` (§4.5 routing). Conflicts
+    /// panic per the shared register.
+    pub fn batches<'w>(&self, world: &'w World) -> LockedBatches<'w, D>;
+
+    /// Escape hatch: manual table-batch iteration (replaces today's `run`). Still
+    /// world-threaded; the closure is called ONCE with a `TableIter` the body
+    /// advances (`while it.next()`), matching today.
     pub fn run(&self, world: &mut World, f: impl FnMut(TableIter<D>));
     pub fn run_shared(&self, world: &World, f: impl FnMut(TableIter<D>));
 }
 ```
 
-`each` taking `&mut World` is the fast, common case; `each_shared` is the
-opt-in for iterating while other shared borrows are alive. Rust cannot overload
-one name on argument mutability, hence the two names (this is the naming the
-design task fixed).
+`each` taking `&mut World` is the fast, common case; `each_shared` is the opt-in for
+iterating while other shared borrows are alive. Rust cannot overload one name on
+argument mutability, hence the two names (this is the naming the design task fixed).
+
+**World-level one-liners (GAP-1).** The ergonomic no-builder forms are retained,
+world-threaded by construction:
+
+```rust
+impl World {
+    /// Build-and-iterate in one call:
+    /// `world.each::<(&mut Position, &Velocity)>(|(p, v)| ..)`.
+    pub fn each<D: QueryTuple>(&mut self, f: impl FnMut(D::Item<'_>));
+    pub fn each_entity<D: QueryTuple>(&mut self, f: impl FnMut(EntityView, D::Item<'_>));
+}
+```
+
+They take `&mut self` (exclusive register) and internally build a cached query and
+run `each`, so `world.each::<&Position>(..)` replaces the old world-level one-liner
+without a visible builder or a `&mut world` argument thread-through.
 
 ### 4.5 The `each!` macro
 
-Adopts the prototype macro (`experimental/mod.rs`), driven by the chunk cursor,
+Adopts the prototype macro (`experimental/mod.rs`), driven by the chunk iterator,
 with native `break` / `continue` / `?`:
 
 ```rust
@@ -391,56 +618,127 @@ each!((pos, vel) in query.chunks(&mut world) {
 });
 ```
 
-The macro expands to a `while let Some(chunk) = cursor.next()` over batches and
-an inner `for row in 0..len` that binds each column's row (`RowSlice::row`).
-Because the body is inlined textually, `break`/`continue`/`?` refer to the
-caller's control flow. Bound-name count must equal column count (else a
-compile error from the tuple destructure).
+The macro expands to a `for chunk in cursor` over batches (the cursor is now a true
+`Iterator`, §4.6) and an inner `for row in 0..len` that binds each column's row.
+Because the body is inlined textually, `break`/`continue`/`?` refer to the caller's
+control flow. `each!` accepts **either** cursor: `query.chunks(..)` (proven-disjoint,
+exclusive) or `query.batches(..)` (unproven, dense, Tier-1 locked, §4.4).
 
-### 4.6 Chunk cursor: pre-checked slice iterators (friction fix)
+**Named compile error on arity mismatch (§9.5 diagnostics).** A bound-name count
+that does not equal the column count emits a **named** macro error ("`each!`: N bound
+names but query has M data columns"), not a raw tuple-destructure mismatch.
+
+**Routing (loud caveat).** `chunks` / `each!`-over-`chunks` require a
+**proven-disjoint, pure dense, self-sourced** query (§4.7). Anything else does not
+qualify:
+
+| Query shape | `chunks` / `each!` | Use instead |
+|---|---|---|
+| proven-disjoint dense self columns | yes: Tier 0, lock-free slices | — |
+| unproven but all-dense self columns | panic | `batches(&world)` (Tier-1 locked slices), or `each_shared` |
+| singleton / traversal (`Up`/`Cascade`) data term | panic | `each_shared` / `run` |
+| wildcard / sparse / `DontFragment` column | panic | `each_shared` / `run` |
+
+`chunks` on a non-qualifying query **panics** (it would hand out `&mut` slices with
+no sound basis); `batches` covers the dense-but-unproven case with per-batch locks;
+non-dense terms route to `each_shared` or the manual `run` loop.
+
+**IDE note.** Inside `each!` the body is macro-expanded, so IDE assistance
+(completion, inline types) is limited. The closure forms (`each` / `each_entity` /
+`each_iter`) remain first-class and are the recommended path for IDE-heavy
+workflows.
+
+### 4.6 Chunk iterator: pre-checked slice iterators, true `Iterator`
+
+`chunks` returns a **true `Iterator`** (not a lending cursor). This upgrades the
+*shape* of Decision 5 (recorded explicitly: still **no `LendingIterator`
+dependency**, chunk still the primitive, row still sugar) from a `while let` lending
+cursor to `impl Iterator`:
 
 ```rust
-pub struct ChunkCursor<'w, D> { /* lending: next() borrows &mut self */ }
+pub struct Chunks<'w, D> { /* borrows &'w mut World */ }
 
-impl<'w, D: QueryTuple> ChunkCursor<'w, D> {
-    /// Advance to the next table batch, yielding whole-column slices
-    /// (`&mut [A]`, `&[B]`, `Option<&[C]>`...). Lending: the chunk borrows
-    /// `&mut self`, so it is dropped before the next pull (hence `while let`,
-    /// not `Iterator`). Decision 5: chunk is the primitive, row is sugar.
-    pub fn next(&mut self) -> Option<D::Chunk<'_>>;
+impl<'w, D: QueryTuple> Iterator for Chunks<'w, D> {
+    /// Whole-column slice tuple: `(&'w mut [A], &'w [B], Option<&'w [C]>, ..)`. The
+    /// yielded slices borrow the TABLE STORAGE with the cursor's `'w` (from
+    /// `&'w mut World`), NOT the cursor, so successive chunks do not alias and the
+    /// item outlives a `next()` call.
+    type Item = D::Chunk<'w>;
+    fn next(&mut self) -> Option<Self::Item>;
+}
 
+impl<'w, D: QueryTuple> Chunks<'w, D> {
     /// Terminal, by value: cannot be reused (double-consume is a compile error).
-    pub fn for_each(self, f: impl FnMut(D::Chunk<'_>));
+    pub fn for_each(self, f: impl FnMut(D::Chunk<'w>));
+    /// Change-detection adapter (§4.12): skips clean batches.
+    pub fn changed(self) -> ChangedChunks<'w, D>;
 }
 ```
 
-**Friction fix (prototype):** the read path must vectorise. The cursor yields
-real `&[T]` / `&mut [T]` slices (not an index-and-bounds-check accessor), so
-user code that does `chunk.0.iter_mut().zip(chunk.1)` gets pointer-add codegen
-with the bounds check hoisted out of the row loop, matching `each`'s pointer
-arithmetic. The `each!` macro's inner loop indexes `0..len` where `len` is read
-once per chunk, so LLVM elides the per-row bounds check. This closes the "chunk
-read path pays per-row bounds checks" friction. The cursor rejects ref /
-inherited / sparse columns (`ref_fields | up_fields | row_fields != 0` → panic):
-those are not plain dense self columns and cannot be handed out as slices.
+Non-overlap of the yielded `&'w mut [_]` slices is guaranteed by two facts together:
+the **proven-disjoint gate** (`chunks` panics unless the query passed the cached §4.7
+proof), and the pinned invariant **"one query iteration visits each `(table,
+row-range)` at most once"**. That invariant is promoted to a **CI-tested contract**
+listed beside the §6.3 scheduler contract: it is re-verified on every vendored-C bump
+and must cover sorted, grouped, and change-skipped iteration. If it cannot be
+established for sorted / grouped queries on a given C version, the `Iterator` impl is
+**scoped to unsorted / ungrouped queries** and sorted / grouped `chunks` fall back to
+the lending `while let` form.
 
-### 4.7 Disjointness proof behind a safe handle (friction fix)
+Being a real `Iterator` (with `Send` slices when `T: Send`) unlocks the std
+combinators and rayon:
+
+- `zip` / `enumerate` / `sum` / `collect` compose directly on the chunk stream;
+- `chunks(..).par_bridge()` (rayon) parallelises the chunk stream, sound because each
+  `Item` is a distinct non-overlapping slice set and slices are `Send` when `T: Send`.
+
+`for_each` stays the **by-value terminal** (cannot be reused); `each!` is unchanged in
+spelling and now expands to a plain `for chunk in query.chunks(..)`.
+
+**Friction fix (prototype), retained:** the yielded columns are real `&[T]` /
+`&mut [T]` slices (not an index-and-bounds-check accessor), so
+`chunk.0.iter_mut().zip(chunk.1)` gets pointer-add codegen with the bounds check
+hoisted out of the row loop, matching `each`'s pointer arithmetic. The `each!` macro's
+inner loop indexes `0..len` where `len` is read once per chunk, so LLVM elides the
+per-row bounds check. The cursor rejects ref / inherited / sparse columns
+(`ref_fields | up_fields | row_fields != 0` → panic): those are not plain dense self
+columns and cannot be handed out as slices (routing, §4.5).
+
+**Singleton-iteration edge case.** When a batch has `count == 0 && table.is_null()`
+(the singleton-only iteration flecs emits for a data-free / singleton match), `next()`
+yields **nothing** from chunks: there are no dense self columns to slice.
+
+### 4.7 Disjointness proof, computed once at `build()` (friction fix)
+
+The disjointness verdict **and** the query's owning-world identity are computed
+**once at `build()`** and cached on `Query` — a `bool` plus a world pointer — so
+per-iteration work is one branch (read the cached bool) plus one pointer compare
+(cached world ptr vs the passed `&World`):
 
 ```rust
 impl<D: QueryTuple> Query<D> {
-    /// True when the query's data terms provably address pairwise-distinct,
-    /// dense, self-sourced storage (so a lock-free exclusive run cannot alias).
-    /// Conservative: `false` means "not proven", never "known aliasing".
-    pub fn is_proven_disjoint(&self, world: &World) -> bool;
+    /// The cached build-time verdict: true when the query's data terms provably
+    /// address pairwise-distinct, dense, self-sourced storage (so a lock-free
+    /// exclusive run cannot alias). Conservative: `false` means "not proven", never
+    /// "known aliasing". O(1): returns the cached bool.
+    pub fn is_proven_disjoint(&self) -> bool;
 }
 ```
 
-Takes a safe `&Query` + `&World`, not a raw `*const ecs_query_t` (prototype
-friction). The analysis is `experimental/disjoint.rs` unchanged: rejects
-wildcards, non-`$this`/`Self`-traversal sources, non-`And` operators, sparse /
-`DontFragment` storage, and any two data terms sharing a concrete id; ignores
-tag terms. `each`/`chunks` call it internally; it is also public so callers can
-branch before choosing `chunks` vs `each_shared`.
+The analysis itself is `experimental/disjoint.rs` unchanged: rejects wildcards,
+non-`$this`/`Self`-traversal sources, non-`And` operators, sparse / `DontFragment`
+storage, and any two data terms sharing a concrete id; ignores tag terms. It now runs
+at build against a safe `&World`, not per call over a raw `*const ecs_query_t`
+(prototype friction). `each` / `chunks` read the cached bool and pointer-compare the
+world; that is their entire tier-selection cost. `is_proven_disjoint` stays public so
+callers can branch before choosing `chunks` vs `each_shared`.
+
+**Caveat pinned.** A component that gains a `Sparse` or `DontFragment` trait *after* a
+query is built against it would invalidate the cached proof. The implementation must
+**debug-assert storage traits are unchanged at iteration time**, and the spec
+documents the contract: **storage traits are fixed before the first query is built
+against them.** Both cached facts join the invariants list beside the 16-byte
+`get_ptr` rule (design record).
 
 ### 4.8 Tuple arities via `tuples!` (friction fix)
 
@@ -450,21 +748,36 @@ macro that drives `QueryTuple` / `GetTuple`), so `GuardTuple`, `ChunkColumns`,
 and `GuardElement` cover the full supported arity uniformly. No behavioural
 change, only coverage.
 
-### 4.9 Multi-source terms are read-only by construction
+### 4.9 Multi-source terms, and the two singleton forms
 
-Traversal / singleton terms name storage the current entity does not own, so
-they are **immutable-only in the type system**:
+**Traversal terms are read-only by construction.** `Up<T>` / `Cascade<T>` name
+storage the current entity does not own, so they are immutable-only in the type
+system:
 
 ```rust
 Up<T>        // -> &T only; `Up<&mut T>` does not implement the query-term trait
 Cascade<T>   // -> &T only
-Singleton<T> // -> &T only
 ```
 
-Requesting `&mut` through `Up` / `Cascade` / `Singleton` is a **compile error**
-(the mutable term impl is simply not provided for these wrappers), not a runtime
-guard. This removes an entire class of aliasing (two entities sharing an
-inherited component and both writing it).
+Requesting `&mut` through `Up` / `Cascade` is a **compile error** (the mutable term
+impl is simply not provided for these wrappers), not a runtime guard. This removes an
+entire class of aliasing (two entities sharing an inherited component and both writing
+it).
+
+**Singletons have two forms (reconciliation).**
+
+- **Trait-based singleton term** — a plain `&Gravity` / `&mut Gravity` where `Gravity`
+  carries the `Singleton` trait. This **remains a legal query term, including
+  mutable**, resolved with **runtime Tier-1 locking** (the write is registered in the
+  stage lock map like any shared-register term, and its wrapper checks the pin, §3.6).
+- **`Singleton<T>` wrapper** — the explicit-source **read-only** form. `Singleton<T>`
+  yields `&T` only; `Singleton<&mut T>` (mutable through the wrapper) **does not
+  compile**. Use it when the source is explicit and the access is a read.
+
+Either way, a singleton-bearing query **never passes the disjointness proof** (§4.7
+rejects it), so it always runs **Tier 1** and **panics under `chunks`** (it is not a
+pure dense self query). Under `each!` it routes to `each_shared` / `run` per §4.5; the
+trait-based mutable form takes its Tier-1 write lock on the batch path.
 
 ### 4.10 `Query` / `QueryHandle` auto-traits (Decision 3)
 
@@ -490,33 +803,110 @@ reverts part of `aa282cef` as the design record notes.
 off the owning thread, and only inside flecs staged execution where the world is
 read-only for the duration.
 
+### 4.11 Bundles
+
+A `Bundle` is a set of components inserted as one archetype move. `trait Bundle` is
+implemented for component tuples via the crate's `tuples!` macro (the same macro that
+drives `QueryTuple`), so `(A, B, C, ..)` is a `Bundle` up to the supported arity.
+
+```rust
+pub trait Bundle { /* sealed; component-set → one table */ }
+
+impl World {
+    /// Exclusive, IMMEDIATE construction of one entity from a bundle: ONE table move
+    /// via the vendored `ecs_bulk_init` path (count = 1). Returns the new entity as an
+    /// `EntityMut` for further immediate ops.
+    pub fn spawn<B: Bundle>(&mut self, bundle: B) -> EntityMut<'_>;
+    /// Bulk construction of `n` entities from one bundle via `ecs_bulk_init`.
+    pub fn spawn_batch<B: Bundle>(&mut self, bundle: B, n: usize)
+        -> impl Iterator<Item = Entity> + '_;
+}
+
+impl<'w> EntityMut<'w> {
+    /// Batch add/set of a whole bundle in ONE table move (not N).
+    pub fn insert<B: Bundle>(&mut self, bundle: B) -> &mut Self;
+}
+
+impl<'s> Stage<'s> {
+    /// Deferred twin of `World::spawn`: enqueues the bundle's commands on the stage;
+    /// flecs defer-merge batches same-entity commands into one move at the sync point.
+    pub fn spawn<B: Bundle>(&self, bundle: B) -> EntityView<'_>;
+}
+```
+
+A per-world **bundle → table cache** (keyed through the §8.2 per-world component index
+machinery) resolves the target table once per bundle type per world. This replaces **N
+archetype moves with one** for the ubiquitous `entity().set().set().set()` startup
+pattern; the fluent form remains valid but the docs steer bulk construction toward
+`spawn` / `insert`. **Hook / observer ordering parity** with the per-component `set`
+sequence (the order and set of `OnAdd` / `OnSet` observers fired) must be pinned by
+tests.
+
+### 4.12 Change detection (thin, opt-in)
+
+Change detection is an **opt-in** builder flag over flecs' existing per-query /
+per-table change tracking, not per-entity tick storage:
+
+```rust
+impl<'w, D: QueryTuple> QueryBuilder<'w, D> {
+    /// Opt in to change detection for this query (`ecs_query_changed` machinery).
+    pub fn detect_changes(self) -> Self;
+}
+
+impl<D: QueryTuple> Query<D> {
+    /// Whether the query's matched tables changed since last iteration
+    /// (`ecs_query_changed`). Requires `detect_changes()`.
+    pub fn is_changed(&self, world: &World) -> bool;
+}
+
+impl<'a, D> TableIter<'a, D> {
+    /// Whether the current batch changed since last iteration.
+    pub fn is_changed(&self) -> bool;
+    /// Skip the current batch. `skip` MUST NOT mark write columns dirty (it declares
+    /// "I did not write this batch").
+    pub fn skip(&mut self);
+}
+```
+
+`Chunks::changed()` (§4.6) is the iterator adapter that skips clean batches and
+composes with the true-`Iterator` chunk stream.
+
+**Rejected: bevy-style per-entity `Changed` / `Added` tick storage.** Per-row change
+ticks impose a per-row write cost that violates priority 1 (the hot path), and flecs
+observers / monitors already cover per-entity change reaction. The rejection is
+recorded so the decision is durable: change detection is per-query / per-table only.
+
 ---
 
 ## 5. Systems and observers
 
-### 5.1 Terminal build is two-phase (kept by construction)
+### 5.1 Terminal build: infallible on the typed path, two-phase init
 
-The system/observer builder's terminal is the closure-taking build, by value,
-returning `Result`:
+The pure-typed system path is **infallible**, mirroring §4.1: a statically-typed `D`
+cannot produce an invalid descriptor, so the terminal returns `System` directly. The
+residual `ecs_system_init` failure is exceptional and **panics** (documented), not a
+`Result`.
 
 ```rust
 impl<'w> SystemBuilder<'w, D> {
-    pub fn each(self, f: impl FnMut(D::Item<'_>) + 'static)
-        -> Result<System, SystemBuildError>;
-    pub fn each_entity(self, f: impl FnMut(EntityView, D::Item<'_>) + 'static)
-        -> Result<System, SystemBuildError>;
-    pub fn run(self, f: impl FnMut(TableIter<D>) + 'static)
-        -> Result<System, SystemBuildError>;
+    pub fn each(self, f: impl FnMut(D::Item<'_>) + 'static) -> System;
+    pub fn each_entity(self, f: impl FnMut(EntityView, D::Item<'_>) + 'static) -> System;
+    pub fn each_iter(self, f: impl FnMut(Iter<'_>, D::Item<'_>) + 'static) -> System;
+    pub fn run(self, f: impl FnMut(TableIter<D>) + 'static) -> System;
 }
 ```
 
-**Two-phase init (kept):** the closure is boxed and its context installed
-*only after* `ecs_system_init` returns a valid system entity. A failed init must
-not leak the closure. This is already correct on the current surface
-(`system_builder.rs` builds the entity first, checks `id() != 0`); the spec
-locks it in as "closure ownership transfers on success, is dropped on failure",
-enforced by construction (the boxed closure lives in a local that is only handed
-to the C context ptr after the id check).
+Only a builder that took a runtime `expr()` or a dynamic term transitions to the
+fallible typestate (`FallibleSystemBuilder`), whose terminals return
+`Result<System, SystemBuildError>`. This matches the query split in §4.1: the `Result`
+appears exactly where a descriptor can be malformed and nowhere else.
+
+**Two-phase init (kept):** the closure is boxed and its context installed *only after*
+`ecs_system_init` returns a valid system entity. A failed init must not leak the
+closure. This is already correct on the current surface (`system_builder.rs` builds the
+entity first, checks `id() != 0`); the spec locks it in as "closure ownership transfers
+on success, is dropped on failure", enforced by construction (the boxed closure lives
+in a local that is only handed to the C context ptr after the id check).
 
 ### 5.2 Closures are `'static`; world access is opt-in
 
@@ -529,17 +919,22 @@ later). They get world access **only** through:
 ```rust
 impl<'w> SystemBuilder<'w, D> {
     /// Opt-in world access. `stage` is the callback's stage handle (§6), through
-    /// which deferred commands are issued. Enabling this makes the system
-    /// register its term locks (the item alone can be served lock-free on the
-    /// tiered path when disjoint; adding arbitrary stage access cannot).
-    pub fn each_with(self, f: impl FnMut(D::Item<'_>, Stage<'_>) + 'static)
-        -> Result<System, SystemBuildError>;
+    /// which deferred commands are issued. Enabling this makes the system register
+    /// its term locks (the item alone can be served lock-free on the tiered path when
+    /// disjoint; adding arbitrary stage access cannot). Infallible on the typed path.
+    pub fn each_with(self, f: impl FnMut(D::Item<'_>, Stage<'_>) + 'static) -> System;
+
+    /// Entity + item + stage (GAP-6): the "visit each matched entity and issue a
+    /// deferred command on it" shape, which `each_entity` (no stage) and `each_with`
+    /// (no entity) could not express together.
+    pub fn each_entity_with(self, f: impl FnMut(EntityView, D::Item<'_>, Stage<'_>) + 'static)
+        -> System;
 }
 ```
 
-`.each` (no stage) can qualify for the lock-free tiered path; `.each_with`
-always registers this system's term locks, since the stage handle can reach
-arbitrary storage the disjointness proof does not cover.
+`.each` (no stage) can qualify for the lock-free tiered path; `.each_with` /
+`.each_entity_with` always register this system's term locks, since the stage handle
+can reach arbitrary storage the disjointness proof does not cover.
 
 ### 5.3 Context: capture, not `*mut c_void`
 
@@ -585,6 +980,13 @@ surface makes it a **type error**: `OnAdd`'s builder bounds `D: DataFreeTerms`
 (tuples of tags / `EntityView` only, no `&T` / `&mut T`), so a data term with
 `OnAdd` fails to compile rather than being silently skipped.
 
+**Observer terminals.** The observer builder's terminals are `each`, `each_entity`,
+`each_iter`, and `run` (same shapes as systems, §5.1). Event metadata is reached
+through `Iter` (`event()`, `event_id()`, `pair()`, §5.6) on `each_iter`, or through
+`TableIter` on `run`; an observer that only reacts (no metadata) uses `each` /
+`each_entity`. This gives event-inspecting observers an `each`-shaped path and removes
+the forced drop to a manual `run` loop.
+
 ### 5.5 Panic policy across the C boundary (Decision 8)
 
 A panicking system/observer/query callback is:
@@ -599,9 +1001,57 @@ A panicking system/observer/query callback is:
 
 A panic never unwinds through a C frame. This is the invariant from the design
 record ("no unbalanced lock counters or `ecs_table_lock`", "Panics caught at the
-trampoline"); the spec requires every new trampoline (each/each_with/run/observer)
-to route through the same catch-stash-rethrow path, tested by the panic-cleanup
-safety suite (§13).
+trampoline"); the spec requires every new trampoline (each / each_iter /
+each_entity / each_with / each_entity_with / run / par_each / observer) to route
+through the same catch-stash-rethrow path, tested by the panic-cleanup safety
+suite (§13).
+
+### 5.6 Iteration context: `Iter<'_>`
+
+`Iter<'_>` is the lightweight per-invocation context handed by the `*_iter` terminals
+(`Query::each_iter`, `SystemBuilder::each_iter`, observer `each_iter`), replacing the
+deleted `each_iter(|it, index, item|)` triple with a typed context object:
+
+```rust
+pub struct Iter<'a> { /* borrows the running iteration, !Send/!Sync */ }
+
+impl<'a> Iter<'a> {
+    pub fn delta_time(&self) -> f32;
+    pub fn delta_system_time(&self) -> f32;
+    pub fn count(&self) -> usize;
+    /// The entity for the row currently bound by the callback.
+    pub fn entity(&self) -> EntityView<'a>;
+
+    // Observer-only event metadata (present when iterating an observer):
+    pub fn event(&self) -> EntityView<'a>;
+    pub fn event_id(&self) -> Id;
+    pub fn pair(&self, index: i8) -> Option<Id>;   // matched pair metadata
+}
+```
+
+`Iter` carries the row's entity and (for observers) the event metadata that previously
+only `TableIter` exposed, so pair- and event-inspecting iteration (wildcard queries,
+observers) no longer has to drop to a manual `run` loop.
+
+**Timestep on the stage.** `Stage<'s>` also exposes `delta_time()` and `count()` so
+`each_with` / `each_entity_with` cover timestep-driven systems without an `Iter`:
+
+```rust
+impl<'s> Stage<'s> {
+    pub fn delta_time(&self) -> f32;
+    pub fn count(&self) -> usize;
+}
+```
+
+### 5.7 Running systems and `progress` (GAP-9)
+
+`World::progress` takes **`&mut self`**: `world.progress(delta)` is an exclusive frame
+step. A stored `System` runs via `System::run(&mut world)` (the `SystemRunnerFluent` is
+deleted, §14.7). Both are exclusive-register calls, so **mixing manual `run` and
+`progress` in one frame is legal** — they serialise on the `&mut World` borrow, and a
+stored `System` / `Query` handle coexists with the `&mut world` iteration borrow
+because each call borrows the world for its own duration and releases it. There is no
+`&World` / `&mut World` split across the two: both are `&mut World`.
 
 ---
 
@@ -631,11 +1081,11 @@ outside a callback: `Stage` has no public constructor.
 
 ```rust
 impl<'w> SystemBuilder<'w, D> {
-    pub fn par_each(self, f: impl Fn(D::Item<'_>) + Send + Sync + 'static)
-        -> Result<System, SystemBuildError>
+    // Infallible on the typed path (§5.1); the fallible typestate returns Result.
+    pub fn par_each(self, f: impl Fn(D::Item<'_>) + Send + Sync + 'static) -> System
         where for<'x> D::Item<'x>: Send;
     pub fn par_each_with(self, f: impl Fn(D::Item<'_>, Stage<'_>) + Send + Sync + 'static)
-        -> Result<System, SystemBuildError>
+        -> System
         where for<'x> D::Item<'x>: Send;
 }
 ```
@@ -677,42 +1127,74 @@ shared-mutable pattern.
 
 ## 7. Defer, staging, Commands
 
-### 7.1 Guard-held defer levels (prototype-validated)
+### 7.1 Guard pin counter and lazy defer level
 
-Each shared-register guard holds exactly one flecs defer level for its lifetime
-(§3.6). Nesting is by count: *k* live guards → *k* open levels; the queue flushes
-when the count returns to zero (last guard drops). This is `guard.rs` +
-`entity_access.rs`, validated. Structural ops through `&World` while a guard is
-live are queued; the borrowed pointer stays valid because the flush is
-unreachable until every guard drops (storage-pin).
+Guards do **not** each hold a flecs defer level. A shared-register guard touches only
+two Rust-side structures on acquire and drop: the stage lock map and a per-stage **pin
+counter** that lives next to `StageLocks` in `core::safety_map`, single-owner per
+thread, no atomics. *k* live guards → pin = *k*. The **read path issues zero defer
+FFI**: `get` / `try_get` acquire and guard drop increment and decrement the pin and
+touch the lock map, nothing else.
+
+The flecs defer level is opened **lazily, once per write episode**, by the
+shared-register write wrappers (§3.6), not by the guards:
+
+- a write wrapper checks the pin; if pin > 0 and no level is open for the stage, it
+  opens exactly one `ecs_defer_begin` and marks the level open;
+- the level is closed with `ecs_defer_end` when the pin returns to zero (the last
+  guard drops); intervening writes reuse the open level;
+- if pin == 0 the write executes immediately (today's semantics), with no bracket.
+
+Structural ops through `&World` while a guard is live are therefore queued behind this
+single episode-scoped level; the borrowed pointer stays valid because the flush is
+unreachable until every guard drops (storage-pin). The queue flushes, and the observers
+behind it fire, when the pin returns to zero.
+
+**Why the pin, not per-guard levels.** The defer decomposition measurement of
+2026-07-26 timed guard `get` at **12.68 ns** with a per-guard defer bracket versus
+**9.75 ns** without it: the bracket is ~23% of the op, paid on every guard whether or
+not it writes. The pin design pays the bracket only on write episodes and recovers the
+full ~23% for all read-only accesses (the dominant case), while preserving the
+observable deferred-write semantics of §3.6 exactly.
+
+**Soundness obligations.** Enumerated as an implementation checklist in §3.6: every
+shared-register mutation wrapper checks the pin; a debug-mode C-shim assert enforces
+`stage pin > 0` ⇒ `stage defer > 0` at op entry; one safety test per wrapper asserts
+queue-under-guard / flush-at-last-drop.
 
 ### 7.2 `mem::forget` on a guard must not wedge the world (specified)
 
 If a caller `mem::forget`s a guard, its `Drop` never runs, so its read/write
-borrow is **never released** and its defer level is **never closed**. The
-specified, sound behaviour:
+borrow is **never released** and the stage pin it incremented is **never
+decremented**. The specified, sound behaviour:
 
 - **The borrow leaks, not corrupts.** The forgotten borrow stays registered in
   the stage lock map. Subsequent conflicting access to that same storage will
   *panic* (or `try_*`-error) forever — a leak that fails safe, never a
   use-after-free. The stage map is a plain counter; a stuck counter denies access,
   it does not alias.
-- **The defer level leaks, not corrupts.** The forgotten level stays open, so
-  writes issued after it remain queued past the point they would otherwise flush.
-  A leaked level can only *delay* the flush and the observers behind it; it can
-  never alias or grant access, so no UB is reachable. Whether `progress()`'s
-  pipeline sync points drain the world queue despite an unbalanced user-held
-  level is deliberately not asserted here: the implementation must pin the
-  actual behaviour with a test (leak a guard, run `progress()`, assert either
-  drain-at-sync or delay-until-close, and assert no abort at world destruction),
-  and the guard-type docs must state whichever behaviour is pinned.
+- **The pin leaks, not corrupts.** The forgotten guard leaves the stage pin
+  permanently above zero (a monotonic Rust counter, exactly as the borrow counter
+  is). A pin stuck above zero can only keep write episodes on the deferred path; it
+  can never alias or grant access.
+- **A defer level leaks only if a write episode was open.** Because levels are now
+  opened lazily per write episode (§7.1), a forgotten *read* guard with no write
+  issued leaks **no** C defer level at all — it leaks only the Rust pin. A guard
+  forgotten while a write episode's level is open leaks that one open level, which
+  can only *delay* the flush and the observers behind it, never alias or grant
+  access, so no UB is reachable. Whether `progress()`'s pipeline sync points drain
+  the world queue despite an unbalanced level is deliberately not asserted here: the
+  implementation must pin the actual behaviour with a test (leak a guard, run
+  `progress()`, assert either drain-at-sync or delay-until-close, and assert no abort
+  at world destruction), and the guard-type docs must state whichever behaviour is
+  pinned.
 
-This is sound because both leaked resources are *monotonic denials* (a stuck
-lock denies; a stuck defer delays), never grants. The prototype's `PendingDefer`
-(`entity_access.rs:30`) guarantees the *acquire* path is balanced on panic; the
-`mem::forget` case is the caller's explicit leak and the spec commits to
-"fails-safe, does not wedge" as the contract. No `mem::forget`-detection code is
-added (it would cost the hot path); the guarantee is structural.
+This is sound because every leaked resource is a *monotonic denial* (a stuck lock
+denies; a stuck pin keeps writes deferred; a stuck level delays), never a grant. The
+prototype's `PendingDefer` (`entity_access.rs:30`) guarantees the *acquire* path is
+balanced on panic; the `mem::forget` case is the caller's explicit leak and the spec
+commits to "fails-safe, does not wedge" as the contract. No `mem::forget`-detection
+code is added (it would cost the hot path); the guarantee is structural.
 
 ### 7.3 Commands: per-call token, not persistent buffer (decided)
 
@@ -723,11 +1205,11 @@ buffer stored on the system.
 Rationale:
 
 - A persistent `Commands` buffer would have to outlive sync points and reconcile
-  with the world's own defer stack and with the guard-held defer levels (§7.1),
-  duplicating bookkeeping the flecs defer queue already owns.
+  with the world's own defer stack and with the guard pin's episode-scoped defer
+  level (§7.1), duplicating bookkeeping the flecs defer queue already owns.
 - The per-call token scopes command issuance to the callback invocation, so it
-  composes cleanly with guard defer levels and with the panic-cleanup path (the
-  token cannot outlive the `catch_unwind`).
+  composes cleanly with the guard pin / write-episode level and with the
+  panic-cleanup path (the token cannot outlive the `catch_unwind`).
 - Deferred ops through `Stage` are just entries on the world's existing defer
   queue; there is no separate replay step to own.
 
@@ -740,7 +1222,8 @@ defer queue and flush at the next sync point.
 A sync point is where the deferred queue drains and observers fire:
 
 - end of a `progress()` pipeline phase (between systems, per flecs merge points);
-- last-guard-drop on a stage (§3.6), which closes the outermost Rust-held level;
+- the stage pin returning to zero at last-guard-drop (§3.6, §7.1), which closes the
+  episode-scoped defer level opened by the write wrappers;
 - an explicit `world.defer_end()` / scope exit at the top level.
 
 The spec does not change flecs merge semantics; it only pins the Rust-visible
@@ -809,9 +1292,12 @@ so a reallocation during recursion cannot dangle an outer `&mut`.
 
 - `Option<T>` — absence: entity not alive, component not present. Returned by
   `get`, `get_mut`, `cloned`, `entity_view`, `entity_mut`.
-- `Result<T, E>` — malformed construction: `build() -> Result<_, QueryBuildError>`,
-  `SystemBuilder::each() -> Result<_, SystemBuildError>`, and
-  `try_get() -> Result<_, AccessError>` (the fallible borrow).
+- `Result<T, E>` — malformed construction, only where a descriptor can actually be
+  malformed: the `expr()`/`term_dyn()` fallible typestate's
+  `build() -> Result<_, QueryBuildError>` and `FallibleSystemBuilder`'s terminals
+  `-> Result<_, SystemBuildError>` (§4.1, §5.1), and `try_get() -> Result<_,
+  AccessError>` (the fallible borrow). The purely-typed query/system build is
+  infallible.
 - **Panic** — genuine aliasing bug only: a shared-register conflict through the
   panicking entry points (`get`, `each_shared`), or an exclusivity invariant the
   borrow checker cannot see (world-identity mismatch in `each`/`chunks`,
@@ -849,7 +1335,7 @@ Unchanged from `guard.rs` except `#[non_exhaustive]` for forward compatibility.
 | Owned copy-out | `cloned` | `Option` per element |
 | Exclusive borrow | `get` / `get_mut` on `EntityMut`; `World::get_mut` | plain `&`/`&mut` |
 | Unchecked twin | `<op>_unchecked` | always `unsafe fn`, always documented contract |
-| Fallible construction | `build`, `each`, ... `-> Result` | terminal, by value |
+| Construction terminal | `build`, `each`, ... | terminal, by value; **infallible** on the typed path (returns `Query`/`System`), `-> Result` only on the `expr()`/`term_dyn()` fallible typestate (§4.1, §5.1) |
 | Shared-register iteration | `each_shared`, `each_entity_shared`, `run_shared` | `&World` |
 | Exclusive-register iteration | `each`, `each_entity`, `run`, `chunks` | `&mut World` |
 
@@ -860,7 +1346,7 @@ Safety is never a feature; these are the Tier-2 escape hatches.
 
 | Checked op | Unsafe twin | Safety contract |
 |---|---|---|
-| `EntityView::get` / `try_get` | `get_unchecked` | Caller guarantees no other live borrow of any requested component's storage on this stage for the returned guards' lifetimes. Skips `read_begin`/`write_begin`; still holds the defer level (storage-pin is a soundness requirement, not a check). |
+| `EntityView::get` / `try_get` | `get_unchecked` | Caller guarantees no other live borrow of any requested component's storage on this stage for the returned guards' lifetimes. Skips `read_begin`/`write_begin`; still increments the stage pin (storage-pin is a soundness requirement, not a check). |
 | `EntityMut::get_mut` | — | No twin: already lock-free (exclusive register); the borrow checker is the proof. |
 | `Query::each` (unproven → Tier 1) | `each_unchecked` | Caller guarantees the batch's term accesses do not alias any live borrow. Skips `acquire_batch_locks`. Mirrors today's `each_unchecked` (`query_api.rs:147`). |
 | `Query::each_entity` | `each_entity_unchecked` | As `each_unchecked`, plus the entity view is not used to take a conflicting borrow. |
@@ -872,6 +1358,26 @@ Safety is never a feature; these are the Tier-2 escape hatches.
 
 The `_unchecked` twins are the *only* way to reach Tier 2. There is no
 feature-gated silent removal of a check.
+
+### 9.5 Diagnostics requirements
+
+The surface must be legible when misused:
+
+- **`#[track_caller]` on every panicking public entry point**, with the actual
+  panic-raising fn marked `#[cold]`, so a borrow-conflict panic points at the user's
+  call site, not into the guard internals.
+- **`#[diagnostic::on_unimplemented]` on every public bound-bearing trait** —
+  `GuardTuple`, `QueryTuple`, `ChunkColumns`, `Bundle`, `DataFreeTerms`,
+  `ReadOnlyTerms` — with an actionable message (e.g. for `DataFreeTerms`: "an `OnAdd`
+  observer cannot request component data; use a tag term or `()`").
+- **Every `#[doc(hidden)]` kernel trait is sealed** (`GuardElement`, `GuardParts`,
+  `ChunkElement`, `RowSlice`, `ChunkColumns`, `Builder`, ...), so downstream crates
+  cannot implement them and the plumbing stays an implementation detail.
+- **`each!` emits a NAMED compile error** on bound-count vs column-count mismatch
+  (§4.5), not raw tuple-destructure "soup".
+
+§4.5 sets the expectation that IDE assistance inside `each!` is limited; the closure
+forms (`each` / `each_entity` / `each_iter`) remain first-class for IDE users.
 
 ---
 
@@ -977,7 +1483,7 @@ thin FFI mirrors):
 
 ## 12. Migration guide outline
 
-Table of old → new for the 15 most common operations. (Full guide is a separate
+Table of old → new for the most common operations. (Full guide is a separate
 document; this is its skeleton.)
 
 | # | Old pattern | New pattern |
@@ -986,17 +1492,22 @@ document; this is its skeleton.)
 | 2 | `e.get::<&Position>(\|p\| { ... use p ... })` (CPS) | `let p = e.get::<&Position>().unwrap(); /* use p */` (guard, NLL scope) |
 | 3 | `e.get::<(&A, &mut B)>(\|(a, b)\| ...)` | `let (a, mut b) = e.get::<(&A, &mut B)>().unwrap();` |
 | 4 | `e.try_get::<&A>(\|a\| ...)` | `let a = e.try_get::<&A>()?;` |
-| 5 | `let p = e.cloned::<&Position>();` | `let p = e.cloned::<&Position>();` (now `Option`) |
+| 5 | `let p = e.cloned::<&Position>();` (panics if absent) | `let p = e.cloned::<&Position>();` now returns `Option` (`None` on absence); today's `try_cloned` is folded in. **Behavior change:** absence stops panicking. |
 | 6 | `world.get::<&mut Position>(e, \|p\| ...)` | `let p = world.get_mut::<Position>(e).unwrap();` (exclusive, `&mut World`) |
-| 7 | `let q = world.query::<&Position>().build();` (panics on error) | `let q = world.query::<&Position>().build()?;` (`Result`) |
-| 8 | `q.each(\|p\| ...)` (no world arg) | `q.each(&mut world, \|p\| ...)` (exclusive) or `q.each_shared(&world, \|p\| ...)` |
+| 7 | `let q = world.query::<&Position>().build();` (panics on error) | `let q = world.query::<&Position>().build();` typed build is now **infallible** (returns `Query<D>`); only a builder that took `expr()`/`term_dyn()` returns `Result` and needs `?`. |
+| 8 | `q.each(\|p\| ...)` (no world arg) | `q.each(&mut world, \|p\| ...)` (exclusive) or `q.each_shared(&world, \|p\| ...)`. Requires `let mut world`; the closure cannot hold another borrow of `world` across the call. |
 | 9 | `q.each_entity(\|e, p\| ...)` | `q.each_entity(&mut world, \|e, p\| ...)` |
-| 10 | `q.run(\|mut it\| ...)` | `q.run(&mut world, \|it\| ...)` |
-| 11 | manual `while it.next()` chunk loop | `each!((a, b) in q.chunks(&mut world) { ... })` or `q.chunks(&mut world)` `while let` |
+| 10 | `q.run(\|mut it\| ...)` | `q.run(&mut world, \|it\| ...)`. `f` is called **once** with a `TableIter` the body advances (`while it.next()`), matching today. |
+| 11 | manual `while it.next()` chunk loop | `each!((a, b) in q.chunks(&mut world) { ... })` (proven-disjoint) or `for chunk in q.chunks(&mut world)` (true `Iterator`, §4.6). Unproven-but-dense: `q.batches(&world)`; non-dense: `each_shared` / `run` (routing §4.5). |
 | 12 | `world.system::<...>().set_context(ptr).each(...)` | capture in the closure, or `.ctx(value)` then `System::ctx::<T>()` |
 | 13 | `world.observer::<OnAdd, &Position>()` | Compile error now; use `world.observer::<OnAdd, ()>()` (data-free) or a different event |
 | 14 | `it.field::<Position>(0)` (feature-gated check) | `it.field::<Position>(0)` (always type-checked) / `it.get_field::<Position>(0)` for `Option` |
 | 15 | `*entity_view = Entity::new(x)` (via `DerefMut`) | Removed; obtain a fresh `world.entity_view(x)` |
+| 16 | `let s = world.system::<...>().each(...);` (infallible) | `let s = world.system::<...>().each(...);` still infallible on the typed path (returns `System`); `Result` only if the builder took `expr()`/`term_dyn()`. `s.run(&mut world)` (the `SystemRunnerFluent` is deleted). |
+| 17 | `let q = world.new_query::<&Position>();` | `let q = world.new_query::<&Position>();` retained and **infallible** (§4.1); it does not panic on a typed descriptor. |
+| 18 | `e.set(A).set(B).set(C)` (N table moves) | `world.spawn((A, B, C))` / `em.insert((A, B, C))` — one table move (§4.11); the fluent form still works. |
+| 19 | read-back of own `set` inside a `get`/`try_get` scope | **Behavior change (GAP-8):** the `set` is deferred while the guard is live, so the in-scope re-read sees the pre-write value. Drop the guard (reach a sync point) or use `&mut World` / `EntityMut` for immediate read-back (§3.6). |
+| 20 | singleton access / `Singleton<T>` term | `world.singleton::<T>()` (`Ref`) / `world.singleton_mut::<T>()` (`&mut`) for direct access; the trait-based `&mut Gravity` term stays legal and Tier-1 locked, while the `Singleton<T>` query wrapper is read-only (`&mut` does not compile). Singleton queries run Tier 1 and panic under `chunks` (§4.9). |
 
 ---
 
@@ -1022,7 +1533,8 @@ Four required categories (extends today's `tests/flecs/safety/`):
   guard-vs-query, disjoint-table read+write stays legal, sparse per-stage
   disjointness.
 - **Panic cleanup** — a panicking callback in each trampoline
-  (each/each_with/run/par_each/observer) leaves the stage lock map balanced (the
+  (each / each_iter / each_entity / each_with / each_entity_with / run / par_each /
+  observer) leaves the stage lock map balanced (the
   `StageLocksScope` restore) and no dangling `ecs_table_lock`; the world is
   usable afterward and the panic is rethrown from the safe entry point.
 - **MT stage isolation** — two workers accessing the same component on disjoint
@@ -1032,8 +1544,8 @@ Four required categories (extends today's `tests/flecs/safety/`):
 - **Compile-fail** (`trybuild`) — the register violations that must not compile:
   holding a `&mut T` from `World::get_mut` across another world access;
   `Up<&mut T>` / `Singleton<&mut T>`; `observer::<OnAdd, &Position>()`;
-  double-`build`; iterating a consumed `ChunkCursor`; sending a non-`Send`
-  `QueryHandle`; `*entity_view = ...`.
+  double-`build`; iterating a consumed `Chunks` iterator; `get_many::<(&mut A, &mut A)>()`
+  (duplicate mutable); sending a non-`Send` `QueryHandle`; `*entity_view = ...`.
 
 ### 13.3 New CI contracts introduced by this spec
 
@@ -1048,6 +1560,18 @@ Four required categories (extends today's `tests/flecs/safety/`):
   safe component (catches a `Rest`-style regression).
 - **World-identity assertions** — the `each`/`chunks` cross-world guards
   (`4dc66a81`) get regression tests in the required suite.
+- **Chunk single-visit contract** (§4.6) — the "one query iteration visits each
+  `(table, row-range)` at most once" invariant that makes the true-`Iterator` chunk
+  slices non-aliasing; re-verified on the vendored-C bump; must cover sorted,
+  grouped, and change-skipped iteration.
+
+### 13.4 New examples required by this spec
+
+- **A `par_each` / `multi_threaded` example** must be added to the examples suite
+  (GAP-12): none exists today under `examples/flecs/`, so the `Stage<'s>`-in-worker /
+  `par_each_with` ergonomics (§6) — the redesign's highest-stakes surface — are
+  currently unexercised by real usage. The example exercises a partitioned parallel
+  write and a stage-issued deferred command.
 
 ---
 
@@ -1060,15 +1584,20 @@ Each verified against the tree; replacement stated.
    scoping, composes with `?`.
 2. **`Copy`-based fluent chaining on views** — `EntityView: Copy` returning
    `Self` from setters let a stale copy be reused after a structural change. New:
-   `EntityView` setters are deferred and return `Self` for chaining only within
-   one deferred scope; `EntityMut` (`!Copy`) is the mutable-fluent path, so a
-   moved-out mutable view cannot be reused.
+   `EntityView` setters return `Self` for chaining but their write is deferred
+   while a guard-pin episode / defer scope is live (immediate at top level, §3.5),
+   so a chained result observes the pin/defer discipline; `EntityMut` (`!Copy`) is
+   the mutable-fluent path, so a moved-out mutable view cannot be reused.
 3. **`&mut self`-returning builders that build twice or never**
-   (`builder.rs:6` `fn build(&mut self)`) → terminal `build(self) -> Result`
-   (§4.1): consuming, single, fallible.
+   (`builder.rs:6` `fn build(&mut self)`) → terminal `build(self)` (§4.1):
+   consuming and single, infallible on the typed path and `Result`-returning only
+   on the `expr()`/`term_dyn()` fallible typestate.
 4. **Panic-first error handling in core/** — `build()` panicking on a bad
-   descriptor with `try_build` bolted on → single `build() -> Result<_,
-   QueryBuildError>` (§4.1); panic reserved for aliasing bugs (§9.1).
+   descriptor with `try_build` bolted on → typed `build()` is infallible (a typed
+   descriptor cannot be malformed; the exceptional `ecs_query_init` failure
+   panics), and a malformed runtime descriptor surfaces as `Result<_,
+   QueryBuildError>` on the fallible typestate (§4.1). Panic is otherwise reserved
+   for aliasing bugs (§9.1).
 5. **Overlapping field accessor families** (`table/iter.rs`: `field` /
    `get_field` / `field_at` / `get_field_at` / untyped / `_unchecked`, 14
    spellings) → the consolidated grid in §10.3.

@@ -22,6 +22,8 @@ Faster than the current API, more ergonomic, sound from 100% safe code. Clean br
 ## Invariants the implementation must preserve
 
 - The 16-byte `ecs_rust_get_ptr_t` return. Never widen it: it is why `get` beats upstream by 19-30%.
+- Query build-time caches (spec §4.7): the disjointness verdict (a `bool`) and the owning-world identity (`*const ecs_world_t`) are computed once at `build()` and read per iteration as one branch plus one pointer compare. Storage traits (`Sparse`/`DontFragment`) must be fixed before the first query build against a component, debug-asserted unchanged at iteration time.
+- Guard pin counter (spec §7.1): guards touch only the stage lock map and a per-stage pin counter (single-owner per thread, no atomics); the flecs defer level is opened lazily once per write episode, never per guard, so the read path issues zero defer FFI.
 - Per-stage sparse tracking (global tracking false-positives on disjoint entities across stages).
 - No atomics in lock paths; stage maps are single-owner per thread.
 - No per-batch RAII type with a `Drop` impl on the iteration path (measured +32% `par_each`, +87% `each` 1-write historically). Unwind recovery lives in `IterGuard`, once per iteration, via `StageLocksScope` snapshot/restore.
@@ -77,3 +79,41 @@ Frictions for the spec (from the prototype):
 - Worker-thread stage acquisition: how a worker legally obtains a stage handle; promote the scheduler invariant (non-MT systems only run on the `progress()` thread) into a CI-tested contract.
 - Defer/staging surface: persistent `Commands` buffer vs per-call token; `mem::forget` on a guard must not wedge defer depth.
 - Unsafe-twin catalogue and final naming pass.
+
+## Review round, 2026-07-26
+
+Three-reviewer evaluation of the spec draft:
+
+- **Adversarial review** — soundness and contradiction hunt over the draft surface.
+- **Design-pattern exploration** — alternative shapes weighed against the register split.
+- **Examples migration evaluation** (`design/2026-07-26-examples-migration-evaluation.md`) — 11 real examples rewritten under the spec, scored **BETTER 2 / MIXED 6 / WORSE 3**.
+
+**Defer decomposition measurement.** Guard `get` was timed at **12.68 ns** with a per-guard defer bracket versus **9.75 ns** without it: the bracket is ~23% of the op, paid on every guard. This motivated the pin-counter redesign (defer level opened lazily once per write episode, read path zero defer FFI).
+
+**Adopted amendments** (one line each):
+
+1. Guard pin counter + lazy per-write-episode defer level (replaces the per-guard defer level); read path zero defer FFI. (spec §3.2, §3.4, §3.6, §7.1, §7.2)
+2. Disjointness verdict + world identity cached at `build()`; per-call cost is one branch + one pointer compare. (§4.7, invariants)
+3. Bundles: `spawn` / `spawn_batch` / `EntityMut::insert` / `Stage::spawn`, one table move via `ecs_bulk_init`. (§4.11, §3.5)
+4. `chunks` becomes a true `Iterator` (slices borrow table storage with `'w`); unlocks zip/enumerate/collect and rayon `par_bridge`. (§4.6)
+5. `CachedRef<T>` integrated: resolve-once, revalidate-by-table-id repeated single-entity access. (§3.7)
+6. Thin opt-in change detection (`detect_changes` / `is_changed` / `skip` / `chunks().changed()`); per-entity tick storage rejected. (§4.12)
+7. Typed-tuple query and system construction infallible; `Result` only on the `expr()`/`term_dyn()` typestate. (§4.1, §5.1)
+8. `each` names `each_shared` in its doc; §4.4 guidance block; `World::each` / `each_entity` one-liners. (§4.4)
+9. `Query::batches` for unproven dense queries; explicit `chunks`/`each!` routing table. (§4.4, §4.5, §4.9)
+10. `Iter<'_>` iteration context (delta time, count, entity, observer event metadata); `each_iter` / `each_entity_with`; `Stage` timestep. (§5.6, §5.2, §5.4)
+11. Two singleton forms: mutable trait-based term (Tier-1 locked) vs read-only `Singleton<T>` wrapper; `World::singleton` / `singleton_mut`. (§3.5, §4.9)
+12. Register-split completions: `World::entity` / `entity_new`, `EntityMut::get_many`, single-optional `get`, pair setters, `progress(&mut self)`, relationship-iteration helpers, id helpers. (§3.4, §3.5, §3.8, §5.7)
+13. Diagnostics: `#[track_caller]` + `#[cold]`, `#[diagnostic::on_unimplemented]`, sealed kernel traits, named `each!` error. (§9.5)
+14. Migration-table corrections and the `par_each` example requirement; `MAX_TRACKED_TERMS = 64`. (§12, §13)
+
+**Recorded rejections** (considered and declined):
+
+- **WorldScope sessions** — a scoped session object over the world; the register split already scopes access by borrow.
+- **Type-level filter typestate** — encoding term filters in the type; too much type machinery for no soundness gain.
+- **Generativity-branded worlds** — `GhostCell`-style invariant lifetime brands; ergonomically hostile and unnecessary given `!Clone` + the register split.
+- **`SystemParam` / `ParamSet`** (bevy-style) — the item tuple + `Stage` cover the need without a param-injection framework.
+- **Per-entity change ticks** (bevy `Changed`/`Added`) — per-row write cost against priority 1; observers/monitors cover it.
+- **`IntoIterator` on `&Query`** — would iterate without a world argument, defeating world-threading (§2.3).
+
+**Decision 5 shape upgraded.** From a lending `while let` cursor to a true `Iterator` (§4.6); the substance is unchanged (no `LendingIterator` dependency, chunk is the primitive, row is sugar).
