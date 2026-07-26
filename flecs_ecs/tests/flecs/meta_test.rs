@@ -3,6 +3,7 @@
 use core::ffi::CStr;
 
 use core::mem::offset_of;
+use flecs_ecs::experimental::prelude::{EntityGuardExt, QuerySharedExt};
 use flecs_ecs::prelude::meta::*;
 use flecs_ecs::prelude::*;
 use flecs_ecs::sys;
@@ -249,10 +250,11 @@ fn meta_partial_struct() {
 
     assert_ne!(c.id(), 0);
 
-    c.get::<&flecs::Component>(|ptr| {
+    {
+        let ptr = c.get_ref::<&flecs::Component>().unwrap();
         assert_eq!(ptr.size, 4);
         assert_eq!(ptr.alignment, 4);
-    });
+    };
 
     unsafe {
         let m = sys::ecs_struct_get_member(world.ptr_mut(), *c.id(), c"x".as_ptr());
@@ -278,10 +280,11 @@ fn meta_partial_struct_custom_offset() {
 
     assert_ne!(c.id(), 0);
 
-    c.get::<&flecs::Component>(|ptr| {
+    {
+        let ptr = c.get_ref::<&flecs::Component>().unwrap();
         assert_eq!(ptr.size, 8);
         assert_eq!(ptr.alignment, 4);
-    });
+    };
 
     unsafe {
         let m = sys::ecs_struct_get_member(world.ptr_mut(), *c.id(), c"y".as_ptr());
@@ -366,9 +369,10 @@ fn meta_bitmask() {
     });
 
     // Convert Sandwidth component to flecs expression string
-    e.get::<&Sandwich>(|val| {
-        assert_eq!(world.to_expr(val), "{toppings: lettuce|bacon}");
-    });
+    {
+        let val = e.get_ref::<&Sandwich>().unwrap();
+        assert_eq!(world.to_expr(&*val), "{toppings: lettuce|bacon}");
+    };
 }
 
 #[test]
@@ -442,11 +446,12 @@ fn meta_world_ser_deser_flecs_entity() {
         .entity_named("ent2")
         .set(RustEntity { entity: e1.id() });
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 
     let json = world.to_json_world(None);
 
@@ -461,11 +466,12 @@ fn meta_world_ser_deser_flecs_entity() {
     assert!(e1.is_alive());
     assert!(e2.is_alive());
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 }
 
 #[test]
@@ -486,11 +492,12 @@ fn meta_new_world_ser_deser_flecs_entity() {
         .entity_named("ent2")
         .set(RustEntity { entity: e1.id() });
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 
     let json = world.to_json_world(None);
 
@@ -511,11 +518,12 @@ fn meta_new_world_ser_deser_flecs_entity() {
     assert!(e1.is_alive());
     assert!(e2.is_alive());
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"ent1\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"ent1\"}");
+    };
 }
 
 #[test]
@@ -534,11 +542,12 @@ fn meta_new_world_ser_deser_empty_flecs_entity() {
     let e1 = Entity::null();
     let e2 = world.entity_named("ent2").set(RustEntity { entity: e1 });
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"#0\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"#0\"}");
+    };
 
     let json = world.to_json_world(None);
 
@@ -556,11 +565,12 @@ fn meta_new_world_ser_deser_empty_flecs_entity() {
 
     assert!(e2.is_alive());
 
-    e2.get::<Option<&RustEntity>>(|ptr| {
+    {
+        let ptr = e2.get_ref::<&RustEntity>();
         assert!(ptr.is_some());
         let ptr = ptr.unwrap();
-        assert_eq!(world.to_json::<RustEntity>(ptr), "{\"entity\":\"#0\"}");
-    });
+        assert_eq!(world.to_json::<RustEntity>(&*ptr), "{\"entity\":\"#0\"}");
+    };
 }
 
 #[test]
@@ -910,9 +920,10 @@ fn meta_ecs_struct_macro_idempotent() {
         assert!(!sys::ecs_struct_get_member(world.ptr_mut(), *c1.id(), c"y".as_ptr()).is_null());
     }
 
-    c1.get::<&flecs::meta::EcsStruct>(|s| {
+    {
+        let s = c1.get_ref::<&flecs::meta::EcsStruct>().unwrap();
         assert_eq!(s.members.count, 2);
-    });
+    };
 }
 
 #[test]
@@ -968,10 +979,11 @@ fn meta_component_as_array() {
 
     assert!(c.has(id::<flecs::meta::Array>()));
 
-    c.get::<&flecs::meta::Array>(|ptr| {
+    {
+        let ptr = c.get_ref::<&flecs::meta::Array>().unwrap();
         assert_eq!(ptr.type_, world.component_id::<f32>());
         assert_eq!(ptr.count, 2);
-    });
+    };
 }
 
 #[test]
@@ -1032,18 +1044,21 @@ fn meta_primitive_type() {
     assert!(t.has(id::<flecs::meta::Type>()));
     assert!(t.has(id::<flecs::meta::Primitive>()));
 
-    t.get::<&flecs::Component>(|c| {
+    {
+        let c = t.get_ref::<&flecs::Component>().unwrap();
         assert_eq!(c.size, 4);
         assert_eq!(c.alignment, 4);
-    });
+    };
 
-    t.get::<&flecs::meta::Type>(|mt| {
+    {
+        let mt = t.get_ref::<&flecs::meta::Type>().unwrap();
         assert_eq!(mt.kind, flecs_ecs_sys::ecs_type_kind_t_EcsPrimitiveType);
-    });
+    };
 
-    t.get::<&flecs::meta::Primitive>(|pt| {
+    {
+        let pt = t.get_ref::<&flecs::meta::Primitive>().unwrap();
         assert_eq!(pt.kind, flecs_ecs_sys::ecs_primitive_kind_t_EcsI32);
-    });
+    };
 }
 
 #[test]
@@ -1057,19 +1072,22 @@ fn meta_array_type() {
     assert!(t.has(id::<flecs::meta::Type>()));
     assert!(t.has(id::<flecs::meta::Array>()));
 
-    t.get::<&flecs::Component>(|c| {
+    {
+        let c = t.get_ref::<&flecs::Component>().unwrap();
         assert_eq!(c.size, 3 * 4);
         assert_eq!(c.alignment, 4);
-    });
+    };
 
-    t.get::<&flecs::meta::Type>(|mt| {
+    {
+        let mt = t.get_ref::<&flecs::meta::Type>().unwrap();
         assert_eq!(mt.kind, flecs_ecs_sys::ecs_type_kind_t_EcsArrayType);
-    });
+    };
 
-    t.get::<&flecs::meta::Array>(|at| {
+    {
+        let at = t.get_ref::<&flecs::meta::Array>().unwrap();
         assert_eq!(at.type_, world.component_id::<i32>());
         assert_eq!(at.count, 3);
-    });
+    };
 }
 
 #[test]
@@ -1083,13 +1101,15 @@ fn meta_vector_type() {
     assert!(t.has(id::<flecs::meta::Type>()));
     assert!(t.has(id::<flecs::meta::Vector>()));
 
-    t.get::<&flecs::meta::Type>(|mt| {
+    {
+        let mt = t.get_ref::<&flecs::meta::Type>().unwrap();
         assert_eq!(mt.kind, flecs_ecs_sys::ecs_type_kind_t_EcsVectorType);
-    });
+    };
 
-    t.get::<&flecs::meta::Vector>(|vt| {
+    {
+        let vt = t.get_ref::<&flecs::meta::Vector>().unwrap();
         assert_eq!(vt.type_, world.component_id::<i32>());
-    });
+    };
 }
 
 #[test]
@@ -1160,10 +1180,11 @@ fn meta_entity_from_json_w_values() {
     assert_eq!(e.name(), "ent");
     assert!(e.has(JsonPos::id()));
 
-    e.get::<&JsonPos>(|p| {
+    {
+        let p = e.get_ref::<&JsonPos>().unwrap();
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
-    });
+    };
 }
 
 // ── entity_to_json ──
@@ -1268,10 +1289,11 @@ fn meta_set_type_json() {
         .entity()
         .set_json(JsonPos::id(), "{\"x\":10, \"y\":20}", None);
 
-    e.get::<&JsonPos>(|p| {
+    {
+        let p = e.get_ref::<&JsonPos>().unwrap();
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
-    });
+    };
 }
 
 // ── set_id_json ──
@@ -1289,10 +1311,11 @@ fn meta_set_id_json() {
         .entity()
         .set_json(pos.id(), "{\"x\":10, \"y\":20}", None);
 
-    e.get::<&JsonPos>(|p| {
+    {
+        let p = e.get_ref::<&JsonPos>().unwrap();
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
-    });
+    };
 }
 
 // ── set_pair_R_T_json ──
@@ -1313,10 +1336,11 @@ fn meta_set_pair_R_T_json() {
         .entity()
         .set_json((JsonPos::id(), PairTag::id()), "{\"x\":10, \"y\":20}", None);
 
-    e.try_get::<&(JsonPos, PairTag)>(|p| {
+    {
+        let p = e.get_ref::<&(JsonPos, PairTag)>().unwrap();
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
-    });
+    };
 }
 
 // ── set_pair_R_t_json ──
@@ -1358,10 +1382,11 @@ fn meta_set_pair_r_T_json() {
         .entity()
         .set_json((pos.id(), PairTag2::id()), "{\"x\":10, \"y\":20}", None);
 
-    e.try_get::<&(JsonPos, PairTag2)>(|p| {
+    {
+        let p = e.get_ref::<&(JsonPos, PairTag2)>().unwrap();
         assert_eq!(p.x, 10.0);
         assert_eq!(p.y, 20.0);
-    });
+    };
 }
 
 // ── set_pair_r_t_json ──
@@ -1438,10 +1463,11 @@ fn meta_out_of_order_member_declaration() {
 
     assert_ne!(c.id(), 0);
 
-    c.get::<&flecs::Component>(|ptr| {
+    {
+        let ptr = c.get_ref::<&flecs::Component>().unwrap();
         assert_eq!(ptr.size, 8);
         assert_eq!(ptr.alignment, 4);
-    });
+    };
 
     unsafe {
         let m = sys::ecs_struct_get_member(world.ptr_mut(), *c.id(), c"x".as_ptr());
@@ -1456,15 +1482,16 @@ fn meta_out_of_order_member_declaration() {
     }
 
     let e2 = world.entity_named("ent2").set(Pos2 { x: 10.0, y: 20.0 });
-    e2.get::<&Pos2>(|p| {
-        let json = world.to_json::<Pos2>(p);
+    {
+        let p = e2.get_ref::<&Pos2>().unwrap();
+        let json = world.to_json::<Pos2>(&*p);
         assert_eq!(json, "{\"y\":20, \"x\":10}");
 
         let mut p2 = Pos2 { x: 0.0, y: 0.0 };
         world.from_json::<Pos2>(&mut p2, &json, None);
         assert_eq!(p2.x, 10.0);
         assert_eq!(p2.y, 20.0);
-    });
+    };
 }
 
 // ── struct_member_ptr_packed_struct ──
@@ -1889,12 +1916,13 @@ fn meta_units() {
     assert_ne!(custom_unit.id(), 0);
     assert_eq!(custom_unit.name(), "some_unit");
 
-    custom_unit.get::<&flecs_ecs_sys::EcsUnit>(|unit| {
+    {
+        let unit = custom_unit.get_ref::<&flecs_ecs_sys::EcsUnit>().unwrap();
         assert_eq!(
             unsafe { core::ffi::CStr::from_ptr(unit.symbol) }.to_string_lossy(),
             "u"
         );
-    });
+    };
 
     let t = world
         .component::<TestMetaUnits>()
@@ -1950,21 +1978,23 @@ fn meta_unit_w_prefix() {
 
     let unit_1 = world.entity();
     unit_1.unit(Some("U1"), 0u64, 0u64, 0u64, 0, 0);
-    unit_1.get::<&flecs_ecs_sys::EcsUnit>(|unit| {
+    {
+        let unit = unit_1.get_ref::<&flecs_ecs_sys::EcsUnit>().unwrap();
         assert_eq!(
             unsafe { core::ffi::CStr::from_ptr(unit.symbol) }.to_string_lossy(),
             "U1"
         );
-    });
+    };
 
     let unit_2 = world.entity();
     unit_2.unit(None, *prefix, *unit_1, 0u64, 0, 0);
-    unit_2.get::<&flecs_ecs_sys::EcsUnit>(|unit| {
+    {
+        let unit = unit_2.get_ref::<&flecs_ecs_sys::EcsUnit>().unwrap();
         assert_eq!(
             unsafe { core::ffi::CStr::from_ptr(unit.symbol) }.to_string_lossy(),
             "pU1"
         );
-    });
+    };
 }
 
 // ── unit_w_over ──
@@ -1982,31 +2012,34 @@ fn meta_unit_w_over() {
 
     let unit_0 = world.entity();
     unit_0.unit(Some("U0"), 0u64, 0u64, 0u64, 0, 0);
-    unit_0.get::<&flecs_ecs_sys::EcsUnit>(|unit| {
+    {
+        let unit = unit_0.get_ref::<&flecs_ecs_sys::EcsUnit>().unwrap();
         assert_eq!(
             unsafe { core::ffi::CStr::from_ptr(unit.symbol) }.to_string_lossy(),
             "U0"
         );
-    });
+    };
 
     let unit_1 = world.entity();
     unit_1.unit(Some("U1"), 0u64, 0u64, 0u64, 0, 0);
-    unit_1.get::<&flecs_ecs_sys::EcsUnit>(|unit| {
+    {
+        let unit = unit_1.get_ref::<&flecs_ecs_sys::EcsUnit>().unwrap();
         assert_eq!(
             unsafe { core::ffi::CStr::from_ptr(unit.symbol) }.to_string_lossy(),
             "U1"
         );
-    });
+    };
 
     // C++: unit(prefix, unit_1, unit_0) means prefix=prefix, base=unit_1, over=unit_0
     let unit_2 = world.entity();
     unit_2.unit(None, *prefix, *unit_1, *unit_0, 0, 0);
-    unit_2.get::<&flecs_ecs_sys::EcsUnit>(|unit| {
+    {
+        let unit = unit_2.get_ref::<&flecs_ecs_sys::EcsUnit>().unwrap();
         assert_eq!(
             unsafe { core::ffi::CStr::from_ptr(unit.symbol) }.to_string_lossy(),
             "pU1/U0"
         );
-    });
+    };
 }
 
 // ─── i32_from_json ────────────────────────────────────────────────────────────
@@ -2196,9 +2229,10 @@ fn meta_create_member_entities() {
             assert_eq!((*m).offset, offset);
             assert_ne!((*m).member, 0);
             let member_entity = EntityView::new_from(&world, (*m).member);
-            member_entity.get::<&flecs::meta::Member>(|member| {
+            {
+                let member = member_entity.get_ref::<&flecs::meta::Member>().unwrap();
                 assert_eq!(member.offset, offset);
-            });
+            };
         }
     }
 
@@ -2233,7 +2267,7 @@ fn meta_member_query_w_member_entities() {
 
     let query = query!(&world, ("Movement.direction", $left)).build();
     let mut count = 0;
-    query.each_entity(|matched, _| {
+    query.each_entity_shared(&world, |matched, _| {
         assert_eq!(matched, e);
         count += 1;
     });

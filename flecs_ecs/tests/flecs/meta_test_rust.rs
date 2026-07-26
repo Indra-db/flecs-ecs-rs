@@ -1,4 +1,5 @@
 use core::mem::offset_of;
+use flecs_ecs::experimental::prelude::EntityGuardExt;
 use flecs_ecs::prelude::*;
 
 #[test]
@@ -30,12 +31,13 @@ fn meta_struct_field_order() {
         e: 50,
     });
 
-    e.get::<&Test>(|ptr| {
+    {
+        let ptr = e.get_ref::<&Test>().unwrap();
         assert_eq!(ptr.a, 10);
         assert_eq!(ptr.b, 20);
-        let json = world.to_expr(ptr);
+        let json = world.to_expr(&*ptr);
         assert_eq!(json, "{a: 10, b: 20, c: 30, d: 40, e: 50}"); //if this fails, field re-ordering is not working
-    });
+    };
 }
 
 #[test]
