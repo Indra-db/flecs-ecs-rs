@@ -289,3 +289,218 @@ fn spawn_batch_drop_runs_exactly_once_per_stored_value() {
     }
     assert_eq!(BATCH_DROP_COUNT.load(SeqCst), 100);
 }
+
+#[test]
+fn insert_adds_all_components_with_values() {
+    let world = World::new();
+    let e = world.entity();
+    let ret = e.insert((Pos { x: 1, y: 2 }, Vel { x: 3, y: 4 }, Health(5)));
+    assert_eq!(ret.id(), e.id());
+
+    assert!(e.has(Pos::id()));
+    assert!(e.has(Vel::id()));
+    assert!(e.has(Health::id()));
+    e.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
+        assert_eq!(*p, Pos { x: 1, y: 2 });
+        assert_eq!(*v, Vel { x: 3, y: 4 });
+        assert_eq!(*h, Health(5));
+    });
+}
+
+#[test]
+fn insert_onto_entity_with_existing_components() {
+    let world = World::new();
+    let e = world.entity().set(Pos { x: 9, y: 9 });
+    e.insert((Vel { x: 1, y: 1 }, Health(3)));
+    assert!(e.has(Pos::id()));
+    assert!(e.has(Vel::id()));
+    assert!(e.has(Health::id()));
+    e.get::<(&Pos, &Vel, &Health)>(|(p, v, h)| {
+        assert_eq!(*p, Pos { x: 9, y: 9 });
+        assert_eq!(*v, Vel { x: 1, y: 1 });
+        assert_eq!(*h, Health(3));
+    });
+}
+
+#[test]
+fn insert_with_tag() {
+    let world = World::new();
+    let e = world.entity();
+    e.insert((Health(7), Tag));
+    assert!(e.has(Health::id()));
+    assert!(e.has(Tag::id()));
+    e.get::<&Health>(|h| assert_eq!(*h, Health(7)));
+}
+
+#[test]
+#[should_panic(expected = "duplicate component type")]
+fn insert_duplicate_component_type_panics() {
+    let world = World::new();
+    let e = world.entity();
+    e.insert((Health(1), Health(2)));
+}
+
+/// A single-move insert lands the entity in its FINAL table before any `OnAdd`
+/// fires, so an `OnAdd` observer for the first component already sees the other
+/// components present. A per-component (N-move) sequence would fire `OnAdd` for
+/// the first component while the later ones are still absent.
+#[test]
+fn insert_is_a_single_table_move() {
+    let world = World::new();
+
+    let all_present = Arc::new(AtomicUsize::new(0));
+    let fired = Arc::new(AtomicUsize::new(0));
+
+    {
+        let all_present = all_present.clone();
+        let fired = fired.clone();
+        world
+            .observer::<flecs::OnAdd, ()>()
+            .with(Pos::id())
+            .each_entity(move |e, _| {
+                fired.fetch_add(1, SeqCst);
+                if e.has(Vel::id()) && e.has(Health::id()) {
+                    all_present.fetch_add(1, SeqCst);
+                }
+            });
+    }
+
+    let e = world.entity();
+    e.insert((Pos { x: 1, y: 1 }, Vel { x: 2, y: 2 }, Health(3)));
+
+    assert_eq!(fired.load(SeqCst), 1, "OnAdd(Pos) fired once");
+    assert_eq!(
+        all_present.load(SeqCst),
+        1,
+        "entity already in final table (Vel + Health present) when OnAdd(Pos) fired -> single move"
+    );
+}
+
+#[test]
+fn insert_observer_parity_with_set_sequence() {
+    let world = World::new();
+
+    let on_add = Arc::new(AtomicUsize::new(0));
+    let on_set = Arc::new(AtomicUsize::new(0));
+    {
+        let a = on_add.clone();
+        world
+            .observer::<flecs::OnAdd, ()>()
+            .with(Pos::id())
+            .each(move |_| {
+                a.fetch_add(1, SeqCst);
+            });
+    }
+    {
+        let a = on_add.clone();
+        world
+            .observer::<flecs::OnAdd, ()>()
+            .with(Vel::id())
+            .each(move |_| {
+                a.fetch_add(1, SeqCst);
+            });
+    }
+    {
+        let s = on_set.clone();
+        world.observer::<flecs::OnSet, &Pos>().each(move |_| {
+            s.fetch_add(1, SeqCst);
+        });
+    }
+    {
+        let s = on_set.clone();
+        world.observer::<flecs::OnSet, &Vel>().each(move |_| {
+            s.fetch_add(1, SeqCst);
+        });
+    }
+
+    world
+        .entity()
+        .insert((Pos { x: 1, y: 1 }, Vel { x: 2, y: 2 }));
+    let insert_add = on_add.swap(0, SeqCst);
+    let insert_set = on_set.swap(0, SeqCst);
+
+    world.entity().set(Pos { x: 1, y: 1 }).set(Vel { x: 2, y: 2 });
+    let seq_add = on_add.swap(0, SeqCst);
+    let seq_set = on_set.swap(0, SeqCst);
+
+    assert_eq!(insert_add, 2);
+    assert_eq!(insert_set, 2);
+    assert_eq!(insert_add, seq_add);
+    assert_eq!(insert_set, seq_set);
+}
+
+#[test]
+fn insert_in_deferred_context_merges() {
+    let world = World::new();
+    let e = world.entity();
+
+    world.defer(|| {
+        e.insert((Pos { x: 4, y: 5 }, Health(6)));
+        // Deferred: not yet applied.
+        assert!(!e.has(Pos::id()));
+    });
+
+    // Merged at the sync point.
+    assert!(e.has(Pos::id()));
+    assert!(e.has(Health::id()));
+    e.get::<(&Pos, &Health)>(|(p, h)| {
+        assert_eq!(*p, Pos { x: 4, y: 5 });
+        assert_eq!(*h, Health(6));
+    });
+}
+
+static INSERT_DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Component)]
+struct InsertDropCounter(u32);
+
+impl Drop for InsertDropCounter {
+    fn drop(&mut self) {
+        INSERT_DROP_COUNT.fetch_add(1, SeqCst);
+    }
+}
+
+#[test]
+fn insert_drop_runs_exactly_once_per_value() {
+    INSERT_DROP_COUNT.store(0, SeqCst);
+    {
+        let world = World::new();
+        let e = world.entity();
+        e.insert((InsertDropCounter(1), Health(2)));
+        assert_eq!(INSERT_DROP_COUNT.load(SeqCst), 0);
+        e.get::<&InsertDropCounter>(|c| assert_eq!(c.0, 1));
+    }
+    assert_eq!(INSERT_DROP_COUNT.load(SeqCst), 1);
+}
+
+static INSERT_DEFAULT_DROP: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Component, Default)]
+struct InsertDefaultDrop(u32);
+
+impl Drop for InsertDefaultDrop {
+    fn drop(&mut self) {
+        INSERT_DEFAULT_DROP.fetch_add(1, SeqCst);
+    }
+}
+
+/// A `Default` + `Drop` component newly added by `insert` has its slot
+/// default-constructed by the commit; the value write must drop that transient
+/// default (never leak it) before moving the real value in. So exactly two drops
+/// occur overall: the discarded default, then the stored value at teardown. The
+/// important guarantees are no leak and no double-free of the same object.
+#[test]
+fn insert_default_component_drops_transient_default_no_leak() {
+    INSERT_DEFAULT_DROP.store(0, SeqCst);
+    {
+        let world = World::new();
+        let e = world.entity();
+        e.insert((InsertDefaultDrop(7),));
+        // The default constructed by the commit was dropped when the real value
+        // was moved in.
+        assert_eq!(INSERT_DEFAULT_DROP.load(SeqCst), 1);
+        e.get::<&InsertDefaultDrop>(|c| assert_eq!(c.0, 7));
+    }
+    // Plus the stored value at world teardown.
+    assert_eq!(INSERT_DEFAULT_DROP.load(SeqCst), 2);
+}

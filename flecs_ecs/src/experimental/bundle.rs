@@ -13,7 +13,7 @@ use core::mem::ManuallyDrop;
 extern crate alloc;
 use alloc::vec::Vec;
 
-use crate::core::{ComponentId, Entity, EntityView, World, WorldProvider, WorldRef};
+use crate::core::{ComponentId, ComponentInfo, Entity, EntityView, World, WorldProvider, WorldRef};
 use crate::sys;
 
 mod private {
@@ -73,10 +73,68 @@ pub trait Bundle: private::Sealed + Sized + 'static {
     unsafe fn data_ptrs(this: *mut Self, out: &mut [*mut c_void]);
 
     /// Consumes the bundle, issuing one `set` per component on `entity` in tuple
-    /// order. Used by `insert` inside a defer scope so flecs merges the
-    /// same-entity commands into a single table move.
+    /// order. Used by `insert`'s deferred fallback (per-component add/set).
     #[doc(hidden)]
     fn apply_set(self, entity: EntityView);
+
+    /// Consumes the bundle, writing each value into its column on `entity`
+    /// (already moved to the destination table by a single `ecs_commit`) and
+    /// firing `OnSet`. `added_mask[i]` is `true` when component `i` was newly
+    /// added by the commit (its slot is default-constructed or uninitialized),
+    /// `false` when it pre-existed (its slot holds a live value that must be
+    /// dropped before overwrite).
+    #[doc(hidden)]
+    fn write_after_commit(self, entity: EntityView, added_mask: &[bool]);
+}
+
+/// Adds and sets a single bundle element on `entity`, dispatching on whether the
+/// component is a zero-sized tag at runtime.
+///
+/// This mirrors the crate's `set` path (emplace for a new component, drop then
+/// overwrite for an existing one) but, unlike the public `set`, carries no
+/// compile-time "not a tag" assertion, so it is safe to instantiate for a tag
+/// element inside the generic bundle plumbing.
+#[inline]
+fn set_bundle_element<T: ComponentId>(entity: EntityView, value: T) {
+    let world = entity.world;
+    let id = T::entity_id(world);
+    let world_ptr = world.world_ptr_mut();
+
+    if core::mem::size_of::<T>() == 0 {
+        // Tag: add the id; the zero-sized value carries no data. `drop` honors a
+        // (rare) tag `Drop` impl and is otherwise a no-op.
+        unsafe { sys::ecs_add_id(world_ptr, *entity.id, id) };
+        drop(value);
+        return;
+    }
+
+    world.check_thread_affinity_exclusive::<T>();
+
+    // SAFETY: `id`/`value`/size are consistent; `ecs_rust_set` skips the ctor for
+    // a new component (emplace) and returns storage (or the deferred command
+    // buffer). We move `value` into that slot exactly once, dropping the prior
+    // value only when overwriting an existing (non-new) component.
+    unsafe {
+        let res = sys::ecs_rust_set(
+            world_ptr,
+            *entity.id,
+            id,
+            (&value as *const T).cast::<c_void>(),
+            core::mem::size_of::<T>(),
+        );
+        assert!(
+            !res.ptr.is_null(),
+            "insert failed: entity is not alive or the world is invalid"
+        );
+        let comp = res.ptr.cast::<T>();
+        if T::NEEDS_DROP && !res.is_new {
+            core::ptr::drop_in_place(comp);
+        }
+        core::ptr::write(comp, value);
+        if res.call_modified {
+            sys::ecs_modified_id(world_ptr, *entity.id, id);
+        }
+    }
 }
 
 macro_rules! bundle_count {
@@ -131,7 +189,54 @@ macro_rules! impl_bundle {
             fn apply_set(self, _entity: EntityView) {
                 let ($($t,)*) = self;
                 $(
-                    _entity.set($t);
+                    set_bundle_element(_entity, $t);
+                )*
+            }
+
+            #[inline]
+            #[allow(clippy::unused_unit)]
+            fn write_after_commit(self, _entity: EntityView, _added_mask: &[bool]) {
+                let _world = _entity.world;
+                let _world_ptr = _world.world_ptr_mut();
+                let _eid = *_entity.id;
+                let ($($t,)*) = self;
+
+                // Pass 1: move every value into its column.
+                let mut _i = 0usize;
+                $(
+                    if core::mem::size_of::<$t>() == 0 {
+                        // Tag: no data column; the commit already added it.
+                        drop($t);
+                    } else {
+                        _world.check_thread_affinity_exclusive::<$t>();
+                        let id = $t::entity_id(_world);
+                        // SAFETY: the entity is in a table that contains `id`
+                        // (the commit added the whole bundle), so `ecs_get_mut_id`
+                        // returns a valid, correctly-typed slot. We overwrite it
+                        // exactly once, dropping the prior value only when the
+                        // slot already holds a live value.
+                        unsafe {
+                            let ptr = sys::ecs_get_mut_id(_world_ptr, _eid, id).cast::<$t>();
+                            debug_assert!(!ptr.is_null());
+                            let has_live = !_added_mask[_i]
+                                || <$t as ComponentInfo>::IMPLS_DEFAULT;
+                            if has_live && <$t as ComponentInfo>::NEEDS_DROP {
+                                core::ptr::drop_in_place(ptr);
+                            }
+                            core::ptr::write(ptr, $t);
+                        }
+                    }
+                    _i += 1;
+                )*
+
+                // Pass 2: fire OnSet once every value is in place (so
+                // multi-component OnSet observers see a fully populated entity),
+                // matching the bulk path.
+                $(
+                    if core::mem::size_of::<$t>() != 0 {
+                        let id = $t::entity_id(_world);
+                        unsafe { sys::ecs_modified_id(_world_ptr, _eid, id) };
+                    }
                 )*
             }
         }
@@ -369,5 +474,112 @@ impl World {
             out.push(Entity::new(unsafe { *id_ptr.add(i) }));
         }
         out
+    }
+}
+
+impl<'a> EntityView<'a> {
+    /// Adds and sets a whole bundle on an existing entity in a **single**
+    /// archetype move (spec §4.11), not N.
+    ///
+    /// On an immediate (non-deferred) world this computes the destination table
+    /// once (adding the bundle's ids to the entity's current table) and performs
+    /// one `ecs_commit` structural move, then moves each value into place and
+    /// fires `OnSet`. `OnAdd` is emitted after the single move, so an observer
+    /// sees the entity already in its final table; `OnSet` fires once per non-tag
+    /// component, matching the per-component `set` path's observer counts.
+    ///
+    /// Deferred context: if the world is already deferred when `insert` is called
+    /// (for example from inside a system or
+    /// [`World::defer`](crate::core::World::defer)), the bundle is applied as a
+    /// per-component add/set on the active stage and merged at the enclosing sync
+    /// point. Note this deferred path is **not** a single archetype move: the
+    /// Rust `set` fast path emplaces new components (skipping wasted default
+    /// construction), and flecs deliberately excludes emplace commands from its
+    /// same-entity command batching (flecs.c:6460), so each component is a
+    /// separate transition. The result is identical; only the number of internal
+    /// moves differs.
+    ///
+    /// The bundle's values are **moved** into storage; they are not dropped on
+    /// the Rust side.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the bundle contains a duplicate component type, if the bundle
+    /// arity exceeds 31, or if the entity is not alive.
+    pub fn insert<B: Bundle>(self, bundle: B) -> Self {
+        const {
+            assert!(
+                B::ARITY <= MAX_BUNDLE_ARITY,
+                "bundle arity exceeds the maximum of 31 components"
+            );
+        }
+
+        let world = self.world;
+        let world_ptr = world.world_ptr_mut();
+
+        let arity = B::ARITY;
+        let mut ids = [0u64; ID_BUF];
+        B::resolve_ids(world, &mut ids[..arity]);
+        world.record_bundle_ids::<B>(&ids[..arity]);
+
+        if world.is_deferred() {
+            // `ecs_commit` cannot run while deferred; apply per component and let
+            // flecs merge at the enclosing sync point (see doc note above).
+            bundle.apply_set(self);
+            return self;
+        }
+
+        // SAFETY: the entity is alive on an immediate world; `ecs_commit`
+        // performs the whole add as one structural move. `added`/`added_mask`
+        // describe exactly the newly-added ids so `OnAdd` fires once each and so
+        // value writes know which slots are freshly constructed.
+        unsafe {
+            let record = sys::ecs_record_find(world_ptr, *self.id);
+            assert!(!record.is_null(), "insert on an entity that is not alive");
+            let src_table = (*record).table;
+
+            let mut dst_table = src_table;
+            for &id in &ids[..arity] {
+                dst_table = sys::ecs_table_add_id(world_ptr, dst_table, id);
+            }
+
+            let src_type = &*sys::ecs_table_get_type(src_table);
+            let src_ids: &[u64] = if src_type.count > 0 {
+                core::slice::from_raw_parts(src_type.array, src_type.count as usize)
+            } else {
+                &[]
+            };
+
+            let mut added = [0u64; ID_BUF];
+            let mut added_mask = [false; ID_BUF];
+            let mut added_count = 0usize;
+            for i in 0..arity {
+                let is_new = !src_ids.contains(&ids[i]);
+                added_mask[i] = is_new;
+                if is_new {
+                    added[added_count] = ids[i];
+                    added_count += 1;
+                }
+            }
+
+            let added_type = sys::ecs_type_t {
+                array: added.as_mut_ptr(),
+                count: added_count as i32,
+            };
+
+            // One structural move; ctors new columns and fires OnAdd.
+            sys::ecs_commit(
+                world_ptr,
+                *self.id,
+                record,
+                dst_table,
+                &added_type,
+                core::ptr::null(),
+            );
+
+            bundle.write_after_commit(self, &added_mask[..arity]);
+        }
+
+        self
     }
 }
