@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component)]
@@ -22,14 +23,14 @@ fn iterate_tree(entity: EntityView, position_parent: &Position) {
     // Print hierarchical name of entity & the entity type
     println!("{} [{:?}]", entity.path().unwrap(), entity.archetype());
 
-    // Get allows you to return a value
-    let pos_actual = entity.get::<&Position>(|pos| {
-        // Calculate actual position
-        Position {
-            x: pos.x + position_parent.x,
-            y: pos.y + position_parent.y,
-        }
-    });
+    // A guard read borrows the component and the result composes like ordinary
+    // Rust: no callback whose only job is to return a value.
+    let pos = entity.get_ref::<&Position>().unwrap();
+    let pos_actual = Position {
+        x: pos.x + position_parent.x,
+        y: pos.y + position_parent.y,
+    };
+    drop(pos); // release the read guard before recursing into the children
 
     // Print the position
     println!("{pos_actual:?}");

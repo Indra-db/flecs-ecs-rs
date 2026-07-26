@@ -1,5 +1,6 @@
 use crate::z_ignore_test_common::*;
 
+use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::prelude::*;
 
 #[derive(Debug, Component, Clone)]
@@ -32,7 +33,7 @@ pub struct ImpulseSpeed {
 pub struct HasFlt;
 
 fn main() {
-    let world = World::new();
+    let mut world = World::new();
 
     // Add the traits to mark the components to be inherited
     world
@@ -96,13 +97,15 @@ fn main() {
     println!("Instance type: [{}]", inst.archetype());
 
     // Even though the instance doesn't have a private copy of ImpulseSpeed, we
-    // can still get it using the regular API (outputs 50)
-    inst.try_get::<&ImpulseSpeed>(|impulse_speed| {
+    // can still get it using the regular API (outputs 50). try_get_ref returns
+    // the missing-component case as an Err rather than panicking.
+    if let Ok(impulse_speed) = inst.try_get_ref::<&ImpulseSpeed>() {
         println!("ImpulseSpeed: {}", impulse_speed.value);
-    });
+    }
 
     // Prefab components can be iterated just like regular components:
-    world.each_entity::<(&ImpulseSpeed, &mut Position)>(|entity, (impulse_speed, position)| {
+    let q = world.new_query::<(&ImpulseSpeed, &mut Position)>();
+    q.each_entity_exclusive(&mut world, |entity, (impulse_speed, position)| {
         position.x += impulse_speed.value;
         println!("Entity {}: {:?}", entity.name(), position);
     });
