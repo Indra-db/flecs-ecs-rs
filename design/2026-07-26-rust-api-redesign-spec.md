@@ -289,8 +289,11 @@ fused acquire but with **zero locks** (the exclusive borrow is the proof):
 impl<'w> EntityMut<'w> {
     /// Fused multi-component exclusive borrow: `get_many::<(&mut A, &B)>()` ->
     /// `Option<(&mut A, &B)>`. A duplicate mutable request (`(&mut A, &mut A)`) or a
-    /// mutable+shared alias of one component is a **compile error** (static
-    /// duplicate-mutable check); absence of any requested component is `None`.
+    /// mutable+shared alias of one component is rejected by a monomorphization-time
+    /// const-folded check that panics before any pointer is handed out (stable Rust
+    /// as of 1.97 cannot express const TypeId inequality, so a true compile error is
+    /// not yet achievable; upgrade to a compile error when const TypeId comparison
+    /// stabilises); absence of any requested component is `None`.
     pub fn get_many<G: ExclusiveTuple<'w>>(&'w mut self) -> Option<G::Refs>;
 }
 ```
@@ -1548,8 +1551,10 @@ Four required categories (extends today's `tests/flecs/safety/`):
 - **Compile-fail** (`trybuild`) — the register violations that must not compile:
   holding a `&mut T` from `World::get_mut` across another world access;
   `Up<&mut T>` / `Singleton<&mut T>`; `observer::<OnAdd, &Position>()`;
-  double-`build`; iterating a consumed `Chunks` iterator; `get_many::<(&mut A, &mut A)>()`
-  (duplicate mutable); sending a non-`Send` `QueryHandle`; `*entity_view = ...`.
+  double-`build`; iterating a consumed `Chunks` iterator; sending a non-`Send`
+  `QueryHandle`; `*entity_view = ...`. (`get_many::<(&mut A, &mut A)>()` is a
+  monomorphization-time panic, not a compile error, until const TypeId
+  comparison stabilises; covered by a should_panic test instead.)
 
 ### 13.3 New CI contracts introduced by this spec
 
