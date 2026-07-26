@@ -72,4 +72,52 @@ fn each_iter_shared_reads_while_shared_borrow_live() {
     assert_eq!(sum, 16);
 }
 
+// --- observer event metadata (spec §5.6) ---
+
+#[test]
+fn each_iter_event_metadata_zero_outside_observer() {
+    let mut world = World::new();
+    world.entity().set(Position { x: 1, y: 2 });
+    let q = world.new_query::<&Position>();
+
+    let mut rows = 0;
+    QueryIterCtxExt::each_iter(&q, &mut world, |it, _p| {
+        // Outside an observer invocation the iterator carries no event: the
+        // documented returns are the zero entity and the zero id.
+        assert_eq!(*it.event().id(), 0);
+        assert_eq!(*it.event_id(), 0);
+        rows += 1;
+    });
+    assert_eq!(rows, 1);
+}
+
+#[test]
+fn each_iter_pair_returns_matched_pair_id() {
+    let mut world = World::new();
+    let likes = world.entity();
+    let eva = world.entity();
+    world
+        .entity()
+        .set(Position { x: 1, y: 2 })
+        .add((likes, eva));
+
+    // Wildcard pair term: `pair(1)` must report the concrete id matched for
+    // the batch, not the wildcard the query was built with.
+    let q = world
+        .query::<&Position>()
+        .with((likes, id::<flecs::Wildcard>()))
+        .build();
+
+    let expected = ecs_pair(*likes.id(), *eva.id());
+    let mut matched = None;
+    let mut plain = None;
+    QueryIterCtxExt::each_iter(&q, &mut world, |it, _p| {
+        matched = it.pair(1);
+        plain = it.pair(0);
+    });
+    assert_eq!(matched.map(|id| *id), Some(expected));
+    // Field 0 is a plain component, not a pair.
+    assert!(plain.is_none());
+}
+
 extern crate alloc;

@@ -2,6 +2,7 @@
 
 use super::{Position, Velocity};
 use flecs_ecs::core::*;
+use flecs_ecs::experimental::is_proven_disjoint;
 use flecs_ecs::experimental::prelude::*;
 use flecs_ecs::macros::query;
 
@@ -98,4 +99,85 @@ fn each_exclusive_foreign_world_panics() {
     let q = query!(world_a, &mut Position, &Velocity).build();
     let mut world_b = World::new();
     q.each_exclusive(&mut world_b, |(_, _)| {});
+}
+
+#[test]
+fn each_entity_exclusive_iterates_proven_disjoint() {
+    let mut world = World::new();
+    let mut expected = Vec::new();
+    for i in 0..6 {
+        let e = world
+            .entity()
+            .set(Position { x: i, y: 0 })
+            .set(Velocity { x: 1, y: 0 });
+        expected.push(e.id());
+    }
+    let q = query!(world, &mut Position, &Velocity).build();
+    assert!(is_proven_disjoint(&world, q.query_ptr()));
+
+    let mut seen = Vec::new();
+    q.each_entity_exclusive(&mut world, |e, (p, v)| {
+        p.x += v.x;
+        seen.push(e.id());
+    });
+    seen.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(seen, expected);
+
+    let mut xs = Vec::new();
+    q.each_entity_exclusive(&mut world, |_, (p, _)| xs.push(p.x));
+    xs.sort_unstable();
+    assert_eq!(xs, vec![1, 2, 3, 4, 5, 6]);
+}
+
+#[test]
+fn each_entity_exclusive_unproven_falls_back_to_locked_path() {
+    let mut world = World::new();
+    world
+        .entity()
+        .set(Position { x: 1, y: 0 })
+        .set(Velocity { x: 2, y: 0 });
+    world.entity().set(Position { x: 3, y: 0 });
+    // An Optional term defeats the disjointness proof, forcing the Tier-1
+    // locked fallback; iteration must still be complete and correct.
+    let q = world.new_query::<(&mut Position, Option<&Velocity>)>();
+    assert!(!is_proven_disjoint(&world, q.query_ptr()));
+
+    let mut rows = 0;
+    q.each_entity_exclusive(&mut world, |_, (p, v)| {
+        p.x += v.map_or(10, |v| v.x);
+        rows += 1;
+    });
+    assert_eq!(rows, 2);
+
+    let mut xs = Vec::new();
+    q.each_entity_exclusive(&mut world, |_, (p, _)| xs.push(p.x));
+    xs.sort_unstable();
+    assert_eq!(xs, vec![3, 13]);
+}
+
+#[test]
+#[should_panic(expected = "each_entity_exclusive requires the query's own world")]
+fn each_entity_exclusive_foreign_world_panics() {
+    let world_a = World::new();
+    world_a
+        .entity()
+        .set(Position::default())
+        .set(Velocity::default());
+    let q = query!(world_a, &mut Position, &Velocity).build();
+    let mut world_b = World::new();
+    q.each_entity_exclusive(&mut world_b, |_, (_, _)| {});
+}
+
+#[test]
+#[should_panic(expected = "run_exclusive requires the query's own world")]
+fn run_exclusive_foreign_world_panics() {
+    let world_a = World::new();
+    world_a
+        .entity()
+        .set(Position::default())
+        .set(Velocity::default());
+    let q = query!(world_a, &mut Position, &Velocity).build();
+    let mut world_b = World::new();
+    q.run_exclusive(&mut world_b, |_| {});
 }
