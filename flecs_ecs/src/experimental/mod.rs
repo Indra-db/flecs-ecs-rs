@@ -74,6 +74,7 @@ pub mod disjoint;
 pub mod entity_mut;
 pub mod exclusive;
 pub mod iter_ctx;
+pub mod shared;
 pub mod stage;
 
 pub use batches::{LockedBatches, QueryBatchesExt};
@@ -83,6 +84,7 @@ pub use chunks::{ChunkCursor, EachArity, EachCursor, QueryChunksExt};
 pub use disjoint::is_proven_disjoint;
 pub use exclusive::{QueryExclusiveExt, WorldExclusiveExt};
 pub use iter_ctx::{Iter, QueryIterCtxExt};
+pub use shared::QuerySharedExt;
 pub use stage::Stage;
 
 /// Iterate a [`chunks`](QueryChunksExt::chunks) cursor with a fused per-row
@@ -221,6 +223,7 @@ pub mod prelude {
     pub use super::chunks::QueryChunksExt;
     pub use super::exclusive::{QueryExclusiveExt, WorldExclusiveExt};
     pub use super::iter_ctx::{Iter, QueryIterCtxExt};
+    pub use super::shared::QuerySharedExt;
     pub use super::stage::Stage;
     #[cfg(feature = "flecs_safety_locks")]
     pub use super::guard::{AccessError, Mut, Ref};

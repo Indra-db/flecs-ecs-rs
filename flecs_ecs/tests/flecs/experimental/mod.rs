@@ -2,6 +2,8 @@
 
 use flecs_ecs::macros::*;
 
+#[cfg(feature = "flecs_safety_locks")]
+mod arity;
 mod batches;
 mod bundle;
 mod entity_mut;
@@ -21,6 +23,8 @@ mod bypass_paths;
 #[cfg(feature = "flecs_safety_locks")]
 mod singleton;
 mod exclusive;
+#[cfg(feature = "flecs_safety_locks")]
+mod shared;
 mod system_run;
 mod system_with;
 mod typed_ctx;

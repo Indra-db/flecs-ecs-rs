@@ -26,6 +26,7 @@ use crate::core::{
     StageLocks, WorldProvider, WorldRef,
 };
 use crate::sys;
+use flecs_ecs_derive::tuples;
 
 use super::guard::{AccessError, Mut, Ref};
 
@@ -315,7 +316,7 @@ where
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a valid guard request",
     label = "not a `get_ref` request",
-    note = "request one component as `&T` / `&mut T` (optional: `Option<&T>` / `Option<&mut T>`), or a tuple of up to five of those"
+    note = "request one component as `&T` / `&mut T` (optional: `Option<&T>` / `Option<&mut T>`), or a tuple of up to 32 of those"
 )]
 pub trait GuardTuple<'w>: GetTuple {
     type Guards;
@@ -372,7 +373,7 @@ where
 }
 
 macro_rules! impl_guard_tuple {
-    ($( $t:ident @ $idx:tt ),+ $(,)?) => {
+    ($( $t:ident ),+) => {
         impl<'w, $($t),+> GuardTuple<'w> for ($($t,)+)
         where
             $($t: GuardElement<'w>,)+
@@ -385,27 +386,27 @@ macro_rules! impl_guard_tuple {
                 let r = unsafe { resolve_and_lock::<Self>(world, id)? };
                 let ptrs = r.data.component_ptrs();
                 let si = r.data.safety_info();
-                Ok(( $(
+                let mut index: isize = -1;
+                Ok(( $( {
+                    index += 1;
+                    let _i = index as usize;
                     unsafe { $t::wrap(GuardParts {
-                        ptr: ptrs[$idx],
+                        ptr: ptrs[_i],
                         world: r.world,
                         locks: r.locks,
-                        key: safety_key(&si[$idx]),
+                        key: safety_key(&si[_i]),
                         #[cfg(debug_assertions)]
                         entity: *id,
                         #[cfg(debug_assertions)]
-                        component_id: safety_id(&si[$idx]),
-                    }) },
-                )+ ))
+                        component_id: safety_id(&si[_i]),
+                    }) }
+                }, )+ ))
             }
         }
     };
 }
 
-impl_guard_tuple!(A @ 0, B @ 1);
-impl_guard_tuple!(A @ 0, B @ 1, C @ 2);
-impl_guard_tuple!(A @ 0, B @ 1, C @ 2, D @ 3);
-impl_guard_tuple!(A @ 0, B @ 1, C @ 2, D @ 3, E @ 4);
+tuples!(impl_guard_tuple, 1, 32);
 
 /// Shared-register component access on [`EntityView`]. Provisional names; the
 /// intended final surface renames `get_ref` to `get`.
@@ -415,7 +416,7 @@ pub trait EntityGuardExt<'a> {
     /// alive or a requested component is missing.
     ///
     /// The request `G` must be a [`GuardTuple`] — a `&T` / `&mut T` (optionally
-    /// `Option<&T>` / `Option<&mut T>`), or a tuple of up to five of those.
+    /// `Option<&T>` / `Option<&mut T>`), or a tuple of up to 32 of those.
     /// Requesting anything else (here a bare `i32`) fails to compile with the
     /// trait's `#[diagnostic::on_unimplemented]` message ("`i32` is not a valid
     /// guard request"); the message text is not asserted by the doctest, only
