@@ -9757,6 +9757,13 @@ unsafe extern "C-unwind" {
     ) -> *const ecs_record_t;
 }
 unsafe extern "C-unwind" {
+    #[doc = "Liveness check + entity-record lookup with no defer level. The entry half of\n the shared-register guard acquire: the guards track a Rust-side pin counter\n and open a defer level lazily on the first write while a guard is live, so\n the read path pays no defer FFI. Returns NULL when the entity is not alive."]
+    pub fn ecs_rust_get_record(
+        world: *mut ecs_world_t,
+        entity: ecs_entity_t,
+    ) -> *const ecs_record_t;
+}
+unsafe extern "C-unwind" {
     pub fn ecs_rust_scope_end(world: *mut ecs_world_t);
 }
 unsafe extern "C-unwind" {

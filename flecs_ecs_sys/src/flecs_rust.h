@@ -102,6 +102,15 @@ const ecs_record_t* ecs_rust_get_scope_begin(
     ecs_world_t *world,
     ecs_entity_t entity);
 
+/* Liveness check + entity-record lookup with no defer level. The entry half of
+ * the shared-register guard acquire: the guards track a Rust-side pin counter
+ * and open a defer level lazily on the first write while a guard is live, so
+ * the read path pays no defer FFI. Returns NULL when the entity is not alive. */
+FLECS_API
+const ecs_record_t* ecs_rust_get_record(
+    ecs_world_t *world,
+    ecs_entity_t entity);
+
 FLECS_API
 void ecs_rust_scope_end(
     ecs_world_t *world);

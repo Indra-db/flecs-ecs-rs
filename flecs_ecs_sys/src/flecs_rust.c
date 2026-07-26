@@ -713,6 +713,20 @@ const ecs_record_t* ecs_rust_get_scope_begin(
     return r;
 }
 
+const ecs_record_t* ecs_rust_get_record(
+    ecs_world_t *world,
+    ecs_entity_t entity)
+{
+    /* Liveness check + record lookup with no defer level: the shared-register
+     * guards track a Rust-side pin counter instead, and open a defer level
+     * lazily only on the first write while a guard is live. Returns NULL for a
+     * dead entity so the Rust side can map it to AccessError::NotAlive. */
+    if (!ecs_is_alive(world, entity)) {
+        return NULL;
+    }
+    return ecs_record_find(world, entity);
+}
+
 void ecs_rust_scope_end(
     ecs_world_t *world)
 {
