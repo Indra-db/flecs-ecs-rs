@@ -406,6 +406,14 @@ fn __internal_do_read_write_locks<
     stage: i32,
     table_records: &[super::TableColumnSafety],
 ) {
+    // Inside a multithreaded system this `WorldRef` is a stage, and
+    // `flecs_components_get` asserts on `ecs_world_t_magic`, so every sparse
+    // term in a threaded system aborted the process.
+    let real_world = unsafe {
+        sys::ecs_get_world(world.raw_world.as_ptr().cast_const().cast()).cast_mut()
+    }
+    .cast::<sys::ecs_world_t>();
+
     let count_immutable: usize = const { T::COUNT_IMMUTABLE };
     let start_index_mutable: usize = const { T::COUNT_IMMUTABLE };
     let start_index_optional_immutable: usize = const { T::COUNT_IMMUTABLE + T::COUNT_MUTABLE };
@@ -427,7 +435,7 @@ fn __internal_do_read_write_locks<
 
             //if component_id is set, that means this term is a row term
             if ANY_SPARSE_TERMS && info.component_id != 0 {
-                let idr = sys::flecs_components_get(world.raw_world.as_ptr(), info.component_id);
+                let idr = sys::flecs_components_get(real_world, info.component_id);
                 lock_sparse::<INCREMENT, true, MULTITHREADED>(world, idr);
                 continue;
             }
@@ -442,7 +450,7 @@ fn __internal_do_read_write_locks<
 
             //if component_id is set, that means this term is a row term
             if ANY_SPARSE_TERMS && info.component_id != 0 {
-                let idr = sys::flecs_components_get(world.raw_world.as_ptr(), info.component_id);
+                let idr = sys::flecs_components_get(real_world, info.component_id);
                 lock_sparse::<INCREMENT, false, MULTITHREADED>(world, idr);
                 continue;
             }
@@ -460,7 +468,7 @@ fn __internal_do_read_write_locks<
             let info = table_records.get_unchecked(i);
 
             if ANY_SPARSE_TERMS && info.component_id != 0 {
-                let idr = sys::flecs_components_get(world.raw_world.as_ptr(), info.component_id);
+                let idr = sys::flecs_components_get(real_world, info.component_id);
                 lock_sparse::<INCREMENT, true, MULTITHREADED>(world, idr);
                 continue;
             }
@@ -478,7 +486,7 @@ fn __internal_do_read_write_locks<
             let info = table_records.get_unchecked(i);
 
             if ANY_SPARSE_TERMS && info.component_id != 0 {
-                let idr = sys::flecs_components_get(world.raw_world.as_ptr(), info.component_id);
+                let idr = sys::flecs_components_get(real_world, info.component_id);
                 lock_sparse::<INCREMENT, false, MULTITHREADED>(world, idr);
                 continue;
             }
